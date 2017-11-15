@@ -36,8 +36,6 @@ FLAGS = None
 def main(_):
   # Import data
   mnist = input_data.read_data_sets(FLAGS.data_dir, one_hot=True)
-#  print(type(mnist))
-#  print(len(mnist))
 
   # Create the model
   x = tf.placeholder(tf.float32, [None, 784])
@@ -64,8 +62,11 @@ def main(_):
   sess = tf.InteractiveSession()
   tf.global_variables_initializer().run()
   # Train
-  for _ in range(1000):
+  for i in range(1000):
     batch_xs, batch_ys = mnist.train.next_batch(100)
+    if i%1000==0:
+        print("x shape is: " + str(batch_xs.shape))
+        print("y shape is: " + str(batch_ys.shape))
     sess.run(train_step, feed_dict={x: batch_xs, y_: batch_ys})
 
   # Test trained model
@@ -80,4 +81,3 @@ if __name__ == '__main__':
                       help='Directory for storing input data')
   FLAGS, unparsed = parser.parse_known_args()
   tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
-#    tf.app.run(main=main)

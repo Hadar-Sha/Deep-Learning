@@ -81,6 +81,8 @@ def fill_feed_dict(data_set, images_pl, labels_pl):
       images_pl: images_feed,
       labels_pl: labels_feed,
   }
+  
+  print(labels_feed.shape)
 #  print(images_feed,labels_feed)
   return feed_dict
 

@@ -9,29 +9,49 @@ import numpy as np
 import tensorflow as tf
 import math
 
+from tensorflow.contrib.data import Dataset
+
+import argparse
+import os
+import sys
 import time
+import matplotlib.pyplot as plt
+
+FLAGS = None
 
 NUM_CLASSES = 10
 VECTORE_SIZE = 24
-DATA_SIZE= 1000
-TRAINING_DATA_SIZE= int(0.8*DATA_SIZE)
+
+#DATA_SIZE= 1000
+#TRAINING_DATA_SIZE= int(0.8*DATA_SIZE)
 
 # Data sets
 SCHI_TRAINING = './data/data-deep-train.csv'
 SCHI_TEST = './data/data-deep-test.csv'
 SCHI_VALIDATION = './data/data-deep-validation.csv'
 
-learning_rate= 0.01
+#SCHI_TRAINING = './data/data-deep-train.csv'
+#SCHI_TEST = './data/data-deep-test.csv'
+#SCHI_VALIDATION = './data/data-deep-validation.csv'
+
+learning_rate= 0.005
+#learning_rate= 0.01
 max_steps= 2000
-hidden1= 24
-hidden2= 12
-batch_size= 10
+hidden1= 120
+hidden2= 60
+#hidden1= 180
+#hidden2= 120
+batch_size= 100
 input_data_dir= SCHI_TRAINING
-log_dir= './log-Hadar'
+num_of_epoch= 200
+#log_dir= './log-Hadar'
+
+precision_list=[]
 
 # Load datasets.
 training_set = tf.contrib.learn.datasets.base.load_csv_without_header(filename=SCHI_TRAINING,target_dtype=np.int,features_dtype=np.int)
 test_set = tf.contrib.learn.datasets.base.load_csv_without_header(filename=SCHI_TEST,target_dtype=np.int,features_dtype=np.int)
+validation_set = tf.contrib.learn.datasets.base.load_csv_without_header(filename=SCHI_VALIDATION,target_dtype=np.int,features_dtype=np.int)
 
 def placeholder_inputs(batch_size):
   """Generate placeholder variables to represent the input tensors.
@@ -149,8 +169,21 @@ def evaluation(logits, labels):
   correct = tf.nn.in_top_k(logits, labels, 1)
   # Return the number of true entries.
   return tf.reduce_sum(tf.cast(correct, tf.int32))
+
+def my_next_batch(num, data, labels):
+    '''
+    Return a total of `num` random samples and labels. 
+    '''
+    idx = np.arange(0 , len(data))
+    np.random.shuffle(idx)
+    idx = idx[:num]
+    data_shuffle = [data[ i] for i in idx]
+    labels_shuffle = [labels[ i] for i in idx]
+
+    return np.asarray(data_shuffle), np.asarray(labels_shuffle)
+
   
-def fill_feed_dict(images_pl, labels_pl):
+def fill_feed_dict(data_set,images_pl, labels_pl):
   """Fills the feed_dict for training the given step.
 
   A feed_dict takes the form of:
@@ -170,7 +203,14 @@ def fill_feed_dict(images_pl, labels_pl):
   # Create the feed_dict for the placeholders filled with the next
   # `batch size` examples.
   
-  images_feed, labels_feed = training_set.next_batch(batch_size)
+#  print (data_set)
+  
+  images_input= data_set.data
+#  print(images_input)
+  labels_input= data_set.target
+#  print(labels_input)
+  images_feed, labels_feed = my_next_batch(batch_size,images_input,labels_input)
+#  images_feed, labels_feed = data_set.next_batch(batch_size)
   
   feed_dict = {
       images_pl: images_feed,
@@ -178,3 +218,197 @@ def fill_feed_dict(images_pl, labels_pl):
   }
   
   return feed_dict
+
+def do_eval(sess,eval_correct,images_placeholder,labels_placeholder,data_set):
+  """Runs one evaluation against the full epoch of data.
+
+  Args:
+    sess: The session in which the model has been trained.
+    eval_correct: The Tensor that returns the number of correct predictions.
+    images_placeholder: The images placeholder.
+    labels_placeholder: The labels placeholder.
+    data_set: The set of images and labels to evaluate, from
+      input_data.read_data_sets().
+  """
+#  print(data_set)
+  num_of_examples= data_set.target.shape[0]
+#  print(num_of_examples)
+  # And run one epoch of eval.
+  true_count = 0  # Counts the number of correct predictions.
+  steps_per_epoch = num_of_examples // batch_size
+  num_examples = steps_per_epoch * batch_size
+  for step in range(steps_per_epoch):
+    feed_dict = fill_feed_dict(data_set,images_placeholder,labels_placeholder)
+    true_count += sess.run(eval_correct, feed_dict=feed_dict)
+  precision = float(true_count) / num_examples
+  precision_list.append(precision)
+  print('  Num examples: %d  Num correct: %d  Precision @ 1: %0.04f' %
+        (num_examples, true_count, precision))
+
+  
+def run_training():
+  """Train SCHI digits for a number of steps."""
+  
+
+  # Tell TensorFlow that the model will be built into the default Graph.
+  with tf.Graph().as_default():
+      with tf.name_scope('input'):
+      # Input data, pin to CPU because rest of pipeline is CPU-only
+          with tf.device('/cpu:0'):
+              input_images = tf.constant(training_set[0])
+              input_labels = tf.constant(training_set[1])
+    
+          image, label = tf.train.slice_input_producer([input_images, input_labels], num_epochs=num_of_epoch)
+          label = tf.cast(label, tf.int32)
+          images, labels = tf.train.batch([image, label], batch_size=batch_size)
+          # Generate placeholders for the images and labels.
+      images_placeholder, labels_placeholder = placeholder_inputs(batch_size)
+
+        # Build a Graph that computes predictions from the inference model.
+      logits = inference(images_placeholder,hidden1,hidden2)
+
+    # Add to the Graph the Ops for loss calculation.
+      loss_res = loss(logits, labels_placeholder)
+
+    # Add to the Graph the Ops that calculate and apply gradients.
+      train_op = training(loss_res, learning_rate)
+
+    # Add the Op to compare the logits to the labels during evaluation.
+      eval_correct = evaluation(logits, labels_placeholder)
+
+    # Build the summary Tensor based on the TF collection of Summaries.
+      summary = tf.summary.merge_all()
+
+    # Add the variable initializer Op.
+      init = tf.global_variables_initializer()
+
+    # Create a saver for writing training checkpoints.
+      saver = tf.train.Saver()
+
+    # Create a session for running Ops on the Graph.
+      sess = tf.Session()
+
+    # Instantiate a SummaryWriter to output summaries and the Graph.
+      summary_writer = tf.summary.FileWriter(FLAGS.log_dir, sess.graph)
+
+    # And then after everything is built:
+
+    # Run the Op to initialize the variables.
+      sess.run(init)
+
+    # Start the training loop.
+      for step in range(max_steps):
+          start_time = time.time()
+
+      # Fill a feed dictionary with the actual set of images and labels
+      # for this particular training step.
+          feed_dict = fill_feed_dict(training_set,images_placeholder,labels_placeholder)
+#          print(feed_dict)
+
+      # Run one step of the model.  The return values are the activations
+      # from the `train_op` (which is discarded) and the `loss` Op.  To
+      # inspect the values of your Ops or variables, you may include them
+      # in the list passed to sess.run() and the value tensors will be
+      # returned in the tuple from the call.
+          _, loss_value = sess.run([train_op, loss_res],feed_dict=feed_dict)
+    
+          duration = time.time() - start_time
+    
+          # Write the summaries and print an overview fairly often.
+          if step % 100 == 0:
+            # Print status to stdout.
+            print('Step %d: loss = %.2f (%.3f sec)' % (step, loss_value, duration))
+            # Update the events file.
+            summary_str = sess.run(summary, feed_dict=feed_dict)
+            summary_writer.add_summary(summary_str, step)
+            summary_writer.flush()
+    
+          # Save a checkpoint and evaluate the model periodically.
+          if (step + 1) % 1000 == 0 or (step + 1) == max_steps:
+            checkpoint_file = os.path.join(FLAGS.log_dir, 'model.ckpt')
+            saver.save(sess, checkpoint_file, global_step=step)
+            # Evaluate against the training set.
+            print('Training Data Eval:')
+            do_eval(sess,eval_correct,images_placeholder,labels_placeholder,training_set)
+            # Evaluate against the validation set.
+            print('Validation Data Eval:')
+            do_eval(sess,eval_correct,images_placeholder,labels_placeholder,validation_set)
+            # Evaluate against the test set.
+            print('Test Data Eval:')
+            do_eval(sess,eval_correct,images_placeholder,labels_placeholder,test_set)
+
+      #plt.plot(precision_list)
+      #plt.show()
+        
+######## main #########
+#if not tf.gfile.Exists(log_dir):
+#    tf.gfile.MakeDirs(log_dir)
+##else:
+##    tf.gfile.DeleteRecursively(log_dir)
+#run_training()
+
+def main(_):
+  if tf.gfile.Exists(FLAGS.log_dir):
+      #a=1
+    tf.gfile.DeleteRecursively(FLAGS.log_dir)
+  tf.gfile.MakeDirs(FLAGS.log_dir)
+  run_training()
+
+if __name__ == '__main__':
+  parser = argparse.ArgumentParser()
+  parser.add_argument(
+      '--learning_rate',
+      type=float,
+      default=0.01,
+      help='Initial learning rate.'
+  )
+  parser.add_argument(
+      '--max_steps',
+      type=int,
+      default=2000,
+      help='Number of steps to run trainer.'
+  )
+  parser.add_argument(
+      '--hidden1',
+      type=int,
+      default=18,
+#      default=128,
+      help='Number of units in hidden layer 1.'
+  )
+  parser.add_argument(
+      '--hidden2',
+      type=int,
+      default=12,
+#      default=32,
+      help='Number of units in hidden layer 2.'
+  )
+  parser.add_argument(
+      '--batch_size',
+      type=int,
+      default=100,
+      help='Batch size.  Must divide evenly into the dataset sizes.'
+  )
+  parser.add_argument(
+      '--input_data_dir',
+      type=str,
+#      default=os.path.join(os.getenv('TEST_TMPDIR', '/tmp'),'tensorflow/mnist/input_data'),
+      default= SCHI_TRAINING,
+      help='Directory to put the input data.'
+  )
+  parser.add_argument(
+      '--log_dir',
+      type=str,
+#      default=os.path.join(os.getenv('TEST_TMPDIR', '/tmp'),'tensorflow/mnist/logs/fully_connected_feed'),
+      default= os.path.expanduser(os.getenv('USERPROFILE'))+'/Documents/Haifa Univ/Thesis/deep-learning/log-folder',
+#      default= os.path.expanduser(os.getenv('USERPROFILE'))+'/Documents/Haifa Univ/Thesis/deep learning/log-folder',
+      help='Directory to put the log data.'
+  )
+  parser.add_argument(
+      '--fake_data',
+      default=False,
+      help='If true, uses fake data for unit testing.',
+      action='store_true'
+  )
+
+  FLAGS, unparsed = parser.parse_known_args()
+  tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
