@@ -45,6 +45,8 @@ batch_size= 100
 input_data_dir= SCHI_TRAINING
 num_of_epoch= 200
 #log_dir= './log-Hadar'
+my_keep_prob = 0.75
+test_keep_prob= 1
 
 precision_list=[]
 
@@ -71,9 +73,10 @@ def placeholder_inputs(batch_size):
   # rather than the full size of the train or test data sets.
   images_placeholder = tf.placeholder(tf.float32, shape=(batch_size,VECTORE_SIZE))
   labels_placeholder = tf.placeholder(tf.int32, shape=(batch_size))
-  return images_placeholder, labels_placeholder
+  keep_prob = tf.placeholder(tf.float32)
+  return images_placeholder, labels_placeholder, keep_prob
   
-def inference(images, hidden1_units, hidden2_units):
+def inference(images, hidden1_units, hidden2_units,keep_prob):
   """Build the SCHI model up to where it may be used for inference.
 
   Args:
@@ -84,25 +87,31 @@ def inference(images, hidden1_units, hidden2_units):
   Returns:
     softmax_linear: Output tensor with the computed logits.
   """ 
-  # Hidden 1
+  # Hidden 1 - with dropout
   with tf.name_scope('hidden1'):
     weights = tf.Variable(tf.truncated_normal([VECTORE_SIZE, hidden1_units],
                             stddev=1.0 / math.sqrt(float(VECTORE_SIZE))), name='weights')
     biases = tf.Variable(tf.zeros([hidden1_units]), name='biases')
     hidden1 = tf.nn.relu(tf.matmul(images, weights) + biases)
 #    hidden1 = tf.nn.relu(tf.matmul(images_sh, weights) + biases)
+
+    # keep_prob = tf.placeholder(tf.float32)
+    hidden1_drop= tf.nn.dropout(hidden1, keep_prob)
   # Hidden 2
   with tf.name_scope('hidden2'):
     weights = tf.Variable(tf.truncated_normal([hidden1_units, hidden2_units],
                             stddev=1.0 / math.sqrt(float(hidden1_units))),name='weights')
     biases = tf.Variable(tf.zeros([hidden2_units]),name='biases')
-    hidden2 = tf.nn.relu(tf.matmul(hidden1, weights) + biases)
+    hidden2 = tf.nn.relu(tf.matmul(hidden1_drop , weights) + biases)
+    hidden2_drop = tf.nn.dropout(hidden2, keep_prob)
+    # hidden2 = tf.nn.relu(tf.matmul(hidden1, weights) + biases)
   # Linear
   with tf.name_scope('softmax_linear'):
     weights = tf.Variable(tf.truncated_normal([hidden2_units, NUM_CLASSES],
                             stddev=1.0 / math.sqrt(float(hidden2_units))),name='weights')
     biases = tf.Variable(tf.zeros([NUM_CLASSES]),name='biases')
-    logits = tf.matmul(hidden2, weights) + biases
+    logits = tf.matmul(hidden2_drop, weights) + biases
+    # logits = tf.matmul(hidden2, weights) + biases
   
   return logits
     
@@ -183,7 +192,7 @@ def my_next_batch(num, data, labels):
     return np.asarray(data_shuffle), np.asarray(labels_shuffle)
 
   
-def fill_feed_dict(data_set,images_pl, labels_pl):
+def fill_feed_dict(data_set,images_pl, labels_pl, keep_prob, isTest):
   """Fills the feed_dict for training the given step.
 
   A feed_dict takes the form of:
@@ -204,22 +213,29 @@ def fill_feed_dict(data_set,images_pl, labels_pl):
   # `batch size` examples.
   
 #  print (data_set)
+#   keep_prob = my_keep_prob
   
   images_input= data_set.data
 #  print(images_input)
   labels_input= data_set.target
 #  print(labels_input)
   images_feed, labels_feed = my_next_batch(batch_size,images_input,labels_input)
+
+  prob_val= my_keep_prob
+  if isTest:
+      prob_val= test_keep_prob
+
 #  images_feed, labels_feed = data_set.next_batch(batch_size)
   
   feed_dict = {
       images_pl: images_feed,
       labels_pl: labels_feed,
+      keep_prob: prob_val
   }
   
   return feed_dict
 
-def do_eval(sess,eval_correct,images_placeholder,labels_placeholder,data_set):
+def do_eval(sess,eval_correct,images_placeholder,labels_placeholder,data_set, keep_prob, isTest):
   """Runs one evaluation against the full epoch of data.
 
   Args:
@@ -238,7 +254,7 @@ def do_eval(sess,eval_correct,images_placeholder,labels_placeholder,data_set):
   steps_per_epoch = num_of_examples // batch_size
   num_examples = steps_per_epoch * batch_size
   for step in range(steps_per_epoch):
-    feed_dict = fill_feed_dict(data_set,images_placeholder,labels_placeholder)
+    feed_dict = fill_feed_dict(data_set,images_placeholder,labels_placeholder,keep_prob, isTest)
     true_count += sess.run(eval_correct, feed_dict=feed_dict)
   precision = float(true_count) / num_examples
   precision_list.append(precision)
@@ -252,6 +268,8 @@ def run_training():
 
   # Tell TensorFlow that the model will be built into the default Graph.
   with tf.Graph().as_default():
+      # keep_prob = tf.placeholder(tf.float32)
+      # keep_prob = 0.75
       with tf.name_scope('input'):
       # Input data, pin to CPU because rest of pipeline is CPU-only
           with tf.device('/cpu:0'):
@@ -262,10 +280,10 @@ def run_training():
           label = tf.cast(label, tf.int32)
           images, labels = tf.train.batch([image, label], batch_size=batch_size)
           # Generate placeholders for the images and labels.
-      images_placeholder, labels_placeholder = placeholder_inputs(batch_size)
+      images_placeholder, labels_placeholder, keep_prob = placeholder_inputs(batch_size)
 
         # Build a Graph that computes predictions from the inference model.
-      logits = inference(images_placeholder,hidden1,hidden2)
+      logits = inference(images_placeholder,hidden1,hidden2,keep_prob)
 
     # Add to the Graph the Ops for loss calculation.
       loss_res = loss(logits, labels_placeholder)
@@ -302,7 +320,7 @@ def run_training():
 
       # Fill a feed dictionary with the actual set of images and labels
       # for this particular training step.
-          feed_dict = fill_feed_dict(training_set,images_placeholder,labels_placeholder)
+          feed_dict = fill_feed_dict(training_set,images_placeholder,labels_placeholder, keep_prob, False)
 #          print(feed_dict)
 
       # Run one step of the model.  The return values are the activations
@@ -329,13 +347,13 @@ def run_training():
             saver.save(sess, checkpoint_file, global_step=step)
             # Evaluate against the training set.
             print('Training Data Eval:')
-            do_eval(sess,eval_correct,images_placeholder,labels_placeholder,training_set)
+            do_eval(sess,eval_correct,images_placeholder,labels_placeholder,training_set, keep_prob, False)
             # Evaluate against the validation set.
             print('Validation Data Eval:')
-            do_eval(sess,eval_correct,images_placeholder,labels_placeholder,validation_set)
+            do_eval(sess,eval_correct,images_placeholder,labels_placeholder,validation_set, keep_prob, True)
             # Evaluate against the test set.
             print('Test Data Eval:')
-            do_eval(sess,eval_correct,images_placeholder,labels_placeholder,test_set)
+            do_eval(sess,eval_correct,images_placeholder,labels_placeholder,test_set, keep_prob, True)
 
       #plt.plot(precision_list)
       #plt.show()
@@ -409,6 +427,12 @@ if __name__ == '__main__':
       help='If true, uses fake data for unit testing.',
       action='store_true'
   )
+
+  # parser.add_argument(
+  #     '--h_keep_prob',
+  #     default=0.5,
+  #     help='keep probability of each neuron'
+  # )
 
   FLAGS, unparsed = parser.parse_known_args()
   tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
