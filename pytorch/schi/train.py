@@ -13,21 +13,10 @@ from torch.autograd import Variable
 import torch.nn as nn
 # from tqdm import tqdm
 
-# print (sys.path)
-# import model
 import utils
 import model.net as net
-import model.data_loader as data_loader
+import model.one_label_data_loader as data_loader
 from evaluate import evaluate
-
-# from . import utils
-# from .model import data_loader
-# from .model import net
-# from .evaluate import evaluate
-# import model.net as net
-# import model.data_loader as data_loader
-# from evaluate import evaluate
-
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_dir', default='data', help="Directory containing the dataset")
@@ -37,7 +26,7 @@ parser.add_argument('--restore_file', default=None,
                     training")  # 'best' or 'train'
 
 
-def train(model, optimizer, loss_fn, dataloader, metrics, params):
+def train(model, optimizer, loss_fn, dataloader, metrics, params, epoch):
     """Train the model on `num_steps` batches
 
     Args:
@@ -47,7 +36,7 @@ def train(model, optimizer, loss_fn, dataloader, metrics, params):
         dataloader: (DataLoader) a torch.utils.data.DataLoader object that fetches training data
         metrics: (dict) a dictionary of functions that compute a metric using the output and labels of each batch
         params: (Params) hyperparameters
-        num_steps: (int) number of batches to train on, each of size params.batch_size
+        epoch:
     """
 
     # set model to training mode
@@ -55,8 +44,10 @@ def train(model, optimizer, loss_fn, dataloader, metrics, params):
 
     # summary for current training loop and a running average object for loss
     summ = []
-    loss_avg = utils.RunningAverage()
-    # crit = nn.CrossEntropyLoss(size_average=True, reduce=True)
+    prop = []
+
+    loss_avg = utils.WeightedAverage()
+    # loss_avg = utils.RunningAverage()
 
     # Use tqdm for progress bar
     # with tqdm(total=len(dataloader)) as t:
@@ -67,7 +58,9 @@ def train(model, optimizer, loss_fn, dataloader, metrics, params):
             train_batch, labels_batch = train_batch.cuda(async=True), labels_batch.cuda(async=True)
         # convert to torch Variables
         train_batch, labels_batch = Variable(train_batch), Variable(labels_batch)
-        labels_batch = labels_batch.view(labels_batch.size(0))
+
+        if labels_batch.size(1) == 1:
+            labels_batch = labels_batch.view(labels_batch.size(0))
 
         # compute model output and loss
         output_batch = model(train_batch)
@@ -86,51 +79,31 @@ def train(model, optimizer, loss_fn, dataloader, metrics, params):
             output_batch = output_batch.data.cpu().numpy()
             labels_batch = labels_batch.data.cpu().numpy()
 
+            proportions_batch = labels_batch.shape[0] / params.batch_size
+            prop.append(proportions_batch)
+
             # compute all metrics on this batch
-            summary_batch = {metric:metrics[metric](output_batch, labels_batch)
+            summary_batch = {metric: metrics[metric](output_batch, labels_batch)
                              for metric in metrics}
             summary_batch['loss'] = loss.item()
             summ.append(summary_batch)
 
-        # if i % 100 == 0:
-        # print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-        #     i, i*len(labels_batch), len(dataloader.dataset),
-        #     # i, i * len(labels_batch)), len(data_loader.dataset),
-        #     100. * i / len(dataloader), loss.item()))
-
-            # print('loss={:05.3f}' ''.format(loss_avg()))
-
+        prop = train_batch.shape[0]/params.batch_size
+        # print(prop)
         # update the average loss
-        loss_avg.update(loss.item())
-
-        # print('loss={:05.3f}'
-        #       ''.format(loss_avg()))
-        # t.set_postfix(loss='{:05.3f}'.format(loss_avg()))
-        # t.update()
+        loss_avg.update(loss.item(), prop)
+        # loss_avg.update(loss.item())
 
     # compute mean of all metrics in summary
-    metrics_mean = {metric:np.mean([x[metric] for x in summ]) for metric in summ[0]}
+    metrics_mean = {metric: np.sum([x[metric] for x in summ] / np.sum(prop)) for metric in summ[0]}
+    # metrics_mean = {metric: np.mean([x[metric] for x in summ]) for metric in summ[0]}
     metrics_string = " ; ".join("{}: {:05.3f}".format(k, v) for k, v in metrics_mean.items())
     logging.info("- Train metrics: " + metrics_string)
 
-
-# def train(ep):
-#     net.train()      # set model in training mode (need this because of dropout)
-#     for batch_idx, sample_batched in enumerate(train_loader):
-#         images = Variable(sample_batched['image'])
-#         labels = Variable(sample_batched['label'])
-#         labels = labels.view(labels.size(0))
-#         # Forward + Backward + Optimize
-#         optimizer.zero_grad()
-#         outputs = net(images)
-#         loss = criterion(outputs, labels)
-#         loss.backward()
-#         optimizer.step()
-#
-#         if ep % 100 == 0 or ep == num_epochs - 1:
-#             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-#                 ep, batch_idx * len(images), len(train_loader.dataset),
-#                        100. * batch_idx / len(train_loader), loss.item()))
+    # print to screen every 1% of iterations
+    if (epoch+1) % (0.01*params.num_epochs) == 0:
+        print("train Epoch {}/{}".format(epoch + 1, params.num_epochs))
+        print(metrics_string)
 
 
 def train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_fn, metrics, incorrect, params, model_dir,
@@ -140,7 +113,7 @@ def train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_
     Args:
         model: (torch.nn.Module) the neural network
         train_dataloader: (DataLoader) a torch.utils.data.DataLoader object that fetches training data
-        val_dataloader: (DataLoader) a torch.utils.data.DataLoader object that fetches validation data
+        dev_dataloader: (DataLoader) a torch.utils.data.DataLoader object that fetches validation data
         optimizer: (torch.optim) optimizer for parameters of model
         loss_fn: a function that takes batch_output and batch_labels and computes the loss for the batch
         metrics: (dict) a dictionary of functions that compute a metric using the output and labels of each batch
@@ -159,14 +132,13 @@ def train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_
 
     for epoch in range(params.num_epochs):
         # Run one epoch
-        # if (epoch) % params.save_summary_steps == 0:
         logging.info("Epoch {}/{}".format(epoch + 1, params.num_epochs))
 
         # compute number of batches in one epoch (one full pass over the training set)
-        train(model, optimizer, loss_fn, train_dataloader, metrics, params)
+        train(model, optimizer, loss_fn, train_dataloader, metrics, params, epoch)
 
         # Evaluate for one epoch on validation set
-        dev_metrics, incorrect_samples = evaluate(model, loss_fn, dev_dataloader, metrics, incorrect, params)
+        dev_metrics, incorrect_samples = evaluate(model, loss_fn, dev_dataloader, metrics, incorrect, params, epoch)
 
         dev_acc = dev_metrics['accuracy']
         is_best = dev_acc >= best_dev_acc
@@ -174,14 +146,15 @@ def train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_
         # Save weights
         utils.save_checkpoint({'epoch': epoch + 1,
                                'state_dict': model.state_dict(),
-                               'optim_dict': optimizer.state_dict()},
-                               is_best=is_best,
-                               checkpoint=model_dir)
+                               'optim_dict': optimizer.state_dict()}, is_best=is_best, checkpoint=model_dir)
 
         # If best_eval, best_save_path
         if is_best:
             logging.info("- Found new best accuracy")
+            print("Epoch {}/{}".format(epoch + 1, params.num_epochs))
+            print("- Found new best accuracy")
             best_dev_acc = dev_acc
+            print("accuracy is {:05.3f}".format(best_dev_acc))
 
             # Save best val metrics in a json file in the model directory
             best_json_path = os.path.join(model_dir, "metrics_dev_best_weights.json")
@@ -199,8 +172,6 @@ def train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_
 
 
 if __name__ == '__main__':
-
-    # print('in main')
 
     # Load the parameters from json file
     args = parser.parse_args()
@@ -227,6 +198,7 @@ if __name__ == '__main__':
     train_dl = dataloaders['train']
     dev_dl = dataloaders['dev']
 
+    logging.info("data was loaded from {}".format(args.data_dir))
     logging.info("- done.")
 
     # Define the model and optimizer
@@ -238,7 +210,6 @@ if __name__ == '__main__':
     optimizer = torch.optim.SGD(model.parameters(), lr=params.learning_rate)
 
     # fetch loss function and metrics
-    # loss_fn = nn.CrossEntropyLoss(size_average=True, reduce=True)
     loss_fn = net.loss_fn
 
     metrics = net.metrics

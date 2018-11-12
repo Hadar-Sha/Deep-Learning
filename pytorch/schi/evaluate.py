@@ -9,7 +9,7 @@ import torch
 from torch.autograd import Variable
 import utils
 import model.net as net
-import model.data_loader as data_loader
+import model.one_label_data_loader as data_loader
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_dir', default='data', help="Directory containing the dataset")
@@ -18,7 +18,7 @@ parser.add_argument('--restore_file', default='best', help="name of the file in 
                      containing weights to load")
 
 
-def evaluate(model, loss_fn, dataloader, metrics, incorrect, params):
+def evaluate(model, loss_fn, dataloader, metrics, incorrect, params, epoch):
     """Evaluate the model on `num_steps` batches.
 
     Args:
@@ -29,6 +29,7 @@ def evaluate(model, loss_fn, dataloader, metrics, incorrect, params):
         incorrect: a function that save all samples with incorrect classification
         params: (Params) hyperparameters
         num_steps: (int) number of batches to train on, each of size params.batch_size
+        epoch:
     """
 
     # set model to evaluation mode
@@ -36,6 +37,7 @@ def evaluate(model, loss_fn, dataloader, metrics, incorrect, params):
 
     # summary for current eval loop
     summ = []
+    prop = []
 
     # incorrect samples of current loop
     incorrect_samples = []
@@ -48,7 +50,8 @@ def evaluate(model, loss_fn, dataloader, metrics, incorrect, params):
             data_batch, labels_batch = data_batch.cuda(async=True), labels_batch.cuda(async=True)
         # fetch the next evaluation batch
         data_batch, labels_batch = Variable(data_batch), Variable(labels_batch)
-        labels_batch = labels_batch.view(labels_batch.size(0))
+        if labels_batch.size(1) == 1:
+            labels_batch = labels_batch.view(labels_batch.size(0))
         
         # compute model output
         output_batch = model(data_batch)
@@ -58,20 +61,33 @@ def evaluate(model, loss_fn, dataloader, metrics, incorrect, params):
         output_batch = output_batch.data.cpu().numpy()
         labels_batch = labels_batch.data.cpu().numpy()
 
+        proportions_batch = labels_batch.shape[0] / params.batch_size
+        prop.append(proportions_batch)
+
         # compute all metrics on this batch
-        summary_batch = {metric: metrics[metric](output_batch, labels_batch)
+        summary_batch = {metric: metrics[metric](output_batch, labels_batch)*proportions_batch
                          for metric in metrics}
         summary_batch['loss'] = loss.item()
         summ.append(summary_batch)
 
-        # Save incorrect samples to CSV file
+        # find incorrect samples
         incorrect_batch = incorrect(data_batch, output_batch, labels_batch)
         incorrect_samples.extend(incorrect_batch)
 
     # compute mean of all metrics in summary
-    metrics_mean = {metric:np.mean([x[metric] for x in summ]) for metric in summ[0]} 
+    prop_sum = np.sum(prop)
+    metrics_mean = {metric: np.sum([x[metric] for x in summ]/prop_sum) for metric in summ[0]}
+
+    # fix here !!! not a mean, weights needed
+    # metrics_mean = {metric:np.mean([x[metric] for x in summ]) for metric in summ[0]}
     metrics_string = " ; ".join("{}: {:05.3f}".format(k, v) for k, v in metrics_mean.items())
     logging.info("- Eval metrics : " + metrics_string)
+
+    # print to screen every 1% of iterations
+    if (epoch+1) % (0.01*params.num_epochs) == 0:
+        print("eval Epoch {}/{}".format(epoch + 1, params.num_epochs))
+        print(metrics_string)
+
     return metrics_mean, incorrect_samples
 
 
@@ -121,5 +137,3 @@ if __name__ == '__main__':
     save_path = os.path.join(args.model_dir, "metrics_test_{}.json".format(args.restore_file))
     utils.save_dict_to_json(test_metrics, save_path)
 
-    # Save incorrect samples to CSV file
-    # incorrect_samples = net.incorect()

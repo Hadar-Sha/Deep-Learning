@@ -63,6 +63,26 @@ class RunningAverage():
         return self.total / float(self.steps)
 
 
+class WeightedAverage():
+    """A simple class that maintains the weighted running average of a quantity
+
+
+    """
+
+    def __init__(self):
+        # self.steps = 0
+        self.total = 0
+        self.prop = 0
+
+    def update(self, val, prop):
+        self.total += val*prop
+        self.prop += prop
+        # self.steps += 1
+
+    def __call__(self):
+        return self.total / float(self.prop)
+
+
 def set_logger(log_path):
     """Set the logger to log info in terminal and file `log_path`.
 
@@ -86,10 +106,10 @@ def set_logger(log_path):
         file_handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s: %(message)s'))
         logger.addHandler(file_handler)
 
-        # Logging to console
-        stream_handler = logging.StreamHandler()
-        stream_handler.setFormatter(logging.Formatter('%(message)s'))
-        logger.addHandler(stream_handler)
+        # # Logging to console
+        # stream_handler = logging.StreamHandler()
+        # stream_handler.setFormatter(logging.Formatter('%(message)s'))
+        # logger.addHandler(stream_handler)
 
 
 def save_dict_to_json(d, json_path):
