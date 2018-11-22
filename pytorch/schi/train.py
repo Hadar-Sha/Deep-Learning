@@ -19,7 +19,7 @@ import model.one_label_data_loader as data_loader
 from evaluate import evaluate
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--data_dir', default='data', help="Directory containing the dataset")
+parser.add_argument('--data_dir', default='data/data', help="Directory containing the dataset")
 parser.add_argument('--model_dir', default='experiments/base_model', help="Directory containing params.json")
 parser.add_argument('--restore_file', default=None,
                     help="Optional, name of the file in --model_dir containing weights to reload before \
@@ -45,6 +45,7 @@ def train(model, optimizer, loss_fn, dataloader, metrics, params, epoch):
     # summary for current training loop and a running average object for loss
     summ = []
     prop = []
+    weights_and_biases = {}
 
     loss_avg = utils.WeightedAverage()
     # loss_avg = utils.RunningAverage()
@@ -52,6 +53,8 @@ def train(model, optimizer, loss_fn, dataloader, metrics, params, epoch):
     # Use tqdm for progress bar
     # with tqdm(total=len(dataloader)) as t:
     for i, (train_batch, labels_batch) in enumerate(dataloader):
+
+        layer_data =[]
 
         # move to GPU if available
         if params.cuda:
@@ -65,6 +68,30 @@ def train(model, optimizer, loss_fn, dataloader, metrics, params, epoch):
         # compute model output and loss
         output_batch = model(train_batch)
         loss = loss_fn(output_batch, labels_batch, params.num_classes)
+
+        # # layer_data.append(model.fc1.weight.data.numpy())
+        # # # print(layer_data)
+        # # layer_data.append(model.fc1.bias.data.numpy())
+        # # # print(layer_data)
+        # # weights_and_biases[str(i)] = layer_data
+        # #
+        # a = list(model.fc1.parameters())
+        # # if a[0].numpy() == layer_data[0]:
+        # #     print('Y')
+        # print("Model's state_dict:")
+        # for param_tensor in model.state_dict():
+        #     b = (model.state_dict()[param_tensor]).numpy()
+        #     print(param_tensor, "\t", model.state_dict()[param_tensor].size())
+
+        # print(model)
+        # print(model.fc1)
+        # print(model.fc1.weight.data)
+        # print(model.fc1.weight.data.norm())
+        # print(model.fc1.weight.data.size())
+        # print(model.fc1.bias.data)
+        # print(model.fc1.bias.data.size())
+
+        # print(model.fc1.weight.grad.data.norm())
 
         # clear previous gradients, compute gradients of all variables wrt loss
         optimizer.zero_grad()
@@ -89,7 +116,6 @@ def train(model, optimizer, loss_fn, dataloader, metrics, params, epoch):
             summ.append(summary_batch)
 
         prop = train_batch.shape[0]/params.batch_size
-        # print(prop)
         # update the average loss
         loss_avg.update(loss.item(), prop)
         # loss_avg.update(loss.item())
@@ -104,6 +130,8 @@ def train(model, optimizer, loss_fn, dataloader, metrics, params, epoch):
     if (epoch+1) % (0.01*params.num_epochs) == 0:
         print("train Epoch {}/{}".format(epoch + 1, params.num_epochs))
         print(metrics_string)
+
+    # return weights_and_biases
 
 
 def train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_fn, metrics, incorrect, params, model_dir,
@@ -128,6 +156,7 @@ def train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_
         logging.info("Restoring parameters from {}".format(restore_path))
         utils.load_checkpoint(restore_path, model, optimizer)
 
+    # weights_and_biases = {}
     best_dev_acc = 0.0
 
     for epoch in range(params.num_epochs):
@@ -147,6 +176,11 @@ def train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_
         utils.save_checkpoint({'epoch': epoch + 1,
                                'state_dict': model.state_dict(),
                                'optim_dict': optimizer.state_dict()}, is_best=is_best, checkpoint=model_dir)
+
+        # # save weights and biases to csv
+        # for param_name in model.state_dict():
+        #     current_param = (model.state_dict()[param_name]).numpy()
+        #     utils.save_weights_biases(param_name, current_param, checkpoint=model_dir)
 
         # If best_eval, best_save_path
         if is_best:

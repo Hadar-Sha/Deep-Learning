@@ -3,6 +3,8 @@ import logging
 import os
 import shutil
 import csv
+import types
+import numpy as np
 
 import torch
 
@@ -143,6 +145,35 @@ def save_checkpoint(state, is_best, checkpoint):
     torch.save(state, filepath)
     if is_best:
         shutil.copyfile(filepath, os.path.join(checkpoint, 'best.pth.tar'))
+
+
+def save_weights_biases(dataname, data, checkpoint):
+    filepath = os.path.join(checkpoint, 'wb.csv')
+    if not os.path.exists(checkpoint):
+        print("Checkpoint Directory does not exist! Making directory {}".format(checkpoint))
+        os.mkdir(checkpoint)
+
+    with open(filepath, "a", newline='') as myfile:
+        myfile.write(dataname)
+        myfile.write('\n')
+        csvwr = csv.writer(myfile)
+        # csvwr.writerow(dataname)
+        # np.savetxt(myfile, dataname, newline='\n')
+        # cast to string
+        # str_data = np.array2string(data, precision=5, separator=',', suppress_small=True)
+        list_data = data.tolist()
+
+        row = list_data[0]
+        if isinstance(row, list):
+            str_data = [["{:05.5f}".format(row[i]) for i in range(len(row))] for row in list_data]
+            for row in str_data:
+                csvwr.writerow(row)
+        else:
+            csvwr.writerow(list_data)
+
+        # np.savetxt(myfile, str_data, delimiter=",")
+
+    return
 
 
 def load_checkpoint(checkpoint, model, optimizer=None):

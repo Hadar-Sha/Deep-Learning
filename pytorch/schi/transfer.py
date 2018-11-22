@@ -8,6 +8,7 @@ import torch
 import torch.optim as optim
 from torch.autograd import Variable
 import torch.nn as nn
+import csv
 
 import utils
 import model.net as net
@@ -28,10 +29,10 @@ parser.add_argument('--model_out_dir', default='experiments/transfer_training_mo
                     help="Directory containing params.json")
 
 
-def load_source_model(restore_file):
+def load_model(model_dir, restore_file):
     # reload weights from restore_file if specified
-    if restore_file is not None:
-        restore_path = os.path.join(args.model_dir, args.restore_file + '.pth.tar')
+    if restore_file is not None and model_dir is not None:
+        restore_path = os.path.join(model_dir, restore_file + '.pth.tar')
         logging.info("Restoring parameters from {}".format(restore_path))
         utils.load_checkpoint(restore_path, model, None)  # optimizer)
     return
@@ -127,8 +128,14 @@ if __name__ == '__main__':
     model = net.NeuralNet(params).cuda() if params.cuda else net.NeuralNet(params)
 
     # print(model)
+    load_model(args.model_dir, args.restore_file)
 
-    load_source_model(args.restore_file)
+    status_before_transfer = []
+    for param_tensor in model.state_dict():
+        # print(param_tensor, "\t", model.state_dict()[param_tensor].norm(),
+        # "\t", model.state_dict()[param_tensor].size())
+        status_before_transfer.append([param_tensor,
+                   (model.state_dict()[param_tensor].norm()).item(), list(model.state_dict()[param_tensor].size())])
 
     # changing last fully connected layer
     num_ftrs = model.fc4.in_features
@@ -154,3 +161,21 @@ if __name__ == '__main__':
     after_transfer_train_and_evaluate(model, train_dl, dev_dl, optimizer, loss_fn, metrics, incorrect, params,
                                       args.model_dir, args.model_out_dir, args.restore_file)
 
+    load_model(args.model_out_dir, args.restore_file)
+
+    status_after_transfer = []
+    for param_tensor in model.state_dict():
+        # print(param_tensor, "\t", model.state_dict()[param_tensor].norm(), "\t",
+        #       model.state_dict()[param_tensor].size())
+        status_after_transfer.append([param_tensor,
+             (model.state_dict()[param_tensor].norm()).item(), list(model.state_dict()[param_tensor].size())])
+
+    # print(status_before_transfer)
+    # print(status_after_transfer)
+    filepath = os.path.join(args.model_out_dir, 'wb.csv')
+    with open(filepath, "a", newline='') as myfile:
+        csvwr = csv.writer(myfile)
+        for row in status_before_transfer:
+            csvwr.writerow(row)
+        for row_a in status_after_transfer:
+            csvwr.writerow(row_a)

@@ -135,7 +135,7 @@ def loss_fn_two_labels(outputs, labels, num_of_classes):
 
     alpha = 0.5
 
-    one_hot_vector_before_filter = convert_int_to_one_hot_vector(label_before_filter, num_of_classes)
+    one_hot_vector_before_filter = convert_int_to_one_hot_vector(label_before_filter, num_of_classes)  # unneeded
     one_hot_vector_after_filter = convert_int_to_one_hot_vector(label_after_filter, num_of_classes)
 
     out_before_filter = torch.index_select(outputs, 1, torch.tensor(list(range(10))))
@@ -147,9 +147,20 @@ def loss_fn_two_labels(outputs, labels, num_of_classes):
     # temp_kl_1 = kl_criterion(out_after_filter, one_hot_vector_after_filter)
     # temp_kl_2 = kl_criterion(out_before_filter, one_hot_vector_before_filter)
 
+    # print(labels.shape[0])
+
+    completing_after_filter = (torch.ones(labels.shape[0], num_of_classes) - one_hot_vector_after_filter)\
+                              /(num_of_classes-1)
+    # print(one_hot_vector_after_filter)
+    # print(completing_after_filter)
+
     func = kl_criterion(out_after_filter, one_hot_vector_after_filter) + \
-           kl_criterion(out_before_filter, one_hot_vector_before_filter) + \
-           min_entropy_criterion(out_after_filter)
+           kl_criterion(out_before_filter, completing_after_filter) + \
+           min_entropy_criterion(out_before_filter)
+
+    # func = kl_criterion(out_after_filter, one_hot_vector_after_filter) + \
+    #        kl_criterion(out_before_filter, one_hot_vector_before_filter) + \
+    #        min_entropy_criterion(out_after_filter)
 
     # torch.mean(entropy(out_after_filter))
 
@@ -202,6 +213,10 @@ def accuracy_two_labels(outputs, labels):
 
     Returns: (float) accuracy in [0,1]
     """
+    # print(list(labels.shape))
+    if len(list(labels.shape)) == 1:
+        return 0.0
+
     label_before_filter = labels[:, 0]  # unneeded
     label_after_filter = labels[:, 1]
 

@@ -13,7 +13,7 @@ parser.add_argument('--parFolder', default='C:/Users/H/Documents/Haifa Univ/Thes
 parser.add_argument('--subfolder', default='data/', help="Directory containing input files")
 parser.add_argument('--outFolder', default='data-divided-by-100', help="Directory containing output files")
 parser.add_argument('--dataSize', default=2429, type=int, help="")
-parser.add_argument('--isDevidedByHundred', default=False, help="")
+parser.add_argument('--isDevidedByHundred', default=False, type=bool, help="")
 
 
 def read_and_divide_input_to_classes(file_path, label_index):
@@ -99,9 +99,28 @@ def write_splitted_to_files(splited_data, output_folder_parent_path, output_path
 
     :return:
     """
+    os.chdir(currdir)
+
+    if not os.path.isdir(output_folder_parent_path):
+        os.chdir(os.path.dirname(output_folder_parent_path))
+        os.mkdir(os.path.basename(output_folder_parent_path))
+    else:
+        os.chdir(output_folder_parent_path)
+
     for ind in range(NUM_OF_OUTPUT_FILES):  # iterate over train/ dev/ test
         os.chdir(currdir)
-        output_file_path = output_folder_parent_path + str(output_paths[ind])
+        os.chdir(output_folder_parent_path)
+        output_file_path = os.path.basename(str(output_paths[ind]))
+        dirname_to_check = os.path.dirname(str(output_paths[ind]))
+
+        if not os.path.isdir(dirname_to_check):
+            os.mkdir(dirname_to_check)
+            os.chdir(dirname_to_check)
+
+        else:
+            os.chdir(dirname_to_check)
+        # os.chdir(currdir)
+        # output_file_path = output_folder_parent_path + str(output_paths[ind])
 
         # write collected data to output file
         with open(output_file_path, 'a+', newline='') as csv_file:
@@ -170,7 +189,7 @@ def complete_to_mult(all_vals):
 
 if __name__ == '__main__':
 
-    trainDevTestSizes = [2 / 3, 1 / 6, 1 / 6]  # [0.7, 0.15, 0.15]  # [0.6, 0.2, 0.2]  #
+    trainDevTestSizes = [0.7, 0.15, 0.15]  # [2 / 3, 1 / 6, 1 / 6]  # [0.7, 0.15, 0.15]  # [0.6, 0.2, 0.2]  #
     totalVals = [0] * 3
     lens = [0] * 3
     neededVals = [0] * 3
@@ -181,7 +200,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     folder = args.parFolder + args.subfolder
-    # outFolder = 'data-divided-by-100'  # 'data-hidden-gray'#'data-with-grayscale/' #'./data'
     outfileLists = [[] for _ in range(NUM_OF_OUTPUT_FILES)]
     syntheticFile = folder + 'synthetic.csv'
 
@@ -192,7 +210,7 @@ if __name__ == '__main__':
     series = 'exp-synthetic'
     filesPaths = []
     for it in ['train', 'dev', 'test']:
-        path = '/{}/'.format(it) + '{}-data-{}.csv'.format(series, it)
+        path = '{}/'.format(it) + '{}-data-{}.csv'.format(series, it)
         filesPaths.append(path)
 
     # iterate over input files
@@ -213,25 +231,27 @@ if __name__ == '__main__':
         splited_data = split_data_to_output_files(digitsCountList, outfileNew, trainDevTestSizes)
         write_splitted_to_files(splited_data, args.outFolder, filesPaths)
 
-    neededVals = calc_extra_samples_needed(trainDevTestSizes, args.dataSize, totalVals)
-    # print(neededVals)
+    if len(os.listdir(folder)) > 1:
+        neededVals = calc_extra_samples_needed(trainDevTestSizes, args.dataSize, totalVals)
+        # print(neededVals)
 
-    # read extra file and split according to classes
-    syntheticFileLen, syntheticFileNew, syntheticDigitsCountList = read_and_divide_input_to_classes(syntheticFile, -1)
-    # print(syntheticFileLen)
-    extra_splited_data = split_extra_to_output(neededVals, syntheticDigitsCountList, trainDevTestSizes, syntheticFileNew)
-    write_splitted_to_files(extra_splited_data, args.outFolder, filesPaths)
-
-    for i in range(len(totalVals)):
-        allVals[i] = totalVals[i] + neededVals[i]
-
-    if args.isDevidedByHundred:
-        extraFile = folder + 'synthetic-extra.csv'
         # read extra file and split according to classes
-        extraFileLen, extraFileNew, extraDigitsCountList = read_and_divide_input_to_classes(extraFile, -1)
-        # print(extraFileLen)
+        syntheticFileLen, syntheticFileNew, syntheticDigitsCountList = read_and_divide_input_to_classes(syntheticFile, -1)
+        # print(syntheticFileLen)
+        extra_splited_data = split_extra_to_output(neededVals, syntheticDigitsCountList, trainDevTestSizes, syntheticFileNew)
+        write_splitted_to_files(extra_splited_data, args.outFolder, filesPaths)
 
-        extraNeededVals = complete_to_mult(allVals)
-        # print(extraNeededVals)
-        second_extra_splited_data = split_extra_to_output(extraNeededVals, extraDigitsCountList, dummyProportions, extraFileNew)
-        write_splitted_to_files(second_extra_splited_data, args.outFolder, filesPaths)
+        for i in range(len(totalVals)):
+            allVals[i] = totalVals[i] + neededVals[i]
+
+        if args.isDevidedByHundred:
+            print(args.isDevidedByHundred)
+            extraFile = folder + 'synthetic-extra.csv'
+            # read extra file and split according to classes
+            extraFileLen, extraFileNew, extraDigitsCountList = read_and_divide_input_to_classes(extraFile, -1)
+            # print(extraFileLen)
+
+            extraNeededVals = complete_to_mult(allVals)
+            # print(extraNeededVals)
+            second_extra_splited_data = split_extra_to_output(extraNeededVals, extraDigitsCountList, dummyProportions, extraFileNew)
+            write_splitted_to_files(second_extra_splited_data, args.outFolder, filesPaths)
