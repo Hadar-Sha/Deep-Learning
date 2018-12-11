@@ -18,7 +18,6 @@ from train import train
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_dir', default='data/data-two-labels', help="Directory containing the destination dataset")
-# default='data-hidden-gray'
 parser.add_argument('--model_dir', default='experiments/transfer_training_model/in-grayscale',
                     help="Directory containing params.json")
 parser.add_argument('--restore_file', default='best',
@@ -39,11 +38,6 @@ def load_model(model_dir, restore_file):
 
 
 def after_transfer_train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_fn, metrics, incorrect, params, model_dir, model_out_dir, restore_file):
-    # # reload weights from restore_file if specified
-    # if restore_file is not None:
-    #     restore_path = os.path.join(model_dir, restore_file + '.pth.tar')
-    #     logging.info("Restoring parameters from {}".format(restore_path))
-    #     utils.load_checkpoint(restore_path, model, optimizer)
 
     best_dev_acc = 0.0
 
@@ -127,15 +121,13 @@ if __name__ == '__main__':
     # Define the model and optimizer
     model = net.NeuralNet(params).cuda() if params.cuda else net.NeuralNet(params)
 
-    # print(model)
     load_model(args.model_dir, args.restore_file)
 
     status_before_transfer = []
     for param_tensor in model.state_dict():
-        # print(param_tensor, "\t", model.state_dict()[param_tensor].norm(),
-        # "\t", model.state_dict()[param_tensor].size())
         status_before_transfer.append([param_tensor,
                    (model.state_dict()[param_tensor].norm()).item(), list(model.state_dict()[param_tensor].size())])
+        status_before_transfer.append(((model.state_dict()[param_tensor]).numpy()).tolist())
 
     # changing last fully connected layer
     num_ftrs = model.fc4.in_features
@@ -143,18 +135,13 @@ if __name__ == '__main__':
 
     model = model.to(device)
 
-    # print(model)
-
-    # optimizer = optim.Adam(model.parameters(), lr=params.learning_rate)
     optimizer = torch.optim.SGD(model.parameters(), lr=params.learning_rate)
 
     # fetch loss function and metrics
     loss_fn = net.loss_fn_two_labels
-    # loss_fn = net.loss_fn
 
     metrics = net.metrics
     incorrect = net.incorrect_two_labels
-    # incorrect = net.incorrect
 
     # Train the model
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))
@@ -165,17 +152,22 @@ if __name__ == '__main__':
 
     status_after_transfer = []
     for param_tensor in model.state_dict():
-        # print(param_tensor, "\t", model.state_dict()[param_tensor].norm(), "\t",
-        #       model.state_dict()[param_tensor].size())
         status_after_transfer.append([param_tensor,
              (model.state_dict()[param_tensor].norm()).item(), list(model.state_dict()[param_tensor].size())])
+        status_after_transfer.append(((model.state_dict()[param_tensor]).numpy()).tolist())
 
-    # print(status_before_transfer)
-    # print(status_after_transfer)
-    filepath = os.path.join(args.model_out_dir, 'wb.csv')
+    filepath = os.path.join(args.model_out_dir, 'wb_ext.csv')
     with open(filepath, "a", newline='') as myfile:
         csvwr = csv.writer(myfile)
-        for row in status_before_transfer:
-            csvwr.writerow(row)
-        for row_a in status_after_transfer:
-            csvwr.writerow(row_a)
+        for elem in status_before_transfer:
+            if isinstance(elem, (list,)) and isinstance(elem[0], (list,)):
+                for row in elem:
+                    csvwr.writerow(row)
+            else:
+                csvwr.writerow(elem)
+        for elem_a in status_after_transfer:
+            if isinstance(elem, (list,)) and isinstance(elem[0], (list,)):
+                for row in elem:
+                    csvwr.writerow(row)
+            else:
+                csvwr.writerow(elem)

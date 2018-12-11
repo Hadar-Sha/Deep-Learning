@@ -88,15 +88,8 @@ def evaluate_after_transfer(model, loss_fn, dataloader, metrics, incorrect, para
     prop_sum = np.sum(prop)
     metrics_mean = {metric: np.sum([x[metric] for x in summ]/prop_sum) for metric in summ[0]}
 
-    # fix here !!! not a mean, weights needed
-    # metrics_mean = {metric:np.mean([x[metric] for x in summ]) for metric in summ[0]}
     metrics_string = " ; ".join("{}: {:05.3f}".format(k, v) for k, v in metrics_mean.items())
     logging.info("- Eval metrics : " + metrics_string)
-
-    # # print to screen every 1% of iterations
-    # if (epoch+1) % (0.01*params.num_epochs) == 0:
-    #     print("eval Epoch {}/{}".format(epoch + 1, params.num_epochs))
-    #     print(metrics_string)
 
     return metrics_mean, incorrect_samples
 
@@ -151,7 +144,6 @@ if __name__ == '__main__':
 
     # Reload weights from the saved file
     load_model(args.model_dir, args.restore_file)
-    # utils.load_checkpoint(os.path.join(args.model_dir, args.restore_file + '.pth.tar'), model)
 
     # Evaluate
     test_metrics, incorrect_samples = evaluate_after_transfer(model, loss_fn, test_dl, metrics, incorrect, params)

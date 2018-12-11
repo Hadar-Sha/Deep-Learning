@@ -30,10 +30,8 @@ class SchiDigitDataset(Dataset):
         temp_images = self.mat[:, :24]
         self.images = np.float32(temp_images)
 
-        digit_labels = self.mat[:, 24:]
-
-        # digit_labels contains two labels, before and after filter
-        self.digit_labels = digit_labels.reshape(len(digit_labels), 2)
+        digit_labels = self.mat[:, 24]
+        self.digit_labels = digit_labels.reshape(len(digit_labels), 1)
 
         self.transform = transform
 
@@ -57,7 +55,7 @@ class ToTensor(object):
     """Convert ndarrays in sample to Tensors."""
 
     def __call__(self, sample):
-        image, confuse_label, hide_label = sample['image'], sample['label']
+        image, label = sample['image'], sample['label']
         tensorimage = torch.from_numpy(image)
         tensorimage = tensorimage.type(torch.FloatTensor)
 

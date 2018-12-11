@@ -230,21 +230,16 @@ if __name__ == '__main__':
         outFiles = [[] for _ in range(NUM_OF_OUTPUT_FILES)]  # will contain mat of values for train / dev / test
 
         infileLen, outfileNew, digitsCountList = read_and_divide_input_to_classes(infilepath, -1)
-        # print(infileLen)
 
         splited_data = split_data_to_output_files(digitsCountList, outfileNew, trainDevTestSizes)
         write_splitted_to_files(splited_data, args.outFolder, filesPaths)
 
-    # for itm in digitsCountList:
-    #     print(len(itm))
-
     if len(os.listdir(folder)) > 1:
         neededVals = calc_extra_samples_needed(trainDevTestSizes, args.dataSize, totalVals)
-        # print(neededVals)
 
         # read extra file and split according to classes
         syntheticFileLen, syntheticFileNew, syntheticDigitsCountList = read_and_divide_input_to_classes(syntheticFile, -1)
-        # print(syntheticFileLen)
+
         extra_splited_data = split_extra_to_output(neededVals, syntheticDigitsCountList, trainDevTestSizes, syntheticFileNew)
         write_splitted_to_files(extra_splited_data, args.outFolder, filesPaths)
 
@@ -255,9 +250,8 @@ if __name__ == '__main__':
             extraFile = folder + 'synthetic-extra.csv'
             # read extra file and split according to classes
             extraFileLen, extraFileNew, extraDigitsCountList = read_and_divide_input_to_classes(extraFile, -1)
-            # print(extraFileLen)
 
             extraNeededVals = complete_to_mult(allVals)
-            # print(extraNeededVals)
+
             second_extra_splited_data = split_extra_to_output(extraNeededVals, extraDigitsCountList, dummyProportions, extraFileNew)
             write_splitted_to_files(second_extra_splited_data, args.outFolder, filesPaths)

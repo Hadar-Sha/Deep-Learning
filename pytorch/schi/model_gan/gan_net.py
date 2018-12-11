@@ -2,59 +2,176 @@
 
 import numpy as np
 import torch
-import torch.nn as nn
+from torch import nn, optim
 import torch.nn.functional as F
-import math
-from scipy import stats
+from torch.autograd.variable import Variable
+
+# class DiscriminatorNet(torch.nn.Module):
+#     """
+#     A three hidden-layer discriminative neural network
+#     """
+#
+#     def __init__(self):
+#         super(DiscriminatorNet, self).__init__()
+#         n_features = 784
+#         n_out = 1
+#
+#         self.hidden0 = nn.Sequential(
+#             nn.Linear(n_features, 1024),
+#             nn.LeakyReLU(0.2),
+#             nn.Dropout(0.3)
+#         )
+#         self.hidden1 = nn.Sequential(
+#             nn.Linear(1024, 512),
+#             nn.LeakyReLU(0.2),
+#             nn.Dropout(0.3)
+#         )
+#         self.hidden2 = nn.Sequential(
+#             nn.Linear(512, 256),
+#             nn.LeakyReLU(0.2),
+#             nn.Dropout(0.3)
+#         )
+#         self.out = nn.Sequential(
+#             torch.nn.Linear(256, n_out),
+#             torch.nn.Sigmoid()
+#         )
+#
+#     def forward(self, x):
+#         x = self.hidden0(x)
+#         x = self.hidden1(x)
+#         x = self.hidden2(x)
+#         x = self.out(x)
+#         return x
 
 
-class NeuralNet(nn.Module):
+class DiscriminatorNet(nn.Module):
     def __init__(self, params):
-        super(NeuralNet, self).__init__()
-        self.fc1 = nn.Linear(params.input_size, params.hidden_size)
-        self.fc2 = nn.Linear(params.hidden_size, params.hidden_size)
-        self.fc3 = nn.Linear(params.hidden_size, params.hidden_size//2)
-        self.fc4 = nn.Linear(params.hidden_size // 2, params.num_classes)
+        super(DiscriminatorNet, self).__init__()
+        self.in_layer = nn.Sequential(
+            nn.Linear(params.input_size, params.hidden_size),
+            nn.Dropout(params.dropout_rate)
+        )
+        self.hidden1 = nn.Sequential(
+            nn.Linear(params.hidden_size, params.hidden_size),
+            nn.Dropout(params.dropout_rate)
+        )
+        self.hidden2 = nn.Sequential(
+            nn.Linear(params.hidden_size, params.hidden_size//2),
+            nn.Dropout(params.dropout_rate)
+        )
+        self.out_layer = nn.Sequential(
+            nn.Linear(params.hidden_size // 2, 1),
+            # nn.Linear(params.hidden_size // 2, params.num_classes),
+            # nn.LogSoftmax(dim=1)
+            nn.Sigmoid()
+        )
 
-        self.dropout_rate = params.dropout_rate
+        # self.dropout_rate = params.dropout_rate
+
+        # self.fc1 = nn.Linear(params.input_size, params.hidden_size)
+        # self.fc2 = nn.Linear(params.hidden_size, params.hidden_size)
+        # self.fc3 = nn.Linear(params.hidden_size, params.hidden_size//2)
+        # self.fc4 = nn.Linear(params.hidden_size // 2, params.num_classes)
+        #
+        # self.dropout_rate = params.dropout_rate
 
     def forward(self, x):
 
-        # first layer
-        out = F.relu(self.fc1(x))
-        out = F.dropout(out, self.dropout_rate, training=self.training)
+        # print(x.size())
+        out = self.in_layer(x)
+        # print(out.size())
+        out = self.hidden1(out)
+        # print(out.size())
+        out = self.hidden2(out)
+        # print(out.size())
+        out = self.out_layer(out)
+        # print(out.size())
 
-        # second layer
-        out = F.relu(self.fc2(out))
-        out = F.dropout(out, self.dropout_rate, training=self.training)
+#         # first layer
+#         out = F.relu(self.fc1(x))
+#         out = F.dropout(out, self.dropout_rate, training=self.training)
+#
+#         # second layer
+#         out = F.relu(self.fc2(out))
+#         out = F.dropout(out, self.dropout_rate, training=self.training)
+#
+#         # third layer
+#         out = F.relu(self.fc3(out))
+#         out = F.dropout(out, self.dropout_rate, training=self.training)
+#
+#         out = self.fc4(out)
+#         out = F.log_softmax(out, dim=1)
+#
+        return out
 
-        # third layer
-        out = F.relu(self.fc3(out))
-        out = F.dropout(out, self.dropout_rate, training=self.training)
 
-        out = self.fc4(out)
-        out = F.log_softmax(out, dim=1)
+class GeneratorNet(nn.Module):
+    def __init__(self, params):
+        super(GeneratorNet, self).__init__()
+        self.in_layer = nn.Sequential(
+            nn.Linear(params.num_classes, params.hidden_size // 2),
+            # nn.Linear(params.input_size, params.hidden_size),
+            nn.Dropout(params.dropout_rate)
+        )
+        self.hidden1 = nn.Sequential(
+            nn.Linear(params.hidden_size // 2, params.hidden_size),
+            # nn.Linear(params.hidden_size, params.hidden_size),
+            nn.Dropout(params.dropout_rate)
+        )
+        self.hidden2 = nn.Sequential(
+            nn.Linear(params.hidden_size, params.hidden_size),
+            # nn.Linear(params.hidden_size, params.hidden_size//2),
+            nn.Dropout(params.dropout_rate)
+        )
+        self.out_layer = nn.Sequential(
+            nn.Linear(params.hidden_size, params.input_size),
+            # nn.Linear(params.hidden_size // 2, params.num_classes),
+            nn.LogSoftmax(dim=1)
+        )
+
+    def forward(self, x):
+
+        out = self.in_layer(x)
+        # print(out.size())
+        out = self.hidden1(out)
+        # print(out.size())
+        out = self.hidden2(out)
+        # print(out.size())
+        out = self.out_layer(out)
+        # print(out.size())
 
         return out
 
 
-def convert_int_to_one_hot_vector(label, num_of_classes):
+# Noise
+def noise(size):
+    n = Variable(torch.randn(size,10))
+    # print(n.size())
+    # n = Variable(torch.randn(size, 100))
+    if torch.cuda.is_available():
+        return n.cuda()
+    return n
 
-    # this is for 3d tensor . continue here!!!!!!
-    # # Dummy input that HAS to be 2D for the scatter (you can use view(-1,1) if needed)
-    # y1_int = torch.LongTensor(batch_size, 1).random_() % nb_digits
-    # print(y1_int.size())
-    # # y1_int = y1_int.view(-1,1)
-    # # print(y1_int.size())
-    # y1_int = y1_int.view(y1_int.size(0), y1_int.size(1), -1)
-    # print(y1_int.size())
-    # print(y1_int)
-    #
-    # # One hot encoding buffer that you create out of the loop and just keep reusing
-    # y1_one_hot = torch.FloatTensor(batch_size, 1, nb_digits)
-    # y1_one_hot.zero_()
-    # print(y1_one_hot.size())
-    # y1_one_hot.scatter_(2, y1_int, 1)
+
+def real_data_target(size):
+    """
+    Tensor containing ones, with shape = size
+    """
+    data = Variable(torch.ones(size, 1))
+    if torch.cuda.is_available(): return data.cuda()
+    return data
+
+
+def fake_data_target(size):
+    """
+    Tensor containing zeros, with shape = size
+    """
+    data = Variable(torch.zeros(size, 1))
+    if torch.cuda.is_available(): return data.cuda()
+    return data
+
+
+def convert_int_to_one_hot_vector(label, num_of_classes):
 
     size_in_list = list(label.size())
     size_in_int = size_in_list[0]
@@ -67,7 +184,7 @@ def convert_int_to_one_hot_vector(label, num_of_classes):
     return one_hot_vector
 
 
-def loss_fn(outputs, labels, num_of_classes):
+def loss_fn(outputs, labels):  # , num_of_classes):
     """
     Compute the cross entropy loss given outputs and labels.
 
@@ -83,10 +200,12 @@ def loss_fn(outputs, labels, num_of_classes):
           demonstrates how you can easily define a custom loss function.
     """
 
-    kl_criterion = nn.KLDivLoss()
-    one_hot_vector = convert_int_to_one_hot_vector(labels, num_of_classes)
+    binary_criterion = nn.BCELoss()
+    return binary_criterion(outputs, labels)
+    # kl_criterion = nn.KLDivLoss()
+    # one_hot_vector = convert_int_to_one_hot_vector(labels, num_of_classes)
 
-    return kl_criterion(outputs, one_hot_vector)
+    # return kl_criterion(outputs, one_hot_vector)
 
 
 class HLoss(nn.Module):
@@ -112,20 +231,11 @@ def loss_fn_two_labels(outputs, labels, num_of_classes):
             loss (Variable): cross entropy loss for all images in the batch
     """
 
-    kl_criterion = nn.KLDivLoss(size_average=True, reduce=True)
+    kl_criterion = nn.KLDivLoss()
     min_entropy_criterion = HLoss()
 
     label_before_filter = torch.index_select(labels, 1, torch.tensor([0]))
     label_after_filter = torch.index_select(labels, 1, torch.tensor([1]))
-
-    label_before_numpy = label_before_filter.numpy()
-    label_after_numpy = label_after_filter.numpy()
-
-    other_labels_before_numpy = np.setdiff1d(np.arange(num_of_classes-1), label_before_numpy)
-    other_labels_after_numpy = np.setdiff1d(np.arange(num_of_classes-1), label_after_numpy)
-
-    other_labels_before = torch.from_numpy(other_labels_before_numpy)
-    other_labels_after = torch.from_numpy(other_labels_after_numpy)
 
     alpha = 0.5
 
@@ -136,20 +246,7 @@ def loss_fn_two_labels(outputs, labels, num_of_classes):
     out_after_filter = torch.index_select(outputs, 1, torch.tensor(list(range(10, 20))))
 
     completing_after_filter = (torch.ones(labels.shape[0], num_of_classes) - one_hot_vector_after_filter)\
-                               / (num_of_classes-1)
-
-    # temp = 1 - kl_criterion(out_before_filter, one_hot_vector_after_filter)
-    # print(temp.item())
-    # ent = min_entropy_criterion(out_before_filter)
-    # print(ent)
-
-    # func = kl_criterion(out_after_filter, one_hot_vector_after_filter) + \
-    #        (1-kl_criterion(out_before_filter, one_hot_vector_after_filter))/labels.shape[0] + \
-    #        min_entropy_criterion(out_before_filter)
-
-    # func = kl_criterion(out_after_filter, one_hot_vector_after_filter) + \
-    #        1/kl_criterion(out_before_filter, one_hot_vector_after_filter) + \
-    #        min_entropy_criterion(out_before_filter)
+                              /(num_of_classes-1)
 
     func = kl_criterion(out_after_filter, one_hot_vector_after_filter) + \
            kl_criterion(out_before_filter, completing_after_filter) + \

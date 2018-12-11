@@ -157,10 +157,6 @@ def save_weights_biases(dataname, data, checkpoint):
         myfile.write(dataname)
         myfile.write('\n')
         csvwr = csv.writer(myfile)
-        # csvwr.writerow(dataname)
-        # np.savetxt(myfile, dataname, newline='\n')
-        # cast to string
-        # str_data = np.array2string(data, precision=5, separator=',', suppress_small=True)
         list_data = data.tolist()
 
         row = list_data[0]
@@ -170,8 +166,6 @@ def save_weights_biases(dataname, data, checkpoint):
                 csvwr.writerow(row)
         else:
             csvwr.writerow(list_data)
-
-        # np.savetxt(myfile, str_data, delimiter=",")
 
     return
 

@@ -78,8 +78,6 @@ def evaluate(model, loss_fn, dataloader, metrics, incorrect, params, epoch):
     prop_sum = np.sum(prop)
     metrics_mean = {metric: np.sum([x[metric] for x in summ]/prop_sum) for metric in summ[0]}
 
-    # fix here !!! not a mean, weights needed
-    # metrics_mean = {metric:np.mean([x[metric] for x in summ]) for metric in summ[0]}
     metrics_string = " ; ".join("{}: {:05.3f}".format(k, v) for k, v in metrics_mean.items())
     logging.info("- Eval metrics : " + metrics_string)
 

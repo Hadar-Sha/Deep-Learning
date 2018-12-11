@@ -45,16 +45,14 @@ def train(model, optimizer, loss_fn, dataloader, metrics, params, epoch):
     # summary for current training loop and a running average object for loss
     summ = []
     prop = []
-    weights_and_biases = {}
 
     loss_avg = utils.WeightedAverage()
-    # loss_avg = utils.RunningAverage()
 
     # Use tqdm for progress bar
     # with tqdm(total=len(dataloader)) as t:
     for i, (train_batch, labels_batch) in enumerate(dataloader):
 
-        layer_data =[]
+        # layer_data = []
 
         # move to GPU if available
         if params.cuda:
@@ -68,30 +66,6 @@ def train(model, optimizer, loss_fn, dataloader, metrics, params, epoch):
         # compute model output and loss
         output_batch = model(train_batch)
         loss = loss_fn(output_batch, labels_batch, params.num_classes)
-
-        # # layer_data.append(model.fc1.weight.data.numpy())
-        # # # print(layer_data)
-        # # layer_data.append(model.fc1.bias.data.numpy())
-        # # # print(layer_data)
-        # # weights_and_biases[str(i)] = layer_data
-        # #
-        # a = list(model.fc1.parameters())
-        # # if a[0].numpy() == layer_data[0]:
-        # #     print('Y')
-        # print("Model's state_dict:")
-        # for param_tensor in model.state_dict():
-        #     b = (model.state_dict()[param_tensor]).numpy()
-        #     print(param_tensor, "\t", model.state_dict()[param_tensor].size())
-
-        # print(model)
-        # print(model.fc1)
-        # print(model.fc1.weight.data)
-        # print(model.fc1.weight.data.norm())
-        # print(model.fc1.weight.data.size())
-        # print(model.fc1.bias.data)
-        # print(model.fc1.bias.data.size())
-
-        # print(model.fc1.weight.grad.data.norm())
 
         # clear previous gradients, compute gradients of all variables wrt loss
         optimizer.zero_grad()
@@ -118,11 +92,9 @@ def train(model, optimizer, loss_fn, dataloader, metrics, params, epoch):
         prop = train_batch.shape[0]/params.batch_size
         # update the average loss
         loss_avg.update(loss.item(), prop)
-        # loss_avg.update(loss.item())
 
     # compute mean of all metrics in summary
     metrics_mean = {metric: np.sum([x[metric] for x in summ] / np.sum(prop)) for metric in summ[0]}
-    # metrics_mean = {metric: np.mean([x[metric] for x in summ]) for metric in summ[0]}
     metrics_string = " ; ".join("{}: {:05.3f}".format(k, v) for k, v in metrics_mean.items())
     logging.info("- Train metrics: " + metrics_string)
 
@@ -130,8 +102,6 @@ def train(model, optimizer, loss_fn, dataloader, metrics, params, epoch):
     if (epoch+1) % (0.01*params.num_epochs) == 0:
         print("train Epoch {}/{}".format(epoch + 1, params.num_epochs))
         print(metrics_string)
-
-    # return weights_and_biases
 
 
 def train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_fn, metrics, incorrect, params, model_dir,
@@ -156,7 +126,6 @@ def train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_
         logging.info("Restoring parameters from {}".format(restore_path))
         utils.load_checkpoint(restore_path, model, optimizer)
 
-    # weights_and_biases = {}
     best_dev_acc = 0.0
 
     for epoch in range(params.num_epochs):
@@ -176,11 +145,6 @@ def train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_
         utils.save_checkpoint({'epoch': epoch + 1,
                                'state_dict': model.state_dict(),
                                'optim_dict': optimizer.state_dict()}, is_best=is_best, checkpoint=model_dir)
-
-        # # save weights and biases to csv
-        # for param_name in model.state_dict():
-        #     current_param = (model.state_dict()[param_name]).numpy()
-        #     utils.save_weights_biases(param_name, current_param, checkpoint=model_dir)
 
         # If best_eval, best_save_path
         if is_best:
@@ -240,10 +204,9 @@ if __name__ == '__main__':
 
     print(model)
 
-    # optimizer = optim.Adam(model.parameters(), lr=params.learning_rate)
     optimizer = torch.optim.SGD(model.parameters(), lr=params.learning_rate)
 
-    # fetch loss function and metrics
+    # fetch loss f1700-50-57-57unction and metrics
     loss_fn = net.loss_fn
 
     metrics = net.metrics
