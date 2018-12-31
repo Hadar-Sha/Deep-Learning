@@ -3,14 +3,16 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from scipy import stats
+import matplotlib.pyplot as plt
 
 batch_size = 5
+second_dim = 3
 nb_digits = 10
 
 kl_criterion = nn.KLDivLoss(reduce=False)
 
 # Dummy input that HAS to be 2D for the scatter (you can use view(-1,1) if needed)
-y1_int = torch.LongTensor(batch_size, 1).random_() % nb_digits
+y1_int = torch.LongTensor(batch_size, second_dim).random_() % nb_digits
 print(y1_int.size())
 # y1_int = y1_int.view(-1,1)
 # print(y1_int.size())
@@ -19,7 +21,7 @@ print(y1_int.size())
 print(y1_int)
 
 # One hot encoding buffer that you create out of the loop and just keep reusing
-y1_one_hot = torch.FloatTensor(batch_size, 1, nb_digits)
+y1_one_hot = torch.FloatTensor(batch_size, second_dim, nb_digits)
 y1_one_hot.zero_()
 print(y1_one_hot.size())
 y1_one_hot.scatter_(2, y1_int, 1)
@@ -37,12 +39,16 @@ y1_one_hot.scatter_(2, y1_int, 1)
 print(y1_one_hot)
 print(y1_one_hot.size())
 
+print(y1_one_hot[0])
+print(y1_one_hot[0].size())
 
+print(y1_one_hot[:, 0])
+print(y1_one_hot[:, 0].size())
 
-t = torch.ones((2, 3, 4))
-print(t.size())
-
-print(t.view(-1, 12).size())
+# t = torch.ones((2, 3, 4))
+# print(t.size())
+#
+# print(t.view(-1, 12).size())
 
 # # Dummy input that HAS to be 2D for the scatter (you can use view(-1,1) if needed)
 # y2_int = torch.LongTensor(batch_size, 1).random_() % nb_digits
@@ -131,3 +137,15 @@ print(t.view(-1, 12).size())
 #         if isinstance(it[0], (list,)):
 #             print(len(it[0]))
 #     # print(type(it))
+
+
+#First create some toy data:
+x = np.linspace(0, 2*np.pi, 400)
+y = np.sin(x**2)
+
+#Creates four polar axes, and accesses them through the returned array
+fig, axes = plt.subplots(1, 4, subplot_kw=dict())
+for i in range(4):
+    axes[i].plot(x+i, y)
+
+plt.show()

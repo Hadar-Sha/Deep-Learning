@@ -1,7 +1,8 @@
 import numpy as np
-from matplotlib.patches import Circle, Wedge, Polygon
+from matplotlib.patches import Polygon
 from matplotlib.collections import PatchCollection, Collection
 import matplotlib.pyplot as plt
+import math
 import argparse
 
 
@@ -15,7 +16,7 @@ height = 0.2
 # parser.add_argument('--colorsfile', default='', help="file containing colors to draw")
 
 
-def create_background(color, center):
+def create_background(color):  # , center):
     # continue here !!!!!
     points = np.zeros([4, 2], dtype=float)
     points[0] = [0, 0]
@@ -71,18 +72,21 @@ def create_segment(segment_center, vertical_or_horizontal, color):
     return segment
 
 
-def display_digit(colors):
+def display_digit(colors, myaxis):
     patches = []
-    fig, ax = plt.subplots()
-    ax.set_xlim([0, 2 * width])
-    ax.set_ylim([0, 3*width])
-    ax.set_aspect('equal', 'box')
+    # fig, ax = plt.subplots()
+    # myaxis.clear()
+    myaxis.set_xlim([0, 2 * width])
+    myaxis.set_ylim([0, 3*width])
+    myaxis.set_aspect('equal', 'box')
+    myaxis.axis('off')
+
     segments_centers = []
     center = [width, 1.5*width]
     # center = [0.5, 0.5]
-    bg_patch = create_background(colors[7], center)
+    bg_patch = create_background(colors[7])  # , center)
     patches.append(bg_patch)
-    ax.add_patch(bg_patch)
+    myaxis.add_patch(bg_patch)
 
     segments_centers.append([center[0], center[1] - width - height])
     segments_centers.append([center[0], center[1]])
@@ -96,26 +100,81 @@ def display_digit(colors):
     for i in range(len(segments_centers)):
         polygon = create_segment(segments_centers[i], vertical_horizon[i], colors[i])
         patches.append(polygon)
-        ax.add_patch(polygon)
+        myaxis.add_patch(polygon)
 
-    plt.show()
+    # plt.show()
+    # plt.draw()
+    # plt.pause(0.02)
+    # plt.show()
     return
 
 
-# if __name__ == '__main__':
+def create_figure():
+    fig = plt.figure()
+    return fig
+
+
+def fill_figure(samples, fig):
+
+    num_of_samples = len(samples)
+    axes = np.zeros((4, 4)).tolist()
+
+    for i in range(num_of_samples):
+        # axes.append(fig.add_subplot(4, math.ceil(num_of_samples / 4), i+1))
+        # display_digit(samples[i], axes[i])
+        row, col = np.unravel_index(i, (4, math.ceil(num_of_samples/4)))
+        axes[row][col] = fig.add_subplot(4, math.ceil(num_of_samples / 4), i + 1)
+        display_digit(samples[i], axes[row][col])
+
+    plt.draw()
+    # plt.show()
+    plt.pause(0.001)
+    fig.clear()
+
+
+def create_grid(num_of_samples):
+    fig, axes = plt.subplots(4, math.ceil(num_of_samples / 4), subplot_kw=dict(), clear=True)
+    # plt.show()
+    return fig, axes
+
+
+def fill_grid(samples, axes):
+    num_of_samples = len(samples)
+    # axes = axes.ravel()
+
+    # fig, axes = plt.subplots(1, num_of_samples, subplot_kw=dict(polar=False))
+    # fig, axes = plt.subplots(4, round(num_of_samples/4), subplot_kw=dict(polar=False), clear=True)
+
+    for i in range(num_of_samples):
+        row, col = np.unravel_index(i, (4, math.ceil(num_of_samples/4)))
+        display_digit(samples[i], axes[row, col])
+
+        plt.draw()
+        plt.pause(0.02)
+        plt.show()
+
+    # fig, axes = plt.subplots(4, round(num_of_samples/4), subplot_kw=dict(polar=True))
+    # axes.set_xlim([0, 2 * width])
+    # axes.set_ylim([0, 3 * width])
+    # axes.set_aspect('equal', 'box')
+    return
+
+
+if __name__ == '__main__':
+    create_grid(16)
 #     colors = [[1, 0, 0]]*7
 #     colors.append([0, 0, 1])
 #     patches = []
-#     fig, ax = plt.subplots()
-#     ax.set_xlim([0, 2*width])
-#     ax.set_ylim([0, 3*width])
-#     ax.set_aspect('equal', 'box')
+#     # fig, ax = plt.subplots()
+#     # ax.set_xlim([0, 2*width])
+#     # ax.set_ylim([0, 3*width])
+#     # ax.set_aspect('equal', 'box')
 #     # ax.axis('equal')
 #     # ax.axis([0, 3*width, 0, 3*width])
 #
 #     display_digit(colors)
-#
-#     plt.show()
+
+    # plt.show()
 
 
 #     width = 100

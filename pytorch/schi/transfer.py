@@ -157,7 +157,7 @@ if __name__ == '__main__':
         status_after_transfer.append(((model.state_dict()[param_tensor]).numpy()).tolist())
 
     filepath = os.path.join(args.model_out_dir, 'wb_ext.csv')
-    with open(filepath, "a", newline='') as myfile:
+    with open(filepath, "w", newline='') as myfile:
         csvwr = csv.writer(myfile)
         for elem in status_before_transfer:
             if isinstance(elem, (list,)) and isinstance(elem[0], (list,)):

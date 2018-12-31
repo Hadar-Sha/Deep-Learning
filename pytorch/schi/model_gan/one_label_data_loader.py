@@ -85,14 +85,15 @@ def fetch_dataloader(types, data_dir, params):
             file = my_list[0]
             path = os.path.join(newpath, file)
 
+            # Normalize() was added, wasn't in discriminator net
             # prevent shuffling in dev or test
             if split == 'train':
-                dl = DataLoader(dataset=SchiDigitDataset(csv_file=path, transform=transforms.Compose([ToTensor()])),
-                                batch_size=params.batch_size, shuffle=True)
+                dl = DataLoader(dataset=SchiDigitDataset(csv_file=path, transform=transforms.Compose(
+                    [Normalize(), ToTensor()])), batch_size=params.batch_size, shuffle=True)
 
             else:
-                dl = DataLoader(dataset=SchiDigitDataset(csv_file=path, transform=transforms.Compose([ToTensor()])),
-                                batch_size=params.batch_size, shuffle=False)
+                dl = DataLoader(dataset=SchiDigitDataset(csv_file=path, transform=transforms.Compose(
+                    [Normalize(), ToTensor()])), batch_size=params.batch_size, shuffle=False)
 
             dataloaders[split] = dl
 

@@ -42,7 +42,6 @@ class DiscriminatorNet(nn.Module):
             # nn.Linear(params.hidden_size // 4, 1),
             nn.Linear(params.hidden_size // 2, 1),
             # nn.ReLU(),
-            # nn.Linear(params.hidden_size // 2, params.num_classes),
             # nn.LogSoftmax(dim=1)
             nn.Sigmoid()
         )
