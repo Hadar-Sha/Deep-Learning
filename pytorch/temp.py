@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 from scipy import stats
 import matplotlib.pyplot as plt
+import numpy as np
 
 batch_size = 5
 second_dim = 3
@@ -149,3 +150,17 @@ for i in range(4):
     axes[i].plot(x+i, y)
 
 plt.show()
+
+
+# a = np.zeros([20, 2])
+# for i in range(20):
+#     a[i][:] = np.random.choice(10, 2, replace=False)
+#
+# print(a)
+
+all_but_eight = np.concatenate((np.arange(8), np.array([[9]])), axis=None)
+b = np.zeros([20, 2])
+for i in range(20):
+    b[i][:] = np.random.choice(all_but_eight,2, replace=False)
+
+print(b)

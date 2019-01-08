@@ -12,6 +12,13 @@ from torch.utils.data import Dataset, DataLoader
 # and http://pytorch.org/tutorials/beginner/data_loading_tutorial.html
 
 
+# def normalize(sample):
+#     print("in normalize")
+#     image, label = sample['image'], sample['label']
+#     image_normalized = np.divide(image, 255.)
+#     return image_normalized, label
+
+
 class SchiDigitDataset(Dataset):
     """Face Landmarks dataset."""
 
@@ -45,16 +52,27 @@ class SchiDigitDataset(Dataset):
 
 
 class Normalize(object):
+    # print("in normalize")
+
     def __call__(self, sample):
+        # image, label = SchiDigitDataset.__getitem__()
         image, label = sample['image'], sample['label']
-        image_normalized = np.divide(image, 255.)
-        return image_normalized, label
+        image = np.divide(image, 255.)
+        return image, label
+
+
+# class Normalize(object):
+#     def __call__(self, sample):
+#         image, label = sample['image'], sample['label']
+#         image_normalized = np.divide(image, 255.)
+#         return image_normalized, label
 
 
 class ToTensor(object):
     """Convert ndarrays in sample to Tensors."""
 
     def __call__(self, sample):
+        print("in toTensor")
         image, label = sample['image'], sample['label']
         tensorimage = torch.from_numpy(image)
         tensorimage = tensorimage.type(torch.FloatTensor)
@@ -74,6 +92,7 @@ def fetch_dataloader(types, data_dir, params):
     Returns:
         data: (dict) contains the DataLoader object for each type in types
     """
+    # print("in fetch ")
     dataloaders = {}
 
     for split in ['train', 'dev', 'test']:
@@ -90,9 +109,11 @@ def fetch_dataloader(types, data_dir, params):
             if split == 'train':
                 dl = DataLoader(dataset=SchiDigitDataset(csv_file=path, transform=transforms.Compose(
                     [Normalize(), ToTensor()])), batch_size=params.batch_size, shuffle=True)
+                # [transforms.Normalize(0, 255), ToTensor()])), batch_size=params.batch_size, shuffle=True)
 
             else:
                 dl = DataLoader(dataset=SchiDigitDataset(csv_file=path, transform=transforms.Compose(
+                    # [transforms.Normalize(0, 255), ToTensor()])), batch_size=params.batch_size, shuffle=False)
                     [Normalize(), ToTensor()])), batch_size=params.batch_size, shuffle=False)
 
             dataloaders[split] = dl

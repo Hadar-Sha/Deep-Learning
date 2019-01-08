@@ -12,29 +12,31 @@ from torch.autograd import Variable
 from utils_gan import Logger
 from display_digit import *
 import utils
-import model_gan.gan_net as gan_net
+import model_gan.conditional_gan_net as gan_net
+# import model_gan.two_labels_data_loader as data_loader
 import model_gan.one_label_data_loader as data_loader
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--data_dir', default='data/data-with-grayscale-4000', help="Directory containing the dataset")
-parser.add_argument('--model_dir', default='experiments/gan_model', help="Directory containing params.json")
+parser.add_argument('--data_dir', default='data/grayscale-logits', help="Directory containing the dataset")
+# data-two-labels-big
+parser.add_argument('--model_dir', default='experiments/cgan_model', help="Directory containing params.json")
 parser.add_argument('--restore_file', default=None,
                     help="Optional, name of the file in --model_dir containing weights to reload before \
                     training")  # 'best' or 'train'
 
 
-def train_discriminator(d, optimizer, real_data, fake_data):
+def train_discriminator(d, optimizer, real_data, fake_data, real_labels, fake_labels):
     # Reset gradients
     optimizer.zero_grad()
 
     # 1.1 Train on Real Data
-    prediction_real = d(real_data)
+    prediction_real = d(real_data, real_labels)
     # Calculate error and backpropagate
     error_real = loss_fn(prediction_real, gan_net.real_data_target(real_data.size(0)))
     error_real.backward()
 
     # 1.2 Train on Fake Data
-    prediction_fake = d(fake_data)
+    prediction_fake = d(fake_data, fake_labels)
     # Calculate error and backpropagate
     error_fake = loss_fn(prediction_fake, gan_net.fake_data_target(real_data.size(0)))
     error_fake.backward()
@@ -46,12 +48,12 @@ def train_discriminator(d, optimizer, real_data, fake_data):
     return error_real + error_fake, prediction_real, prediction_fake
 
 
-def train_generator(d, optimizer, fake_data):
+def train_generator(d, optimizer, fake_data, fake_labels):
     # 2. Train Generator
     # Reset gradients
     optimizer.zero_grad()
     # Sample noise and generate fake data
-    prediction = d(fake_data)
+    prediction = d(fake_data, fake_labels)
     # Calculate error and backpropagate
     error = loss_fn(prediction, gan_net.real_data_target(prediction.size(0)))
     error.backward()
@@ -90,23 +92,39 @@ def train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, dataloader, param
         real_data = Variable(real_batch)
         real_label = Variable(real_label)
 
-        if params.cuda:
+        if torch.cuda.is_available():
             real_data = real_data.cuda()
             real_label = real_label.cuda()
 
-        if real_label.size(1) == 1:
-            real_label = real_label.view(real_label.size(0))
+        # if real_label.size(1) == 1:
+        #     real_label = real_label.view(real_label.size(0))
+
+        # real_label = real_label.type(torch.FloatTensor)
+        real_one_hot_v = gan_net.convert_int_to_one_hot_vector(real_label, params.num_classes)
 
         # Generate fake data
-        fake_data = g_model(gan_net.noise(real_data.size(0))).detach()
+        noisy_input = gan_net.noise(real_data.size(0))
+        # noisy_label = gan_net.create_random_labels(real_data.size(0))
+        noisy_label = Variable(torch.randint(params.num_classes, (real_data.size(0), 1)))
+        noisy_label = noisy_label.type(torch.LongTensor)
+        noisy_one_hot_v = gan_net.convert_int_to_one_hot_vector(noisy_label, params.num_classes)
+
+        # fake_data = g_model(noisy_input, noisy_label).detach()
+        fake_data = g_model(noisy_input, noisy_one_hot_v).detach()
+
         # Train D
-        d_error, d_pred_real, d_pred_fake = train_discriminator(d_model, d_optimizer, real_data, fake_data)
+        # d_error, d_pred_real, d_pred_fake = train_discriminator(d_model, d_optimizer, real_data, fake_data, real_label, noisy_label)
+        d_error, d_pred_real, d_pred_fake = train_discriminator(d_model, d_optimizer, real_data, fake_data,
+                                                                real_one_hot_v, noisy_one_hot_v)
 
         # 2. Train Generator
         # Generate fake data
-        fake_data = g_model(gan_net.noise(real_batch.size(0)))
+        noisy_input = gan_net.noise(real_data.size(0))
+        # fake_data = g_model(noisy_input, noisy_label)
+        fake_data = g_model(noisy_input, noisy_one_hot_v)
         # Train G
-        g_error = train_generator(d_model, g_optimizer, fake_data)
+        # g_error = train_generator(d_model, g_optimizer, fake_data, noisy_label)
+        g_error = train_generator(d_model, g_optimizer, fake_data, noisy_one_hot_v)
         # Log error
         logger.log(d_error, g_error, epoch, i, i)  # num_batches)
 
@@ -114,14 +132,21 @@ def train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, dataloader, param
     # if (epoch+1) % (0.25*params.num_epochs) == 0:
     if (epoch+1) % (0.01*params.num_epochs) == 0:
 
+        # # create random noise and samples
+        # test_noise = gan_net.noise(num_test_samples)
+        # test_labels = Variable(torch.randint(10, (num_test_samples, 1)))
+
         # Display Images
-        test_samples = g_model(test_noise).data.cpu()
+        # test_samples = g_model(test_noise, test_labels).data.cpu()
+        test_samples = g_model(test_noise, test_one_hot_v).data.cpu()
         test_samples = gan_net.vectors_to_samples(test_samples)
+        # test_labels = test_labels.data.cpu()
+        # test_labels = gan_net.labels_to_titles(test_labels)
 
         # fig, axes = create_grid(num_test_samples)
         # fill_grid(test_samples, axes)
 
-        fill_figure(test_samples, fig)
+        fill_figure(test_samples, fig, gan_net.labels_to_titles(test_labels))
 
         # logger.log_images(test_images, num_test_samples, epoch, i, 17)
         # Display status Logs
@@ -199,7 +224,18 @@ if __name__ == '__main__':
 
     # Train the model
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))
-    num_test_samples = 16
+    num_test_samples = 20
     test_noise = gan_net.noise(num_test_samples)
+
+    # test_labels = gan_net.create_random_labels(num_test_samples)
+    test_labels = Variable(torch.randint(10, (num_test_samples, 1)))
+    test_labels = list(range(num_test_samples))
+    test_labels = [it % params.num_classes for it in test_labels]
+    test_labels = torch.Tensor(test_labels)
+    test_labels = test_labels.view(num_test_samples, -1)
+    test_labels = test_labels.type(torch.LongTensor)
+
+    test_one_hot_v = gan_net.convert_int_to_one_hot_vector(test_labels, params.num_classes)
+
     train_gan(discriminator, generator, train_dl, dev_dl, d_optimizer, g_optimizer, loss_fn, params, args.model_dir,
               args.restore_file)

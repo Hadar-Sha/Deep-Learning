@@ -14,28 +14,28 @@ class DiscriminatorNet(nn.Module):
             # nn.Linear(params.input_size, params.hidden_size//4),
             # nn.Linear(params.input_size, params.hidden_size//2),
             nn.Linear(params.input_size, params.hidden_size),
-            # nn.ReLU(),
-            nn.LeakyReLU(params.leaky_relu_slope),
+            nn.ReLU(),
+            # nn.LeakyReLU(params.leaky_relu_slope),
             nn.Dropout(params.dropout_rate)
         )
         self.hidden1 = nn.Sequential(
             nn.Linear(params.hidden_size, params.hidden_size),
-            # nn.ReLU(),
-            nn.LeakyReLU(params.leaky_relu_slope),
+            nn.ReLU(),
+            # nn.LeakyReLU(params.leaky_relu_slope),
             nn.Dropout(params.dropout_rate)
         )
         self.hidden2 = nn.Sequential(
             nn.Linear(params.hidden_size, params.hidden_size//2),
             # nn.Linear(params.hidden_size//2, params.hidden_size//4),
-            # nn.ReLU(),
-            nn.LeakyReLU(params.leaky_relu_slope),
+            nn.ReLU(),
+            # nn.LeakyReLU(params.leaky_relu_slope),
             nn.Dropout(params.dropout_rate)
         )
         self.hidden3 = nn.Sequential(
             nn.Linear(params.hidden_size // 2, params.hidden_size // 2),
             # nn.Linear(params.hidden_size // 2, params.hidden_size // 4),
-            # nn.ReLU(),
-            nn.LeakyReLU(params.leaky_relu_slope),
+            nn.ReLU(),
+            # nn.LeakyReLU(params.leaky_relu_slope),
             nn.Dropout(params.dropout_rate)
         )
         self.out_layer = nn.Sequential(
@@ -47,15 +47,6 @@ class DiscriminatorNet(nn.Module):
             nn.Sigmoid()
         )
 
-        # self.dropout_rate = params.dropout_rate
-
-        # self.fc1 = nn.Linear(params.input_size, params.hidden_size)
-        # self.fc2 = nn.Linear(params.hidden_size, params.hidden_size)
-        # self.fc3 = nn.Linear(params.hidden_size, params.hidden_size//2)
-        # self.fc4 = nn.Linear(params.hidden_size // 2, params.num_classes)
-        #
-        # self.dropout_rate = params.dropout_rate
-
     def forward(self, x):
 
         out = self.in_layer(x)
@@ -63,50 +54,81 @@ class DiscriminatorNet(nn.Module):
         out = self.hidden2(out)
         out = self.hidden3(out)
         out = self.out_layer(out)
-        # print(out.size())
 
         return out
+
+
+def linear_transformation(x):
+    min_v, _ = torch.min(x, 0, True)
+    max_v, _ = torch.max(x, 0, True)
+    range_v = max_v - min_v
+    ones_mat = torch.ones(x.size(0), 1)  # , dtype=torch.int)
+
+    min_mat = torch.mm(ones_mat, min_v)
+    range_mat = torch.mm(ones_mat, range_v)
+
+    zeros_range_ind = (range_mat == 0).nonzero()
+
+    if zeros_range_ind.nelement() == 0:
+        normalised = \
+            (x - min_mat) / range_mat
+    else:
+        print("in else of linear_transformation function")
+        normalised = torch.zeros(x.size())
+
+    return normalised
 
 
 class GeneratorNet(nn.Module):
     def __init__(self, params):
         super(GeneratorNet, self).__init__()
         self.in_layer = nn.Sequential(
-            nn.Linear(params.num_classes, params.hidden_size // 2),
-            nn.ReLU(True),
+            nn.Linear(100, params.hidden_size // 2),
+            # nn.Linear(params.num_classes, params.hidden_size // 2),
+            nn.ReLU(),
             # nn.LeakyReLU(params.leaky_relu_slope),
             # nn.Linear(params.input_size, params.hidden_size),
-            # nn.Dropout(params.dropout_rate)
+            nn.Dropout(params.dropout_rate)
         )
         self.hidden1 = nn.Sequential(
-            nn.Linear(params.hidden_size // 2, params.hidden_size),
-            nn.ReLU(True),
+            nn.Linear(params.hidden_size // 2, params.hidden_size// 2),
+            nn.ReLU(),
             # nn.LeakyReLU(params.leaky_relu_slope),
             # nn.Linear(params.hidden_size, params.hidden_size),
-            # nn.Dropout(params.dropout_rate)
+            nn.Dropout(params.dropout_rate)
         )
         self.hidden2 = nn.Sequential(
-            nn.Linear(params.hidden_size, params.hidden_size),
-            nn.ReLU(True),
+            nn.Linear(params.hidden_size// 2, params.hidden_size),
+            nn.ReLU(),
             # nn.LeakyReLU(params.leaky_relu_slope),
             # nn.Linear(params.hidden_size, params.hidden_size//2),
-            # nn.Dropout(params.dropout_rate)
+            nn.Dropout(params.dropout_rate)
         )
         self.hidden3 = nn.Sequential(
             nn.Linear(params.hidden_size, params.hidden_size),
-            nn.ReLU(True),
+            nn.ReLU(),
             # nn.LeakyReLU(params.leaky_relu_slope),
             # nn.Linear(params.hidden_size, params.hidden_size//2),
-            # nn.Dropout(params.dropout_rate)
+            nn.Dropout(params.dropout_rate)
         )
         self.out_layer = nn.Sequential(
             nn.Linear(params.hidden_size, params.input_size),
             # nn.ReLU(),
             # nn.Linear(params.hidden_size // 2, params.num_classes),
             # nn.LogSoftmax(dim=1)
-            nn.Sigmoid()
+            # nn.Sigmoid()
             # nn.Softmax(dim=1)
         )
+        # self.linear_normalization = linear_transformation()
+
+    # def linear_transformation(self, x):
+    #     min_v = torch.min(x, 0, True)
+    #     range_v = torch.max(x, 0, True) - min_v
+    #     if range_v > 0:
+    #         normalised = (x - min_v) / range_v
+    #     else:
+    #         normalised = torch.zeros(x.size())
+    #     return normalised
 
     def forward(self, x):
 
@@ -115,14 +137,16 @@ class GeneratorNet(nn.Module):
         out = self.hidden2(out)
         out = self.hidden3(out)
         out = self.out_layer(out)
+        out = linear_transformation(out)
 
         return out
 
 
 # Noise
 def noise(size):
-    n = Variable(torch.rand(size, 10))
-    # n = Variable(torch.randint(256, (size, 10)))
+    # n = Variable(torch.rand(size, num_of_classes))
+    # print(n)
+    n = Variable(torch.randint(256, (size, 100)))
     # n = Variable(torch.randn(size, 10))
     if torch.cuda.is_available():
         return n.cuda()
