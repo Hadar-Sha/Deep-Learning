@@ -48,9 +48,9 @@ class Logger:
         if format=='NHWC':
             images = images.transpose(1,3)
 
-        #
-        # step = Logger._step(epoch, n_batch, num_batches)
-        # img_name = '{}/images{}'.format(self.comment, '')
+
+        step = Logger._step(epoch, n_batch, num_batches)
+        img_name = '{}/images{}'.format(self.comment, '')
 
         # Make horizontal grid from image tensor
         horizontal_grid = vutils.make_grid(

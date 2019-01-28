@@ -1,6 +1,6 @@
 from IPython import display
 
-from utils import Logger
+from vanilla_gan_tutorial_utils import Logger
 
 import torch
 from torch import nn, optim

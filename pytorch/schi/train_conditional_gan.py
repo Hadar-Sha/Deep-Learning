@@ -10,15 +10,16 @@ from torch.autograd import Variable
 # from tqdm import tqdm
 
 from utils_gan import Logger
-from display_digit import *
+import display_digit as display_results
 import utils
 import model_gan.conditional_gan_net as gan_net
 # import model_gan.two_labels_data_loader as data_loader
 import model_gan.one_label_data_loader as data_loader
+import numpy as np
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--data_dir', default='data/grayscale-logits', help="Directory containing the dataset")
-# data-two-labels-big
+parser.add_argument('--data_dir', default='data/data-with-grayscale-4000', help="Directory containing the dataset")
+# data-two-labels-big # grayscale-logits # data/data-w-gray-only-2 data/data-with-grayscale-4000
 parser.add_argument('--model_dir', default='experiments/cgan_model', help="Directory containing params.json")
 parser.add_argument('--restore_file', default=None,
                     help="Optional, name of the file in --model_dir containing weights to reload before \
@@ -74,9 +75,10 @@ def train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, dataloader, param
         metrics: (dict) a dictionary of functions that compute a metric using the output and labels of each batch
         params: (Params) hyperparameters
         epoch:
+        fig:
     """
 
-    logger = Logger(model_name='VGAN', data_name='SCHI')
+    logger = Logger(model_name='CGAN', data_name='SCHI')
 
     # fig = create_figure()
 
@@ -85,8 +87,9 @@ def train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, dataloader, param
     for i, (real_batch, real_label) in enumerate(dataloader):
         # for i, (train_batch, labels_batch) in enumerate(dataloader):
 
-        # normalize to [0,1]
-        real_batch = real_batch/255
+        # # normalize to [-1,1]
+        # real_batch = (real_batch - 127.5)/127.5
+        # real_batch = real_batch.view(real_batch.size(0), 24)
 
         # 1. Train Discriminator
         real_data = Variable(real_batch)
@@ -96,59 +99,81 @@ def train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, dataloader, param
             real_data = real_data.cuda()
             real_label = real_label.cuda()
 
-        # if real_label.size(1) == 1:
-        #     real_label = real_label.view(real_label.size(0))
+        if not params.is_one_hot:
+            if real_label.size(1) == 1:
+                real_label = real_label.view(real_label.size(0))
 
         # real_label = real_label.type(torch.FloatTensor)
-        real_one_hot_v = gan_net.convert_int_to_one_hot_vector(real_label, params.num_classes)
+        else:
+            real_one_hot_v = gan_net.convert_int_to_one_hot_vector(real_label, params.num_classes)
 
         # Generate fake data
-        noisy_input = gan_net.noise(real_data.size(0))
+        noisy_input = gan_net.noise(real_data.size(0), params.noise_dim)
         # noisy_label = gan_net.create_random_labels(real_data.size(0))
-        noisy_label = Variable(torch.randint(params.num_classes, (real_data.size(0), 1)))
-        noisy_label = noisy_label.type(torch.LongTensor)
-        noisy_one_hot_v = gan_net.convert_int_to_one_hot_vector(noisy_label, params.num_classes)
 
-        # fake_data = g_model(noisy_input, noisy_label).detach()
-        fake_data = g_model(noisy_input, noisy_one_hot_v).detach()
+        # noisy_label = Variable(2*torch.ones((real_data.size(0),), dtype=torch.int))
+        noisy_label = Variable(torch.randint(params.num_classes, (real_data.size(0),)))
+        noisy_label = noisy_label.type(torch.LongTensor)
+
+        if params.is_one_hot:
+            noisy_label = noisy_label.view(real_data.size(0), -1)
+            noisy_one_hot_v = gan_net.convert_int_to_one_hot_vector(noisy_label, params.num_classes)
+
+        if not params.is_one_hot:
+            fake_data = g_model(noisy_input, noisy_label).detach()
+        else:
+            fake_data = g_model(noisy_input, noisy_one_hot_v).detach()
 
         # Train D
-        # d_error, d_pred_real, d_pred_fake = train_discriminator(d_model, d_optimizer, real_data, fake_data, real_label, noisy_label)
-        d_error, d_pred_real, d_pred_fake = train_discriminator(d_model, d_optimizer, real_data, fake_data,
+        if not params.is_one_hot:
+            d_error, d_pred_real, d_pred_fake = train_discriminator(d_model, d_optimizer, real_data, fake_data,
+                                                              real_label, noisy_label)
+        else:
+            d_error, d_pred_real, d_pred_fake = train_discriminator(d_model, d_optimizer, real_data, fake_data,
                                                                 real_one_hot_v, noisy_one_hot_v)
 
         # 2. Train Generator
         # Generate fake data
-        noisy_input = gan_net.noise(real_data.size(0))
-        # fake_data = g_model(noisy_input, noisy_label)
-        fake_data = g_model(noisy_input, noisy_one_hot_v)
+        noisy_input = gan_net.noise(real_data.size(0), params.noise_dim)
+        if not params.is_one_hot:
+            fake_data = g_model(noisy_input, noisy_label)
+        else:
+            fake_data = g_model(noisy_input, noisy_one_hot_v)
+
         # Train G
-        # g_error = train_generator(d_model, g_optimizer, fake_data, noisy_label)
-        g_error = train_generator(d_model, g_optimizer, fake_data, noisy_one_hot_v)
+        if not params.is_one_hot:
+            g_error = train_generator(d_model, g_optimizer, fake_data, noisy_label)
+        else:
+            g_error = train_generator(d_model, g_optimizer, fake_data, noisy_one_hot_v)
+
         # Log error
-        logger.log(d_error, g_error, epoch, i, i)  # num_batches)
+        logger.log(d_error, g_error, epoch, i+1, i+1)  # num_batches)
+
+        # Save Losses for plotting later
+        G_losses.append(d_error.item())
+        D_losses.append(g_error.item())
+
+        G_preds.append(d_pred_fake.data.mean())
+        D_preds.append(d_pred_real.data.mean())
 
     # Display Progress
-    # if (epoch+1) % (0.25*params.num_epochs) == 0:
     if (epoch+1) % (0.01*params.num_epochs) == 0:
 
-        # # create random noise and samples
-        # test_noise = gan_net.noise(num_test_samples)
-        # test_labels = Variable(torch.randint(10, (num_test_samples, 1)))
-
         # Display Images
-        # test_samples = g_model(test_noise, test_labels).data.cpu()
-        test_samples = g_model(test_noise, test_one_hot_v).data.cpu()
-        test_samples = gan_net.vectors_to_samples(test_samples)
-        # test_labels = test_labels.data.cpu()
-        # test_labels = gan_net.labels_to_titles(test_labels)
+        if not params.is_one_hot:
+            test_samples = g_model(test_noise, test_labels).data.cpu()
+        else:
+            test_samples = g_model(test_noise, test_one_hot_v).data.cpu()
 
-        # fig, axes = create_grid(num_test_samples)
-        # fill_grid(test_samples, axes)
+        test_samples = gan_net.vectors_to_samples(test_samples)  # ?
 
-        fill_figure(test_samples, fig, gan_net.labels_to_titles(test_labels))
+        # fig1, axes1 = display_results.create_grid(num_test_samples)
+        # display_results.fill_grid(test_samples, fig1, axes1, epoch, i+1)
 
-        # logger.log_images(test_images, num_test_samples, epoch, i, 17)
+        # numpy_samples = np.array([np.array(xi) for xi in test_samples])
+        # logger.log_images(numpy_samples, num_test_samples, epoch, i+1, i+1)
+
+        display_results.fill_figure(test_samples, fig, gan_net.labels_to_titles(test_labels))
         # Display status Logs
         logger.display_status(
             epoch+1, params.num_epochs, i+1, i+1,
@@ -158,8 +183,9 @@ def train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, dataloader, param
 def train_gan(d_model, g_model, train_dataloader, dev_dataloader, d_optimizer, g_optimizer, loss_fn, params, model_dir,
                        restore_file=None):
 
-    plt.ion()
-    fig = create_figure()
+    # plt.ion()
+    fig = display_results.create_figure()
+
     # fig = None
 
     for epoch in range(params.num_epochs):
@@ -167,6 +193,7 @@ def train_gan(d_model, g_model, train_dataloader, dev_dataloader, d_optimizer, g
         logging.info("Epoch {}/{}".format(epoch + 1, params.num_epochs))
 
         train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, train_dataloader, params, epoch, fig)  # , axes)
+
     return
 
 
@@ -181,10 +208,10 @@ if __name__ == '__main__':
     # use GPU if available
     params.cuda = torch.cuda.is_available()
 
-    # Set the random seed for reproducible experiments
-    torch.manual_seed(230)
-    if params.cuda:
-        torch.cuda.manual_seed(230)
+    # # Set the random seed for reproducible experiments
+    # torch.manual_seed(230)
+    # if params.cuda:
+    #     torch.cuda.manual_seed(230)
 
     # Set the logger
     utils.set_logger(os.path.join(args.model_dir, 'train.log'))
@@ -207,35 +234,104 @@ if __name__ == '__main__':
         gan_net.discriminator.cuda()
         gan_net.generator.cuda()
 
+    discriminator.apply(gan_net.weights_init)
+    generator.apply(gan_net.weights_init)
+
     print(discriminator)
     print(generator)
 
     # Optimizers
-    d_optimizer = optim.Adam(discriminator.parameters(), lr=params.learning_rate, betas=(params.beta1, 0.999))
-    g_optimizer = optim.Adam(generator.parameters(), lr=params.learning_rate, betas=(params.beta1, 0.999))
+    d_optimizer = optim.Adam(discriminator.parameters(), lr=params.learning_rate, betas=(params.beta1, params.beta2))
+    g_optimizer = optim.Adam(generator.parameters(), lr=params.learning_rate, betas=(params.beta1, params.beta2))
     # d_optimizer = optim.SGD(discriminator.parameters(), lr=params.learning_rate)
     # g_optimizer = optim.SGD(generator.parameters(), lr=params.learning_rate)
 
-    # fetch loss function and metrics
+    # fetch loss function
     loss_fn = gan_net.loss_fn
-
-    # metrics = gan_net.metrics
-    # incorrect = gan_net.incorrect
 
     # Train the model
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))
     num_test_samples = 20
-    test_noise = gan_net.noise(num_test_samples)
+    test_noise = gan_net.noise(num_test_samples, params.noise_dim)
+    # if params.is_one_hot:
+    #     test_noise_one_hot_v = gan_net.convert_int_to_one_hot_vector(test_noise, params.num_classes)
 
     # test_labels = gan_net.create_random_labels(num_test_samples)
-    test_labels = Variable(torch.randint(10, (num_test_samples, 1)))
+
+    # test_labels = Variable(torch.randint(params.num_classes, (num_test_samples,)))
     test_labels = list(range(num_test_samples))
     test_labels = [it % params.num_classes for it in test_labels]
+    # test_labels = [2 for _ in range(num_test_samples)]
     test_labels = torch.Tensor(test_labels)
-    test_labels = test_labels.view(num_test_samples, -1)
     test_labels = test_labels.type(torch.LongTensor)
 
-    test_one_hot_v = gan_net.convert_int_to_one_hot_vector(test_labels, params.num_classes)
+    if params.is_one_hot:
+        test_labels = test_labels.view(num_test_samples, -1)
+        test_one_hot_v = gan_net.convert_int_to_one_hot_vector(test_labels, params.num_classes)
+
+    D_losses = []
+    G_losses = []
+    D_preds = []
+    G_preds = []
 
     train_gan(discriminator, generator, train_dl, dev_dl, d_optimizer, g_optimizer, loss_fn, params, args.model_dir,
               args.restore_file)
+
+    # track results
+    display_results.plot_graph(G_losses, D_losses, "Loss")
+    display_results.plot_graph(G_preds, D_preds, "Predictions")
+
+    status_discriminator = []
+    status_generator = []
+    d_grads_graph = []
+    g_grads_graph = []
+
+    for param_tensor in discriminator.state_dict():
+
+        status_discriminator.append([param_tensor,
+                                       (discriminator.state_dict()[param_tensor].norm()).item(),
+                                       list(discriminator.state_dict()[param_tensor].size())])
+
+        all_d_grads = ((discriminator.state_dict()[param_tensor]).numpy()).tolist()
+        # if needed, flatten the list to get one nim and one max
+        if isinstance(all_d_grads, (list,)):
+            flat_d_grads = []
+            for elem in all_d_grads:
+                if isinstance(elem, (list,)) and isinstance(elem[0], (list,)):
+                    for item in elem:
+                        flat_d_grads.extend(item)
+                elif isinstance(elem, (list,)):
+                    flat_d_grads.extend(elem)
+                else:
+                    flat_d_grads.extend([elem])
+        else:
+            flat_d_grads = all_d_grads
+        # flat_d_grads = [item for sublist in all_d_grads for item in sublist]
+        d_grads_graph.append([min(flat_d_grads), max(flat_d_grads)])
+    # print(len(d_grads_graph))
+
+    for param_tensor in generator.state_dict():
+        status_generator.append([param_tensor,
+                                     (generator.state_dict()[param_tensor].norm()).item(),
+                                     list(generator.state_dict()[param_tensor].size())])
+        all_g_grads = ((generator.state_dict()[param_tensor]).numpy()).tolist()
+        # if needed, flatten the list to get one nim and one max
+
+        if isinstance(all_d_grads, (list,)):
+            flat_g_grads = []
+            for elem in all_g_grads:
+                if isinstance(elem, (list,)) and isinstance(elem[0], (list,)):
+                    for item in elem:
+                        flat_g_grads.extend(item)
+                elif isinstance(elem, (list,)):
+                    flat_g_grads.extend(elem)
+                else:
+                    flat_g_grads.extend([elem])
+        else:
+            flat_g_grads = all_g_grads
+
+        # flat_g_grads = [item for sublist in all_g_grads for item in sublist]
+        g_grads_graph.append([min(flat_g_grads), max(flat_g_grads)])
+
+    # print(len(g_grads_graph))
+    display_results.plot_graph(g_grads_graph, d_grads_graph, "Grads")

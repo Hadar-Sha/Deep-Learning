@@ -2,10 +2,14 @@ import numpy as np
 from matplotlib.patches import Polygon
 import matplotlib.pyplot as plt
 import math
-
+import argparse
+import os
 
 width = 1
 height = 0.2
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--model_dir', default='experiments/cgan_model', help="Directory containing params.json")
 
 
 def create_background(color):
@@ -67,12 +71,13 @@ def display_digit(colors, myaxis):
 
     # flat_colors = [item for sublist in colors for item in sublist]
 
-    # numpy_colors = np.array(colors)
-    #
-    # if numpy_colors.min() < 0 or numpy_colors.max() > 1:
-    #     numpy_colors = (numpy_colors - numpy_colors.min()) / (numpy_colors.max()- numpy_colors.min())
-    #
-    # colors = numpy_colors.tolist()
+    numpy_colors = np.array(colors)
+    # numpy_colors = np.array([np.array(xi) for xi in colors])
+
+    if numpy_colors.min() < 0 or numpy_colors.max() > 1:
+        numpy_colors = (numpy_colors - numpy_colors.min()) / (numpy_colors.max() - numpy_colors.min())
+
+    colors = numpy_colors.tolist()
 
     patches = []
     myaxis.set_xlim([0, 2 * width])
@@ -86,13 +91,22 @@ def display_digit(colors, myaxis):
     patches.append(bg_patch)
     myaxis.add_patch(bg_patch)
 
-    segments_centers.append([center[0], center[1] - width - height])
-    segments_centers.append([center[0], center[1]])
     segments_centers.append([center[0], center[1] + width + height])
-    segments_centers.append([center[0] - width / 2 - height / 2, center[1] - width / 2 - height / 2])
-    segments_centers.append([center[0] + width / 2 + height / 2, center[1] - width / 2 - height / 2])
+    segments_centers.append([center[0], center[1]])
+    segments_centers.append([center[0], center[1] - width - height])
     segments_centers.append([center[0] - width / 2 - height / 2, center[1] + width / 2 + height / 2])
     segments_centers.append([center[0] + width / 2 + height / 2, center[1] + width / 2 + height / 2])
+    segments_centers.append([center[0] - width / 2 - height / 2, center[1] - width / 2 - height / 2])
+    segments_centers.append([center[0] + width / 2 + height / 2, center[1] - width / 2 - height / 2])
+
+
+    # segments_centers.append([center[0], center[1] - width - height])
+    # segments_centers.append([center[0], center[1]])
+    # segments_centers.append([center[0], center[1] + width + height])
+#     segments_centers.append([center[0] - width / 2 - height / 2, center[1] - width / 2 - height / 2])
+#     segments_centers.append([center[0] + width / 2 + height / 2, center[1] - width / 2 - height / 2])
+#     segments_centers.append([center[0] - width / 2 - height / 2, center[1] + width / 2 + height / 2])
+#     segments_centers.append([center[0] + width / 2 + height / 2, center[1] + width / 2 + height / 2])
 
     vertical_horizon = [0, 0, 0, 1, 1, 1, 1]
     for i in range(len(segments_centers)):
@@ -108,7 +122,9 @@ def create_figure():
     return fig
 
 
-def fill_figure(samples, fig, labels=None):
+def fill_figure(samples, fig, labels=None):  # , save=True):
+    # args = parser.parse_args()
+    fig.clear()
 
     num_of_samples = len(samples)
     axes = np.zeros((4, 5)).tolist()
@@ -124,6 +140,11 @@ def fill_figure(samples, fig, labels=None):
         display_digit(samples[i], axes[row][col])
 
     plt.draw()
+    # if save:
+    #     path = os.path.join(args.model_dir, 'images')
+    #     if not os.path.isdir(path):
+    #         os.mkdir(path)
+    #         fig.savefig('{}/{}_epoch_{}_batch_{}.png'.format(path, '', epoch, n_batch))
     # plt.show()
     plt.pause(0.001)
 
@@ -136,43 +157,92 @@ def fill_figure(samples, fig, labels=None):
     #         print(v)
     #        # axes[i][j].cla()
 
-    fig.clear()
+    # fig.clear()
+
+
+def plot_graph(g_losses, d_losses, gtype):
+    plt.figure(figsize=(10, 5))
+    if gtype == "Loss":
+        plt.title("Generator and Discriminator Loss During Training")
+        plt.xlabel("iterations")
+        plt.ylabel("Loss")
+    elif gtype == "Predictions":
+        plt.title("Generator and Discriminator predictions During Training")
+        plt.xlabel("iterations")
+        plt.ylabel("Predictions")
+    else:
+        plt.title("Generator and Discriminator min and max gradients During Training")
+        plt.xlabel("layers")
+        plt.ylabel("Grads")
+    plt.plot(g_losses, label="G")
+    plt.plot(d_losses, label="D")
+
+    plt.legend()
+    plt.show()
+    return
 
 
 def create_grid(num_of_samples):
     fig, axes = plt.subplots(4, math.ceil(num_of_samples / 4), subplot_kw=dict(), clear=True)
+    # fig.set_visible(False)
     return fig, axes
 
 
-def fill_grid(samples, axes):
+def fill_grid(samples, fig, axes, epoch, n_batch, save=True):
     num_of_samples = len(samples)
+    args = parser.parse_args()
+
+    # plt.draw()
+
 
     for i in range(num_of_samples):
         row, col = np.unravel_index(i, (4, math.ceil(num_of_samples/4)))
         display_digit(samples[i], axes[row, col])
 
+    # fig.set_visible(False)
+    if save:
+        path = os.path.join(args.model_dir, 'images')
+        if not os.path.isdir(path):
+            os.mkdir(path)
+        fig.savefig('{}/{}_epoch_{}_batch_{}.png'.format(path, '', epoch, n_batch))
+
     plt.draw()
-    plt.pause(0.001)
     plt.show()
+    plt.pause(0.001)
+    plt.close(fig)
+
+    # plt.pause(0.001)
+    # plt.show()
 
     return
 
 
 if __name__ == '__main__':
-    create_grid(16)
-#     colors = [[1, 0, 0]]*7
-#     colors.append([0, 0, 1])
+    # create_grid(16)
+    # colors = [[1, 0, 0]]*3
+    colors = []
+    colors.append([1, 0, 0])
+    colors.append([1, 0, 0])
+    colors.append([1, 0, 0])
+    colors.append([1, 0, 0])
+    colors.append([1, 0, 0])
+    colors.append([0, 0, 0])
+    colors.append([1, 0, 0])
+    # background
+    colors.append([0, 0, 0])
+
+    print(colors)
 #     patches = []
-#     # fig, ax = plt.subplots()
+    fig, ax = plt.subplots()
 #     # ax.set_xlim([0, 2*width])
 #     # ax.set_ylim([0, 3*width])
 #     # ax.set_aspect('equal', 'box')
 #     # ax.axis('equal')
 #     # ax.axis([0, 3*width, 0, 3*width])
 #
-#     display_digit(colors)
+    display_digit(colors, ax)
 
-    # plt.show()
+    plt.show()
 
 
 #     width = 100
