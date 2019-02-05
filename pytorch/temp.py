@@ -5,6 +5,7 @@ import numpy as np
 from scipy import stats
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib import animation
 
 batch_size = 5
 second_dim = 3
@@ -164,3 +165,45 @@ for i in range(20):
     b[i][:] = np.random.choice(all_but_eight,2, replace=False)
 
 print(b)
+
+# import numpy as np
+# import matplotlib.pyplot as plt
+
+
+fig, ax = plt.subplots()
+xdata, ydata = [], []
+ln, = plt.plot([], [], 'ro', animated=True)
+
+
+def init():
+    ax.set_xlim(0, 2*np.pi)
+    ax.set_ylim(-1, 1)
+    return ln,
+
+
+def update(frame):
+    xdata.append(frame)
+    ydata.append(np.sin(frame))
+    ln.set_data(xdata, ydata)
+    return ln,
+
+
+ani = animation.FuncAnimation(fig, update, frames=np.linspace(0, 2*np.pi, 128),
+                    init_func=init, blit=True)
+plt.show()
+
+fig2 = plt.figure()
+
+x = np.arange(-9, 10)
+y = np.arange(-9, 10).reshape(-1, 1)
+base = np.hypot(x, y)
+ims = []
+for add in np.arange(15):
+    ims.append((plt.pcolor(x, y, base + add, norm=plt.Normalize(0, 30)),))
+
+im_ani = animation.ArtistAnimation(fig2, ims, interval=50, repeat_delay=3000,
+                                   blit=True)
+# To save this second animation with some metadata, use the following command:
+# im_ani.save('im.mp4', metadata={'artist':'Guido'})
+
+plt.show()

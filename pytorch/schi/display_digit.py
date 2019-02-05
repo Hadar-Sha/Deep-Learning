@@ -1,6 +1,7 @@
 import numpy as np
 from matplotlib.patches import Polygon
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import math
 import argparse
 import os
@@ -10,6 +11,8 @@ height = 0.2
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_dir', default='experiments/cgan_model', help="Directory containing params.json")
+
+plt.ioff()
 
 
 def create_background(color):
@@ -99,15 +102,6 @@ def display_digit(colors, myaxis):
     segments_centers.append([center[0] - width / 2 - height / 2, center[1] - width / 2 - height / 2])
     segments_centers.append([center[0] + width / 2 + height / 2, center[1] - width / 2 - height / 2])
 
-
-    # segments_centers.append([center[0], center[1] - width - height])
-    # segments_centers.append([center[0], center[1]])
-    # segments_centers.append([center[0], center[1] + width + height])
-#     segments_centers.append([center[0] - width / 2 - height / 2, center[1] - width / 2 - height / 2])
-#     segments_centers.append([center[0] + width / 2 + height / 2, center[1] - width / 2 - height / 2])
-#     segments_centers.append([center[0] - width / 2 - height / 2, center[1] + width / 2 + height / 2])
-#     segments_centers.append([center[0] + width / 2 + height / 2, center[1] + width / 2 + height / 2])
-
     vertical_horizon = [0, 0, 0, 1, 1, 1, 1]
     for i in range(len(segments_centers)):
         polygon = create_segment(segments_centers[i], vertical_horizon[i], colors[i])
@@ -118,13 +112,19 @@ def display_digit(colors, myaxis):
 
 
 def create_figure():
+    # print(mpl.is_interactive())
     fig = plt.figure()
+    # print(id(plt.gcf()))
+    # fig.set_visible(False)  # ? need ti be checked
     return fig
 
 
 def fill_figure(samples, fig, labels=None):  # , save=True):
     # args = parser.parse_args()
     fig.clear()
+    # print(id(plt.gcf()))
+
+    # fig.set_visible(not fig.get_visible())   # ? need ti be checked
 
     num_of_samples = len(samples)
     axes = np.zeros((4, 5)).tolist()
@@ -139,6 +139,7 @@ def fill_figure(samples, fig, labels=None):  # , save=True):
             axes[row][col].set_title(digit_val)
         display_digit(samples[i], axes[row][col])
 
+    # fig.set_visible(True)  # ? need ti be checked
     plt.draw()
     # if save:
     #     path = os.path.join(args.model_dir, 'images')
@@ -146,8 +147,9 @@ def fill_figure(samples, fig, labels=None):  # , save=True):
     #         os.mkdir(path)
     #         fig.savefig('{}/{}_epoch_{}_batch_{}.png'.format(path, '', epoch, n_batch))
     # plt.show()
-    plt.pause(0.001)
-
+    plt.pause(10)  # 0.001
+    # fig.set_visible(False)   # ? need ti be checked
+    # plt.close()
     # for i in range(4):
     #     for j in range(4):
     #         v = axes[i][j].get_title()
