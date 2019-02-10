@@ -9,7 +9,7 @@ import torch.optim as optim
 from torch.autograd import Variable
 # from tqdm import tqdm
 
-from utils_gan import Logger
+# from utils_gan import Logger
 import display_digit as display_results
 import utils
 import model_gan.conditional_gan_net as gan_net
@@ -64,6 +64,24 @@ def train_generator(d, optimizer, fake_data, fake_labels):
     return error
 
 
+def get_stats(d_error, g_error, d_pred_real, d_pred_fake):
+    stats = {}
+    if isinstance(d_error, torch.autograd.Variable):
+        d_error = d_error.data.cpu().numpy()
+        stats['d_error'] = d_error
+    if isinstance(g_error, torch.autograd.Variable):
+        g_error = g_error.data.cpu().numpy()
+        stats['g_error'] = g_error
+    if isinstance(d_pred_real, torch.autograd.Variable):
+        d_pred_real = d_pred_real.data.mean()
+        stats['d_pred_real'] = d_pred_real
+    if isinstance(d_pred_fake, torch.autograd.Variable):
+        d_pred_fake = d_pred_fake.data.mean()
+        stats['d_pred_fake'] = d_pred_fake
+
+    return stats
+
+
 def train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, dataloader, params, epoch, fig):  # , axes):
     """Train the model on `num_steps` batches
 
@@ -78,12 +96,6 @@ def train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, dataloader, param
         fig:
     """
 
-    logger = Logger(model_name='CGAN', data_name='SCHI')
-
-    # fig = display_results.create_figure()
-
-    # Use tqdm for progress bar
-    # with tqdm(total=len(dataloader)) as t:
     for i, (real_batch, real_label) in enumerate(dataloader):
 
         # 1. Train Discriminator
@@ -96,13 +108,9 @@ def train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, dataloader, param
 
         # Generate fake data
         noisy_input = gan_net.noise(real_data.size(0), params.noise_dim)
-        # noisy_label = gan_net.create_random_labels(real_data.size(0))
 
-        # noisy_label = Variable(2*torch.ones((real_data.size(0),), dtype=torch.int))
         noisy_label = Variable(torch.randint(params.num_classes, (real_data.size(0),)))
         noisy_label = noisy_label.type(torch.LongTensor)
-
-        test_samples = None
 
         if not params.is_one_hot:
             if real_label.size(1) == 1:
@@ -134,8 +142,10 @@ def train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, dataloader, param
             # Train G
             g_error = train_generator(d_model, g_optimizer, fake_data, noisy_one_hot_v)
 
-        # Log error
-        logger.log(d_error, g_error, epoch, i+1, i+1)  # num_batches)
+        # # Log error
+        stats = get_stats(d_error, g_error, d_pred_real, d_pred_fake)
+        stats_string = " ; ".join("{}: {:05.3f}".format(k, v) for k, v in stats.items())
+        logging.info("metrics: " + stats_string)
 
         # Save Losses for plotting later
         G_losses.append(d_error.item())
@@ -145,24 +155,25 @@ def train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, dataloader, param
         D_preds.append(d_pred_real.data.mean())
 
     # Display Progress
-    if (epoch+1) % (0.01*params.num_epochs) == 0:
-
-        # Display Images
-        if not params.is_one_hot:
-            test_samples = g_model(test_noise, test_labels).data.cpu()
-        else:
-            test_samples = g_model(test_noise, test_one_hot_v).data.cpu()
-
+    # Display Images
+    if not params.is_one_hot:
+        test_samples = g_model(test_noise, test_labels).data.cpu()
+    else:
+        test_samples = g_model(test_noise, test_one_hot_v).data.cpu()
+    if (epoch + 1) % (0.01 * params.num_epochs) == 0:
         test_samples_reshaped = gan_net.vectors_to_samples(test_samples)  # ?
 
         # fig1, axes1 = display_results.create_grid(num_test_samples)
         # display_results.fill_grid(test_samples, fig1, axes1, epoch, i+1)
 
         display_results.fill_figure(test_samples_reshaped, fig, gan_net.labels_to_titles(test_labels))
-        # Display status Logs
-        logger.display_status(
-            epoch+1, params.num_epochs, i+1, i+1,
-            d_error, g_error, d_pred_real, d_pred_fake)
+
+        print("Epoch {}/{}".format(epoch + 1, params.num_epochs))
+        print(stats_string)
+        # # Display status Logs
+        # logger.display_status(
+        #     epoch+1, params.num_epochs, i+1, i+1,
+        #     d_error, g_error, d_pred_real, d_pred_fake)
 
     return test_samples
 
@@ -171,7 +182,6 @@ def train_gan(d_model, g_model, train_dataloader, dev_dataloader, d_optimizer, g
                        restore_file=None):
 
     fig = display_results.create_figure()
-    # fig = None
 
     for epoch in range(params.num_epochs):
         # Run one epoch
@@ -187,14 +197,12 @@ def train_gan(d_model, g_model, train_dataloader, dev_dataloader, d_optimizer, g
                                'state_dict': g_model.state_dict(),
                                'optim_dict': g_optimizer.state_dict()}, is_best=False, checkpoint=model_dir, ntype='g')
 
-        # a=1
         if test_samples is not None:
             np_test_samples = np.array(test_samples)
             np_test_samples = np.around(np_test_samples * 127.5 + 127.5).astype(int)
             np_test_out = (test_noise.numpy())  # .tolist()
             np_test_labels = (test_labels.view(test_labels.shape[0], -1).numpy())
-            # print(np_test_samples.shape)
-            # print(np_test_labels.shape)
+
             test_all_data = (np.concatenate((np_test_samples, np_test_out, np_test_labels), axis=1)).tolist()
             last_csv_path = os.path.join(model_dir, "samples_epoch_{}.csv".format(epoch+1))
             utils.save_incorrect_to_csv(test_all_data, last_csv_path)
@@ -288,11 +296,8 @@ if __name__ == '__main__':
     num_test_samples = 20
     test_noise = gan_net.noise(num_test_samples, params.noise_dim)
 
-    # test_labels = gan_net.create_random_labels(num_test_samples)
-    # test_labels = Variable(torch.randint(params.num_classes, (num_test_samples,)))
     test_labels = list(range(num_test_samples))
     test_labels = [it % params.num_classes for it in test_labels]
-    # test_labels = [2 for _ in range(num_test_samples)]
     test_labels = torch.Tensor(test_labels)
     test_labels = test_labels.type(torch.LongTensor)
 
@@ -312,57 +317,7 @@ if __name__ == '__main__':
     display_results.plot_graph(G_losses, D_losses, "Loss")
     display_results.plot_graph(G_preds, D_preds, "Predictions")
 
-    # status_discriminator = []
-    # status_generator = []
-    # d_grads_graph = []
-    # g_grads_graph = []
-
     d_grads_graph = collect_network_statistics(discriminator)
     g_grads_graph = collect_network_statistics(generator)
-
-    # for param_tensor in discriminator.state_dict():
-    #
-    #     status_discriminator.append([param_tensor,
-    #                                    (discriminator.state_dict()[param_tensor].norm()).item(),
-    #                                    list(discriminator.state_dict()[param_tensor].size())])
-    #
-    #     all_d_grads = ((discriminator.state_dict()[param_tensor]).numpy()).tolist()
-    #     # if needed, flatten the list to get one nim and one max
-    #     if isinstance(all_d_grads, (list,)):
-    #         flat_d_grads = []
-    #         for elem in all_d_grads:
-    #             if isinstance(elem, (list,)) and isinstance(elem[0], (list,)):
-    #                 for item in elem:
-    #                     flat_d_grads.extend(item)
-    #             elif isinstance(elem, (list,)):
-    #                 flat_d_grads.extend(elem)
-    #             else:
-    #                 flat_d_grads.extend([elem])
-    #     else:
-    #         flat_d_grads = all_d_grads
-    #
-    #     d_grads_graph.append([min(flat_d_grads), max(flat_d_grads)])
-    #
-    # for param_tensor in generator.state_dict():
-    #     status_generator.append([param_tensor,
-    #                                  (generator.state_dict()[param_tensor].norm()).item(),
-    #                                  list(generator.state_dict()[param_tensor].size())])
-    #     all_g_grads = ((generator.state_dict()[param_tensor]).numpy()).tolist()
-    #     # if needed, flatten the list to get one nim and one max
-    #
-    #     if isinstance(all_d_grads, (list,)):
-    #         flat_g_grads = []
-    #         for elem in all_g_grads:
-    #             if isinstance(elem, (list,)) and isinstance(elem[0], (list,)):
-    #                 for item in elem:
-    #                     flat_g_grads.extend(item)
-    #             elif isinstance(elem, (list,)):
-    #                 flat_g_grads.extend(elem)
-    #             else:
-    #                 flat_g_grads.extend([elem])
-    #     else:
-    #         flat_g_grads = all_g_grads
-    #
-    #     g_grads_graph.append([min(flat_g_grads), max(flat_g_grads)])
 
     display_results.plot_graph(g_grads_graph, d_grads_graph, "Grads")

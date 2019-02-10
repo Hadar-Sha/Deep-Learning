@@ -5,6 +5,7 @@ import matplotlib as mpl
 import math
 import argparse
 import os
+from matplotlib import animation
 
 width = 1
 height = 0.2
@@ -112,19 +113,13 @@ def display_digit(colors, myaxis):
 
 
 def create_figure():
-    # print(mpl.is_interactive())
     fig = plt.figure()
-    # print(id(plt.gcf()))
-    # fig.set_visible(False)  # ? need ti be checked
     return fig
 
 
 def fill_figure(samples, fig, labels=None):  # , save=True):
     # args = parser.parse_args()
     fig.clear()
-    # print(id(plt.gcf()))
-
-    # fig.set_visible(not fig.get_visible())   # ? need ti be checked
 
     num_of_samples = len(samples)
     axes = np.zeros((4, 5)).tolist()
@@ -139,7 +134,7 @@ def fill_figure(samples, fig, labels=None):  # , save=True):
             axes[row][col].set_title(digit_val)
         display_digit(samples[i], axes[row][col])
 
-    # fig.set_visible(True)  # ? need ti be checked
+    im_ani = animation.ArtistAnimation(fig, axes, interval=2, repeat=False, blit=False)
     plt.draw()
     # if save:
     #     path = os.path.join(args.model_dir, 'images')
@@ -147,19 +142,7 @@ def fill_figure(samples, fig, labels=None):  # , save=True):
     #         os.mkdir(path)
     #         fig.savefig('{}/{}_epoch_{}_batch_{}.png'.format(path, '', epoch, n_batch))
     # plt.show()
-    plt.pause(10)  # 0.001
-    # fig.set_visible(False)   # ? need ti be checked
-    # plt.close()
-    # for i in range(4):
-    #     for j in range(4):
-    #         v = axes[i][j].get_title()
-    #         print(v)
-    #         axes[i][j].set_title('')
-    #         v = axes[i][j].get_title()
-    #         print(v)
-    #        # axes[i][j].cla()
-
-    # fig.clear()
+    plt.pause(0.001)  # 0.001 , 10
 
 
 def plot_graph(g_losses, d_losses, gtype):
@@ -186,7 +169,6 @@ def plot_graph(g_losses, d_losses, gtype):
 
 def create_grid(num_of_samples):
     fig, axes = plt.subplots(4, math.ceil(num_of_samples / 4), subplot_kw=dict(), clear=True)
-    # fig.set_visible(False)
     return fig, axes
 
 
@@ -194,14 +176,10 @@ def fill_grid(samples, fig, axes, epoch, n_batch, save=True):
     num_of_samples = len(samples)
     args = parser.parse_args()
 
-    # plt.draw()
-
-
     for i in range(num_of_samples):
         row, col = np.unravel_index(i, (4, math.ceil(num_of_samples/4)))
         display_digit(samples[i], axes[row, col])
 
-    # fig.set_visible(False)
     if save:
         path = os.path.join(args.model_dir, 'images')
         if not os.path.isdir(path):
@@ -213,15 +191,12 @@ def fill_grid(samples, fig, axes, epoch, n_batch, save=True):
     plt.pause(0.001)
     plt.close(fig)
 
-    # plt.pause(0.001)
-    # plt.show()
 
     return
 
 
 if __name__ == '__main__':
-    # create_grid(16)
-    # colors = [[1, 0, 0]]*3
+
     colors = []
     colors.append([1, 0, 0])
     colors.append([1, 0, 0])
@@ -234,40 +209,9 @@ if __name__ == '__main__':
     colors.append([0, 0, 0])
 
     print(colors)
-#     patches = []
     fig, ax = plt.subplots()
-#     # ax.set_xlim([0, 2*width])
-#     # ax.set_ylim([0, 3*width])
-#     # ax.set_aspect('equal', 'box')
-#     # ax.axis('equal')
-#     # ax.axis([0, 3*width, 0, 3*width])
-#
+
     display_digit(colors, ax)
 
     plt.show()
 
-
-#     width = 100
-#     height = 20
-
-# colors1 = np.array([1, 0.5, 0])
-# #
-# # # for i in range(3):
-# polygon = Polygon([[0.25, 0.75], [0.75, 0.75], [0.75, 0.25], [0.25, 0.25]], True, facecolor=colors1)
-# patches.append(polygon)
-#
-# colors = np.random.rand(len(patches))
-# print(colors)
-# # colors1 = np.array([1, 0, 0])
-# print(colors1)
-# # colors = [100,20,50,70]
-# p = PatchCollection(patches, alpha=1)
-# p.set_array(colors1)
-# # p.set_facecolor(colors1)
-# # p.set_edgecolor(colors1)
-# # # p.set_array(colors1)
-# ax.add_patch(polygon)
-# # ax.add_collection(p)
-# # fig.colorbar(p, ax=ax)
-#
-# plt.show()
