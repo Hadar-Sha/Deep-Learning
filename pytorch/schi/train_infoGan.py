@@ -12,7 +12,7 @@ from torch.autograd import Variable
 from utils_gan import Logger
 import display_digit as display_results
 import utils
-import model_gan.infoGan_net as gan_net
+import model_gan.conditional_gan_net as gan_net
 # import model_gan.two_labels_data_loader as data_loader
 import model_gan.one_label_data_loader as data_loader
 import numpy as np
@@ -33,7 +33,7 @@ def train_discriminator(d, optimizer, real_data, fake_data):  # , real_labels, f
     # 1.1 Train on Real Data
     prediction_real = d(real_data)  # , real_labels)
     # Calculate error and backpropagate
-    error_real = real_fake_loss_fn(prediction_real, gan_net.real_data_target(real_data.size(0)))
+    error_real = loss_fn(prediction_real, gan_net.real_data_target(real_data.size(0)))
     error_real.backward()
 
     # 1.2 Train on Fake Data
@@ -43,7 +43,7 @@ def train_discriminator(d, optimizer, real_data, fake_data):  # , real_labels, f
     prediction_dc = prediction_all[:, 1+params.cc_dim:]
 
     # Calculate error and backpropagate
-    error_fake = real_fake_loss_fn(prediction_fake, gan_net.fake_data_target(real_data.size(0)))
+    error_fake = loss_fn(prediction_fake, gan_net.fake_data_target(real_data.size(0)))
     error_fake.backward()
 
     # 1.3 Update weights with gradients
@@ -60,7 +60,7 @@ def train_generator(d, optimizer, fake_data, fake_labels):
     # Sample noise and generate fake data
     prediction = d(fake_data, fake_labels)
     # Calculate error and backpropagate
-    error = real_fake_loss_fn(prediction, gan_net.real_data_target(prediction.size(0)))  # because of GanHacks trick #4
+    error = loss_fn(prediction, gan_net.real_data_target(prediction.size(0)))  # because of GanHacks trick #4
     error.backward()
     # Update weights with gradients
     optimizer.step()
@@ -212,7 +212,6 @@ if __name__ == '__main__':
 
     # use GPU if available
     params.cuda = torch.cuda.is_available()
-    device = torch.device("cuda:0" if (torch.cuda.is_available()) else "cpu")
 
     # # Set the random seed for reproducible experiments
     # torch.manual_seed(230)
@@ -234,38 +233,26 @@ if __name__ == '__main__':
     logging.info("- done.")
 
     # Define the model and optimizer
-    discriminator = gan_net.DiscriminatorNet(params).to(device)
-    d_real_fake = gan_net.DREalFake(params).to(device)
-    q_dist = gan_net.Q(params).to(device)
-
-    generator = gan_net.GeneratorNet(params).to(device)
-    # if torch.cuda.is_available():
-    #     gan_net.discriminator.cuda()
-    #     gan_net.generator.cuda()
+    discriminator = gan_net.DiscriminatorNet(params)
+    generator = gan_net.GeneratorNet(params)
+    if torch.cuda.is_available():
+        gan_net.discriminator.cuda()
+        gan_net.generator.cuda()
 
     discriminator.apply(gan_net.weights_init)
-    d_real_fake.apply(gan_net.weights_init)
-    q_dist.apply(gan_net.weights_init)
-
     generator.apply(gan_net.weights_init)
 
     print(discriminator)
     print(generator)
 
     # Optimizers
-    # [{'params': discriminator.parameters()}, {'params': d_real_fake.parameters()}]
-    # [{'params': generator.parameters()}, {'params': q_dist.parameters()}]
-    d_optimizer = optim.Adam([{'params': discriminator.parameters()}, {'params': d_real_fake.parameters()}],
-                             lr=params.d_learning_rate, betas=(params.beta1, params.beta2))
-    g_optimizer = optim.Adam([{'params': generator.parameters()}, {'params': q_dist.parameters()}],
-                             lr=params.g_learning_rate, betas=(params.beta1, params.beta2))
+    d_optimizer = optim.Adam(discriminator.parameters(), lr=params.d_learning_rate, betas=(params.beta1, params.beta2))
+    g_optimizer = optim.Adam(generator.parameters(), lr=params.g_learning_rate, betas=(params.beta1, params.beta2))
     # d_optimizer = optim.SGD(discriminator.parameters(), lr=params.learning_rate)
     # g_optimizer = optim.SGD(generator.parameters(), lr=params.learning_rate)
 
-    # fetch loss functions
-    real_fake_loss_fn = gan_net.loss_fn_real_or_fake
-    discrete_code_loss_fn = gan_net.loss_fn_dis_code
-    continuous_code_loss_fn = gan_net.loss_fn_con_code
+    # fetch loss function
+    loss_fn = gan_net.loss_fn
 
     # Train the model
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))

@@ -42,58 +42,27 @@ class DiscriminatorNet(nn.Module):
         #     # nn.Dropout(params.dropout_rate)
         # )
 
-        # self.out_layer = nn.Sequential(
-        #     nn.Linear(params.hidden_size, 1 + self.cc_dim + self.dc_dim),
-        #     # nn.ReLU(),
-        #     # nn.Sigmoid()
-        # )
+        self.out_layer = nn.Sequential(
+            nn.Linear(params.hidden_size, 1 + self.cc_dim + self.dc_dim),
+            # nn.ReLU(),
+            # nn.Sigmoid()
+        )
 
     def forward(self, x):  # , labels):
 
         out = self.in_layer(x)
         out = self.hidden1(out)
         out = self.hidden2(out)
-        # out = self.out_layer(out)
+
+        # if not self.is_one_hot:
+        #     y_ = self.label_emb(labels)
+        # else:
+        #     y_ = self.fc_insert_label(labels)
+
+        # out = torch.cat([x_, y_], 1)
+        out = self.out_layer(out)
 
         return out
-
-
-class DREalFake(nn.Module):
-    def __init__(self, params):
-        super(DREalFake, self).__init__()
-
-        self.layer = nn.Sequential(
-            nn.Linear(params.hidden_size, 1),
-            # nn.ReLU(),
-            nn.Sigmoid()
-        )
-
-    def forward(self, x):
-        out = self.layer(x)
-        return out
-
-
-class Q(nn.Module):
-    def __init__(self, params):
-        super(Q, self).__init__()
-
-        self.conv_disc = nn.Linear(params.hidden_size, params.dc_dim)
-        self.conv_mu = nn.Linear(params.hidden_size, params.cc_dim)
-        self.conv_var = nn.Linear(params.hidden_size, params.cc_dim)
-
-        self.layer = nn.Sequential(
-            nn.Linear(params.hidden_size, 1),
-            # nn.ReLU(),
-            nn.Sigmoid()
-        )
-
-    def forward(self, x):
-        # out = self.layer(x)
-        disc_logits = self.conv_disc(x).squeeze()
-        mean = self.conv_mu(x).squeeze()
-        var = torch.exp(self.conv_var(x).squeeze())
-
-        return disc_logits, mean, var
 
 
 class GeneratorNet(nn.Module):
@@ -238,13 +207,13 @@ class MILoss(nn.Module):
     def __init__(self):
         super(MILoss, self).__init__()
 
-    def forward(self, x, mu, var):
-        normal_dist_log_likelihood = -0.5 * (var.mul(2 * np.pi) + 1e-6).log() - (x - mu).pow(2).div(var.mul(2.0) + 1e-6)
-        negative_log_likelihood_loss = -(normal_dist_log_likelihood.sum(1).mean())
-        return negative_log_likelihood_loss
+    def forward(self, x):
+        val = -x*torch.exp(x)
+        val = torch.sum(val, dim=1)
+        return torch.mean(val)
 
 
-def loss_fn_real_or_fake(outputs, labels):
+def loss_fn(outputs, labels):
     """
     Compute the cross entropy loss given outputs and labels.
 
@@ -262,16 +231,6 @@ def loss_fn_real_or_fake(outputs, labels):
 
     binary_criterion = nn.BCELoss()
     return binary_criterion(outputs, labels)
-
-
-def loss_fn_dis_code(output, labels):
-    discrete_criterion = nn.CrossEntropyLoss()
-    return discrete_criterion(output, labels)
-
-
-def loss_fn_con_code(output, mean, variance):
-    continuous_criterion = MILoss()
-    return continuous_criterion(output, mean, variance)
 
 
 # InfoGAN Function (Gaussian)
