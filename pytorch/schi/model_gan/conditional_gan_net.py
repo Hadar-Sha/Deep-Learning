@@ -62,6 +62,7 @@ class DiscriminatorNet(nn.Module):
 
     def forward(self, x, labels):
 
+        # print(x.type())
         x_ = self.in_layer(x)
         x_ = self.hidden1(x_)
         # x_ = self.hidden2(x_)
@@ -159,7 +160,19 @@ class GeneratorNet(nn.Module):
             y_ = self.label_emb(labels)
         else:
             y_ = self.fc_insert_label(labels)
+
+        # print(y_.type())
+        # if torch.cuda.is_available():
+        #     y_ = y_.cuda()
+        #
+        # print(x.type())
+        # print(y_.type())
+
         out = torch.cat([x, y_], 1)
+
+        # out = out.to(torch.device("cpu"))
+        # print(out.type())
+
         out = self.hidden_with_label(out)
         out = self.hidden1(out)
         # out = self.hidden2(out)
@@ -186,25 +199,34 @@ def convert_int_to_one_hot_vector(label, num_of_classes):
     if min(list(label.size())) == 1:
         label_shaped = label.view(-1, 1)
 
-        one_hot_vector = torch.FloatTensor(list(label.size())[0], num_of_classes)
-        one_hot_vector.zero_()  # set all values to zero
+        # if torch.cuda.is_available():
+        one_hot_vector = torch.zeros([list(label.size())[0], num_of_classes], device=label.device)
+
+        # one_hot_vector = torch.FloatTensor(list(label.size())[0], num_of_classes, device=label.device)
+        # one_hot_vector.zero_()  # set all values to zero
 
         one_hot_vector.scatter_(1, label_shaped, 1)
         # one_hot_vector = one_hot_vector.type(torch.LongTensor)
         one_hot_vector = one_hot_vector.type(torch.FloatTensor)
+        if torch.cuda.is_available():
+            return one_hot_vector.cuda()
         return one_hot_vector
 
     else:
         # this is for 3d tensor
         labels_shaped = label.view(label.size(0), label.size(1), -1)
 
-        one_hot_matrix = torch.FloatTensor(list(labels_shaped.size())[0], list(labels_shaped.size())[1], num_of_classes)
-        one_hot_matrix.zero_()  # set all values to zero
+        one_hot_matrix = torch.zeros([list(labels_shaped.size())[0], list(labels_shaped.size())[1], num_of_classes], device=label.device)
+
+        # one_hot_matrix = torch.FloatTensor(list(labels_shaped.size())[0], list(labels_shaped.size())[1], num_of_classes, device=label.device)
+        # one_hot_matrix.zero_()  # set all values to zero
         one_hot_matrix.scatter_(2, labels_shaped, 1)
         # added to keep a 2d dimension of labels
         one_hot_matrix = one_hot_matrix.view(-1, list(labels_shaped.size())[1]*num_of_classes)
         one_hot_matrix = one_hot_matrix.type(torch.FloatTensor)
         # one_hot_matrix = one_hot_matrix.type(torch.LongTensor)
+        if torch.cuda.is_available():
+            return one_hot_matrix.cuda()
         return one_hot_matrix
 
 
@@ -230,7 +252,7 @@ def fake_data_target(size):
 
 def vectors_to_samples(vectors):
     vectors = vectors.reshape(vectors.size()[0], -1, 3)
-    vectors = vectors.numpy()
+    vectors = vectors.cpu().numpy()
     vectors = vectors.tolist()
     return vectors
 
@@ -239,7 +261,7 @@ def labels_to_titles(labels):
     if len(labels.shape) > 1 and min(labels.shape) == 1:
         labels = labels.view(labels.size()[0],)
     # labels_np = (labels.numpy())
-    labels = (labels.numpy()).tolist()
+    labels = (labels.cpu().numpy()).tolist()
     return labels
 
 

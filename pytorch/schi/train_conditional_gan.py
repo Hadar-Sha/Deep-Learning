@@ -110,7 +110,7 @@ def train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, dataloader, param
         noisy_input = gan_net.noise(real_data.size(0), params.noise_dim)
 
         noisy_label = Variable(torch.randint(params.num_classes, (real_data.size(0),)))
-        noisy_label = noisy_label.type(torch.LongTensor)
+        noisy_label = noisy_label.type(torch.LongTensor).to(device)
 
         if not params.is_one_hot:
             if real_label.size(1) == 1:
@@ -126,10 +126,10 @@ def train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, dataloader, param
             g_error = train_generator(d_model, g_optimizer, fake_data, noisy_label)
 
         else:
-            real_one_hot_v = gan_net.convert_int_to_one_hot_vector(real_label, params.num_classes)
+            real_one_hot_v = gan_net.convert_int_to_one_hot_vector(real_label, params.num_classes).to(device)
 
             noisy_label = noisy_label.view(real_data.size(0), -1)
-            noisy_one_hot_v = gan_net.convert_int_to_one_hot_vector(noisy_label, params.num_classes)
+            noisy_one_hot_v = gan_net.convert_int_to_one_hot_vector(noisy_label, params.num_classes).to(device)
 
             fake_data = g_model(noisy_input, noisy_one_hot_v).detach()
 
@@ -200,8 +200,9 @@ def train_gan(d_model, g_model, train_dataloader, dev_dataloader, d_optimizer, g
         if test_samples is not None:
             np_test_samples = np.array(test_samples)
             np_test_samples = np.around(np_test_samples * 127.5 + 127.5).astype(int)
-            np_test_out = (test_noise.numpy())  # .tolist()
-            np_test_labels = (test_labels.view(test_labels.shape[0], -1).numpy())
+            np_test_out = (test_noise.cpu().numpy())  # .tolist()
+            # np_test_out = (test_noise.numpy())  # .tolist()
+            np_test_labels = (test_labels.view(test_labels.shape[0], -1).cpu().numpy())
 
             test_all_data = (np.concatenate((np_test_samples, np_test_out, np_test_labels), axis=1)).tolist()
             last_csv_path = os.path.join(model_dir, "samples_epoch_{}.csv".format(epoch+1))
@@ -249,6 +250,8 @@ if __name__ == '__main__':
 
     # use GPU if available
     params.cuda = torch.cuda.is_available()
+    device = torch.device("cuda:0" if (torch.cuda.is_available()) else "cpu")
+    # print(device)
 
     # # Set the random seed for reproducible experiments
     # torch.manual_seed(230)
@@ -272,9 +275,10 @@ if __name__ == '__main__':
     # Define the model and optimizer
     discriminator = gan_net.DiscriminatorNet(params)
     generator = gan_net.GeneratorNet(params)
+
     if torch.cuda.is_available():
-        gan_net.discriminator.cuda()
-        gan_net.generator.cuda()
+        discriminator = gan_net.DiscriminatorNet(params).cuda()
+        generator = gan_net.GeneratorNet(params).cuda()
 
     discriminator.apply(gan_net.weights_init)
     generator.apply(gan_net.weights_init)
@@ -282,7 +286,21 @@ if __name__ == '__main__':
     print(discriminator)
     print(generator)
 
+    for d_pa in discriminator.parameters():
+        d_pa.cuda()
+        # print(d_pa.type())
+
+    for g_pa in generator.parameters():
+        g_pa.cuda()
+        # print(g_pa.type())
+
     # Optimizers
+    # if torch.cuda.is_available() and not params.is_one_hot:
+    #     d_optimizer = optim.SparseAdam(discriminator.parameters(), lr=params.d_learning_rate,
+    #                              betas=(params.beta1, params.beta2))
+    #     g_optimizer = optim.SparseAdam(generator.parameters(), lr=params.g_learning_rate,
+    #                             betas=(params.beta1, params.beta2))
+    # else:
     d_optimizer = optim.Adam(discriminator.parameters(), lr=params.d_learning_rate, betas=(params.beta1, params.beta2))
     g_optimizer = optim.Adam(generator.parameters(), lr=params.g_learning_rate, betas=(params.beta1, params.beta2))
     # d_optimizer = optim.SGD(discriminator.parameters(), lr=params.learning_rate)
@@ -300,10 +318,11 @@ if __name__ == '__main__':
     test_labels = [it % params.num_classes for it in test_labels]
     test_labels = torch.Tensor(test_labels)
     test_labels = test_labels.type(torch.LongTensor)
+    test_labels = test_labels.to(device)
 
     if params.is_one_hot:
         test_labels = test_labels.view(num_test_samples, -1)
-        test_one_hot_v = gan_net.convert_int_to_one_hot_vector(test_labels, params.num_classes)
+        test_one_hot_v = gan_net.convert_int_to_one_hot_vector(test_labels, params.num_classes).to(device)
 
     D_losses = []
     G_losses = []

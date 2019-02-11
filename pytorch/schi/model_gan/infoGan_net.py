@@ -207,10 +207,13 @@ class MILoss(nn.Module):
     def __init__(self):
         super(MILoss, self).__init__()
 
-    def forward(self, x):
-        val = -x*torch.exp(x)
-        val = torch.sum(val, dim=1)
-        return torch.mean(val)
+    def forward(self, x, mean, var):
+        log_lilelihood = -0.5 * (var.mul(2 * np.pi) + 1e-6).log() - (x - mean).pow(2).div(var.mul(2.0) + 1e-6)
+        normal_dist_negative_log_likelihood = -(log_lilelihood.sum(1).mean())
+        return normal_dist_negative_log_likelihood
+        # val = -x*torch.exp(x)
+        # val = torch.sum(val, dim=1)
+        # return torch.mean(val)
 
 
 def loss_fn(outputs, labels):
