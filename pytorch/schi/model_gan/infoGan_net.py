@@ -10,7 +10,7 @@ from torch.autograd.variable import Variable
 class DiscriminatorNet(nn.Module):
     def __init__(self, params):
         super(DiscriminatorNet, self).__init__()
-        # self.is_one_hot = params.is_one_hot
+
         self.dc_dim = params.dc_dim
         self.cc_dim = params.cc_dim
 
@@ -33,15 +33,6 @@ class DiscriminatorNet(nn.Module):
             nn.Dropout(params.dropout_rate)
         )
 
-        # self.label_emb = nn.Embedding(params.num_classes, params.num_classes)
-        #
-        # self.fc_insert_label = nn.Sequential(
-        #     nn.Linear(params.num_classes, params.num_classes),
-        #     # nn.ReLU(),
-        #     nn.LeakyReLU(params.leaky_relu_slope),
-        #     # nn.Dropout(params.dropout_rate)
-        # )
-
         self.out_layer = nn.Sequential(
             nn.Linear(params.hidden_size, 1 + self.cc_dim + self.dc_dim),
             # nn.ReLU(),
@@ -53,13 +44,6 @@ class DiscriminatorNet(nn.Module):
         out = self.in_layer(x)
         out = self.hidden1(out)
         out = self.hidden2(out)
-
-        # if not self.is_one_hot:
-        #     y_ = self.label_emb(labels)
-        # else:
-        #     y_ = self.fc_insert_label(labels)
-
-        # out = torch.cat([x_, y_], 1)
         out = self.out_layer(out)
 
         return out
@@ -119,9 +103,7 @@ def convert_int_to_one_hot_vector(label, num_of_classes):
 
     if min(list(label.size())) == 1:
         label_shaped = label.view(-1, 1)
-
-        one_hot_vector = torch.FloatTensor(list(label.size())[0], num_of_classes)
-        one_hot_vector.zero_()  # set all values to zero
+        one_hot_vector = torch.zeros([list(label.size())[0], num_of_classes], device=label.device)
 
         one_hot_vector.scatter_(1, label_shaped, 1)
         one_hot_vector = one_hot_vector.type(torch.FloatTensor)
@@ -131,8 +113,8 @@ def convert_int_to_one_hot_vector(label, num_of_classes):
         # this is for 3d tensor
         labels_shaped = label.view(label.size(0), label.size(1), -1)
 
-        one_hot_matrix = torch.FloatTensor(list(labels_shaped.size())[0], list(labels_shaped.size())[1], num_of_classes)
-        one_hot_matrix.zero_()  # set all values to zero
+        one_hot_matrix = torch.zeros([list(labels_shaped.size())[0], list(labels_shaped.size())[1], num_of_classes],
+                                     device=label.device)
         one_hot_matrix.scatter_(2, labels_shaped, 1)
         # added to keep a 2d dimension of labels
         one_hot_matrix = one_hot_matrix.view(-1, list(labels_shaped.size())[1]*num_of_classes)
@@ -162,7 +144,7 @@ def fake_data_target(size):
 
 def vectors_to_samples(vectors):
     vectors = vectors.reshape(vectors.size()[0], -1, 3)
-    vectors = vectors.numpy()
+    vectors = vectors.cpu().numpy()
     vectors = vectors.tolist()
     return vectors
 
@@ -171,7 +153,7 @@ def labels_to_titles(labels):
     if len(labels.shape) > 1 and min(labels.shape) == 1:
         labels = labels.view(labels.size()[0],)
 
-    labels = (labels.numpy()).tolist()
+    labels = (labels.cpu().numpy()).tolist()
     return labels
 
 
@@ -201,6 +183,8 @@ def weights_init(m):
     if classname.find('Linear') != -1:
         nn.init.normal_(m.weight.data, 0.0, 0.02)
         nn.init.constant_(m.bias.data, 0)
+    if torch.cuda.is_available():
+        m.cuda()
 
 
 class MILoss(nn.Module):
@@ -216,7 +200,17 @@ class MILoss(nn.Module):
         # return torch.mean(val)
 
 
-def loss_fn(outputs, labels):
+def cont_dist_loss_func(outputs, mean, var):
+    cont_dist_criterion = MILoss()
+    return cont_dist_criterion(outputs, mean, var)
+
+
+def disc_dist_loss_func(outputs, labels):
+    disc_dist_criterion = nn.CrossEntropyLoss()
+    return disc_dist_criterion(outputs, labels)
+
+
+def real_fake_loss_fn(outputs, labels):
     """
     Compute the cross entropy loss given outputs and labels.
 

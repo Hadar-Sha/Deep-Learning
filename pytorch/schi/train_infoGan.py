@@ -12,7 +12,7 @@ from torch.autograd import Variable
 from utils_gan import Logger
 import display_digit as display_results
 import utils
-import model_gan.conditional_gan_net as gan_net
+import model_gan.infoGan_net as gan_net
 # import model_gan.two_labels_data_loader as data_loader
 import model_gan.one_label_data_loader as data_loader
 import numpy as np
@@ -74,6 +74,24 @@ def to_cuda_var(x):
     return Variable(x)
 
 
+def get_stats(d_error, g_error, d_pred_real, d_pred_fake):
+    stats = {}
+    if isinstance(d_error, torch.autograd.Variable):
+        d_error = d_error.data.cpu().numpy()
+        stats['d_error'] = d_error
+    if isinstance(g_error, torch.autograd.Variable):
+        g_error = g_error.data.cpu().numpy()
+        stats['g_error'] = g_error
+    if isinstance(d_pred_real, torch.autograd.Variable):
+        d_pred_real = d_pred_real.data.mean()
+        stats['d_pred_real'] = d_pred_real
+    if isinstance(d_pred_fake, torch.autograd.Variable):
+        d_pred_fake = d_pred_fake.data.mean()
+        stats['d_pred_fake'] = d_pred_fake
+
+    return stats
+
+
 def train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, dataloader, params, epoch, fig):  # , axes):
     """Train the model on `num_steps` batches
 
@@ -88,21 +106,11 @@ def train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, dataloader, param
         fig:
     """
 
-    logger = Logger(model_name='INFOGAN', data_name='SCHI')
-
-    # Use tqdm for progress bar
-    # with tqdm(total=len(dataloader)) as t:
     for i, (real_batch, _) in enumerate(dataloader):
-        # for i, (real_batch, real_label) in enumerate(dataloader):
 
+        batch_size = real_data.size(0)
         # 1. Train Discriminator
         real_data = to_cuda_var(real_batch)
-        # real_label = Variable(real_label)
-        batch_size = real_data.size(0)
-
-        # if torch.cuda.is_available():
-        #     real_data = real_data.cuda()
-        #     # real_label = real_label.cuda()
 
         # Generate fake data
         noisy_input = to_cuda_var(gan_net.noise(batch_size, params.noise_dim))
@@ -128,8 +136,11 @@ def train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, dataloader, param
         # Train G
         g_error = train_generator(d_model, g_optimizer, fake_data, noisy_one_hot_v)
 
-        # Log error
-        logger.log(d_error, g_error, epoch, i+1, i+1)  # num_batches)
+        stats = get_stats(d_error, g_error, d_pred_real, d_pred_fake)
+        stats_string = " ; ".join("{}: {:05.3f}".format(k, v) for k, v in stats.items())
+        logging.info("metrics: " + stats_string)
+        # # Log error
+        # logger.log(d_error, g_error, epoch, i+1, i+1)  # num_batches)
 
         # Save Losses for plotting later
         G_losses.append(d_error.item())
@@ -138,25 +149,23 @@ def train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, dataloader, param
         G_preds.append(d_pred_fake.data.mean())
         D_preds.append(d_pred_real.data.mean())
 
-    # Display Progress
-    if (epoch+1) % (0.01*params.num_epochs) == 0:
-
-        # Display Images
-        # if not params.is_one_hot:
-        #     test_samples = g_model(test_noise, test_labels).data.cpu()
-        # else:
         test_samples = g_model(test_noise, test_one_hot_v).data.cpu()
-
-        test_samples = gan_net.vectors_to_samples(test_samples)
+        # Display Progress
+        if (epoch + 1) % (0.01 * params.num_epochs) == 0:
+            test_samples_reshaped = gan_net.vectors_to_samples(test_samples)
 
         # fig1, axes1 = display_results.create_grid(num_test_samples)
         # display_results.fill_grid(test_samples, fig1, axes1, epoch, i+1)
 
-        display_results.fill_figure(test_samples, fig, gan_net.labels_to_titles(test_labels))
+            display_results.fill_figure(test_samples_reshaped, fig, gan_net.labels_to_titles(test_labels))
+            print("Epoch {}/{}".format(epoch + 1, params.num_epochs))
+            print(stats_string)
         # Display status Logs
-        logger.display_status(
-            epoch+1, params.num_epochs, i+1, i+1,
-            d_error, g_error, d_pred_real, d_pred_fake)
+        # logger.display_status(
+        #     epoch+1, params.num_epochs, i+1, i+1,
+        #     d_error, g_error, d_pred_real, d_pred_fake)
+
+        return test_samples
 
 
 def train_gan(d_model, g_model, train_dataloader, dev_dataloader, d_optimizer, g_optimizer, loss_fn, params, model_dir,
@@ -168,7 +177,26 @@ def train_gan(d_model, g_model, train_dataloader, dev_dataloader, d_optimizer, g
         # Run one epoch
         logging.info("Epoch {}/{}".format(epoch + 1, params.num_epochs))
 
-        train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, train_dataloader, params, epoch, fig)
+        test_samples = train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, train_dataloader, params, epoch, fig)
+
+        utils.save_checkpoint({'epoch': epoch + 1,
+                               'state_dict': d_model.state_dict(),
+                               'optim_dict': d_optimizer.state_dict()}, is_best=False, checkpoint=model_dir, ntype='d')
+
+        utils.save_checkpoint({'epoch': epoch + 1,
+                               'state_dict': g_model.state_dict(),
+                               'optim_dict': g_optimizer.state_dict()}, is_best=False, checkpoint=model_dir, ntype='g')
+
+        if test_samples is not None:
+            np_test_samples = np.array(test_samples)
+            np_test_samples = np.around(np_test_samples * 127.5 + 127.5).astype(int)
+            np_test_out = (test_noise.cpu().numpy())  # .tolist()
+            # np_test_out = (test_noise.numpy())  # .tolist()
+            np_test_labels = (test_labels.view(test_labels.shape[0], -1).cpu().numpy())
+
+            test_all_data = (np.concatenate((np_test_samples, np_test_out, np_test_labels), axis=1)).tolist()
+            last_csv_path = os.path.join(model_dir, "samples_epoch_{}.csv".format(epoch + 1))
+            utils.save_incorrect_to_csv(test_all_data, last_csv_path)
 
     return
 
@@ -236,8 +264,8 @@ if __name__ == '__main__':
     discriminator = gan_net.DiscriminatorNet(params)
     generator = gan_net.GeneratorNet(params)
     if torch.cuda.is_available():
-        gan_net.discriminator.cuda()
-        gan_net.generator.cuda()
+        discriminator.cuda()
+        generator.cuda()
 
     discriminator.apply(gan_net.weights_init)
     generator.apply(gan_net.weights_init)
@@ -252,21 +280,14 @@ if __name__ == '__main__':
     # g_optimizer = optim.SGD(generator.parameters(), lr=params.learning_rate)
 
     # fetch loss function
-    loss_fn = gan_net.loss_fn
+    loss_fn = gan_net.real_fake_loss_fn
+    loss_fn = gan_net.disc_dist_loss_func
+    loss_fn = gan_net.cont_dist_loss_func
 
     # Train the model
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))
     num_test_samples = 20
     test_noise = gan_net.noise(num_test_samples, params.noise_dim)
-
-    # test_labels = list(range(num_test_samples))
-    # test_labels = [it % params.num_classes for it in test_labels]
-    # test_labels = torch.Tensor(test_labels)
-    # test_labels = test_labels.type(torch.LongTensor)
-
-    # # if params.is_one_hot:
-    # test_labels = test_labels.view(num_test_samples, -1)
-    # test_one_hot_v = gan_net.convert_int_to_one_hot_vector(test_labels, params.num_classes)
 
     D_losses = []
     G_losses = []

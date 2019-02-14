@@ -117,36 +117,52 @@ def create_figure():
     return fig
 
 
-def fill_figure(samples, fig, labels=None):  # , save=True):
-    # args = parser.parse_args()
+def close_figure(figure):
+    plt.close(figure)
+    return
+
+
+def feed_digits_to_figure(_, samples, fig, epoch, labels):
+    args = parser.parse_args()
     fig.clear()
+    fig.suptitle('epoch #{}'.format(epoch))
 
     num_of_samples = len(samples)
     axes = np.zeros((4, 5)).tolist()
 
     for i in range(num_of_samples):
-        row, col = np.unravel_index(i, (4, math.ceil(num_of_samples/4)))
+        row, col = np.unravel_index(i, (4, math.ceil(num_of_samples / 4)))
         axes[row][col] = fig.add_subplot(4, math.ceil(num_of_samples / 4), i + 1)
 
         if labels is not None:
-            # temp = labels[i]
             digit_val = str(labels[i])
             axes[row][col].set_title(digit_val)
         display_digit(samples[i], axes[row][col])
 
-    im_ani = animation.ArtistAnimation(fig, axes, interval=2, repeat=False, blit=False)
+    # save graph
+    path = os.path.join(args.model_dir, 'images')
+    if not os.path.isdir(path):
+        os.mkdir(path)
+    impath = os.path.join(path, 'test_samples_epoch_#{}.png'.format(epoch))
+    plt.savefig(impath)
+    return
+
+
+def fill_figure(samples, fig, epoch, labels=None):
+
+    im_ani = animation.FuncAnimation(fig, feed_digits_to_figure, frames=None,
+                         fargs=(samples, fig, epoch, labels), interval=2, repeat=False, blit=False)
+
     plt.draw()
-    # if save:
-    #     path = os.path.join(args.model_dir, 'images')
-    #     if not os.path.isdir(path):
-    #         os.mkdir(path)
-    #         fig.savefig('{}/{}_epoch_{}_batch_{}.png'.format(path, '', epoch, n_batch))
-    # plt.show()
-    plt.pause(0.001)  # 0.001 , 10
+    plt.pause(0.01)
 
 
 def plot_graph(g_losses, d_losses, gtype):
-    plt.figure(figsize=(10, 5))
+    plt.close('all')
+    args = parser.parse_args()
+    fig1 = plt.figure()
+    print(fig1)
+
     if gtype == "Loss":
         plt.title("Generator and Discriminator Loss During Training")
         plt.xlabel("iterations")
@@ -162,8 +178,15 @@ def plot_graph(g_losses, d_losses, gtype):
     plt.plot(g_losses, label="G")
     plt.plot(d_losses, label="D")
 
-    plt.legend()
-    plt.show()
+    #save graph
+    path = os.path.join(args.model_dir, 'images')
+    if not os.path.isdir(path):
+        os.mkdir(path)
+    impath = os.path.join(path, '{}_graph.png'.format(gtype))
+    plt.savefig(impath)
+    plt.pause(1)
+    plt.close(fig1)
+
     return
 
 
@@ -190,7 +213,6 @@ def fill_grid(samples, fig, axes, epoch, n_batch, save=True):
     plt.show()
     plt.pause(0.001)
     plt.close(fig)
-
 
     return
 

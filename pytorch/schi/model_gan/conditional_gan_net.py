@@ -292,6 +292,10 @@ def weights_init(m):
         nn.init.normal_(m.weight.data, 0.0, 0.02)
         nn.init.constant_(m.bias.data, 0)
 
+    if torch.cuda.is_available():
+        for pa in m.parameters():
+            pa.cuda()
+
 
 def loss_fn(outputs, labels):
     """

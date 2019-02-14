@@ -166,7 +166,7 @@ def train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, dataloader, param
         # fig1, axes1 = display_results.create_grid(num_test_samples)
         # display_results.fill_grid(test_samples, fig1, axes1, epoch, i+1)
 
-        display_results.fill_figure(test_samples_reshaped, fig, gan_net.labels_to_titles(test_labels))
+        display_results.fill_figure(test_samples_reshaped, fig, epoch+1, gan_net.labels_to_titles(test_labels))
 
         print("Epoch {}/{}".format(epoch + 1, params.num_epochs))
         print(stats_string)
@@ -178,8 +178,7 @@ def train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, dataloader, param
     return test_samples
 
 
-def train_gan(d_model, g_model, train_dataloader, dev_dataloader, d_optimizer, g_optimizer, loss_fn, params, model_dir,
-                       restore_file=None):
+def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, loss_fn, params, model_dir):
 
     fig = display_results.create_figure()
 
@@ -200,14 +199,14 @@ def train_gan(d_model, g_model, train_dataloader, dev_dataloader, d_optimizer, g
         if test_samples is not None:
             np_test_samples = np.array(test_samples)
             np_test_samples = np.around(np_test_samples * 127.5 + 127.5).astype(int)
-            np_test_out = (test_noise.cpu().numpy())  # .tolist()
-            # np_test_out = (test_noise.numpy())  # .tolist()
+            np_test_out = (test_noise.cpu().numpy())
             np_test_labels = (test_labels.view(test_labels.shape[0], -1).cpu().numpy())
 
             test_all_data = (np.concatenate((np_test_samples, np_test_out, np_test_labels), axis=1)).tolist()
             last_csv_path = os.path.join(model_dir, "samples_epoch_{}.csv".format(epoch+1))
             utils.save_incorrect_to_csv(test_all_data, last_csv_path)
 
+    display_results.close_figure(fig)
     return
 
 
@@ -215,16 +214,19 @@ def collect_network_statistics(net):
 
     status_net = []
     net_grads_graph = []
+
     for param_tensor in net.state_dict():
 
         status_net.append([param_tensor,
                                        (net.state_dict()[param_tensor].norm()).item(),
                                        list(net.state_dict()[param_tensor].size())])
 
-        all_net_grads = ((net.state_dict()[param_tensor]).numpy()).tolist()
+        all_net_grads = ((net.state_dict()[param_tensor]).cpu().numpy()).tolist()
+
         # if needed, flatten the list to get one nim and one max
+        flat_net_grads = []
         if isinstance(all_net_grads, (list,)):
-            flat_net_grads = []
+
             for elem in all_net_grads:
                 if isinstance(elem, (list,)) and isinstance(elem[0], (list,)):
                     for item in elem:
@@ -236,7 +238,8 @@ def collect_network_statistics(net):
         else:
             flat_net_grads = all_net_grads
 
-            net_grads_graph.append([min(flat_net_grads), max(flat_net_grads)])
+        net_grads_graph.append([min(flat_net_grads), max(flat_net_grads)])
+
     return net_grads_graph
 
 
@@ -251,7 +254,6 @@ if __name__ == '__main__':
     # use GPU if available
     params.cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if (torch.cuda.is_available()) else "cpu")
-    # print(device)
 
     # # Set the random seed for reproducible experiments
     # torch.manual_seed(230)
@@ -262,6 +264,8 @@ if __name__ == '__main__':
     utils.set_logger(os.path.join(args.model_dir, 'train.log'))
 
     # Create the input data pipeline
+    logging.info("device {} will be used".format(device))
+
     logging.info("Loading the datasets...")
 
     # fetch dataloaders
@@ -276,31 +280,16 @@ if __name__ == '__main__':
     discriminator = gan_net.DiscriminatorNet(params)
     generator = gan_net.GeneratorNet(params)
 
-    if torch.cuda.is_available():
-        discriminator = gan_net.DiscriminatorNet(params).cuda()
-        generator = gan_net.GeneratorNet(params).cuda()
-
     discriminator.apply(gan_net.weights_init)
     generator.apply(gan_net.weights_init)
+
+    if torch.cuda.is_available():
+        discriminator.cuda()
+        generator.cuda()
 
     print(discriminator)
     print(generator)
 
-    for d_pa in discriminator.parameters():
-        d_pa.cuda()
-        # print(d_pa.type())
-
-    for g_pa in generator.parameters():
-        g_pa.cuda()
-        # print(g_pa.type())
-
-    # Optimizers
-    # if torch.cuda.is_available() and not params.is_one_hot:
-    #     d_optimizer = optim.SparseAdam(discriminator.parameters(), lr=params.d_learning_rate,
-    #                              betas=(params.beta1, params.beta2))
-    #     g_optimizer = optim.SparseAdam(generator.parameters(), lr=params.g_learning_rate,
-    #                             betas=(params.beta1, params.beta2))
-    # else:
     d_optimizer = optim.Adam(discriminator.parameters(), lr=params.d_learning_rate, betas=(params.beta1, params.beta2))
     g_optimizer = optim.Adam(generator.parameters(), lr=params.g_learning_rate, betas=(params.beta1, params.beta2))
     # d_optimizer = optim.SGD(discriminator.parameters(), lr=params.learning_rate)
@@ -329,8 +318,7 @@ if __name__ == '__main__':
     D_preds = []
     G_preds = []
 
-    train_gan(discriminator, generator, train_dl, dev_dl, d_optimizer, g_optimizer, loss_fn, params, args.model_dir,
-              args.restore_file)
+    train_gan(discriminator, generator, train_dl, d_optimizer, g_optimizer, loss_fn, params, args.model_dir)
 
     # track results
     display_results.plot_graph(G_losses, D_losses, "Loss")
