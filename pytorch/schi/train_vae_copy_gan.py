@@ -12,57 +12,18 @@ from torch.autograd import Variable
 # from utils_gan import Logger
 import display_digit as display_results
 import utils
-import model_gan.conditional_gan_net as gan_net
+import model_vae.vae_net as vae_net
 # import model_gan.two_labels_data_loader as data_loader
 import model_gan.one_label_data_loader as data_loader
 import numpy as np
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_dir', default='data/data-with-grayscale-4000', help="Directory containing the dataset")
+# data-two-labels-big # grayscale-logits # data/data-w-gray-only-2 data/data-with-grayscale-4000
 parser.add_argument('--model_dir', default='experiments/cgan_model', help="Directory containing params.json")
 parser.add_argument('--restore_file', default=None,
                     help="Optional, name of the file in --model_dir containing weights to reload before \
                     training")  # 'best' or 'train'
-
-# data-two-labels-big # grayscale-logits # data/data-w-gray-only-2 data/data-with-grayscale-4000
-
-
-def train_discriminator(d, optimizer, real_data, fake_data, real_labels, fake_labels):
-    # Reset gradients
-    optimizer.zero_grad()
-
-    # 1.1 Train on Real Data
-    prediction_real = d(real_data, real_labels)
-    # Calculate error and backpropagate
-    error_real = loss_fn(prediction_real, gan_net.real_data_target(real_data.size(0)))
-    error_real.backward()
-
-    # 1.2 Train on Fake Data
-    prediction_fake = d(fake_data, fake_labels)
-    # Calculate error and backpropagate
-    error_fake = loss_fn(prediction_fake, gan_net.fake_data_target(real_data.size(0)))
-    error_fake.backward()
-
-    # 1.3 Update weights with gradients
-    optimizer.step()
-
-    # Return error0
-    return error_real + error_fake, prediction_real, prediction_fake
-
-
-def train_generator(d, optimizer, fake_data, fake_labels):
-    # 2. Train Generator
-    # Reset gradients
-    optimizer.zero_grad()
-    # Sample noise and generate fake data
-    prediction = d(fake_data, fake_labels)
-    # Calculate error and backpropagate
-    error = loss_fn(prediction, gan_net.real_data_target(prediction.size(0)))
-    error.backward()
-    # Update weights with gradients
-    optimizer.step()
-    # Return error
-    return error
 
 
 def get_stats(d_error, g_error, d_pred_real, d_pred_fake):
@@ -167,7 +128,7 @@ def train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, dataloader, param
         # fig1, axes1 = display_results.create_grid(num_test_samples)
         # display_results.fill_grid(test_samples, fig1, axes1, epoch, i+1)
 
-        display_results.fill_figure(test_samples_reshaped, fig, epoch+1, args.model_dir, None, gan_net.labels_to_titles(test_labels))
+        display_results.fill_figure(test_samples_reshaped, fig, epoch+1, gan_net.labels_to_titles(test_labels))
 
         print("Epoch {}/{}".format(epoch + 1, params.num_epochs))
         print(stats_string)
@@ -304,9 +265,8 @@ if __name__ == '__main__':
     num_test_samples = 20
     test_noise = gan_net.noise(num_test_samples, params.noise_dim)
 
-    # test_labels = list(range(num_test_samples))
-    # test_labels = [it % params.num_classes for it in test_labels]
-    test_labels = [0 for _ in range(num_test_samples)]
+    test_labels = list(range(num_test_samples))
+    test_labels = [it % params.num_classes for it in test_labels]
     test_labels = torch.Tensor(test_labels)
     test_labels = test_labels.type(torch.LongTensor)
     test_labels = test_labels.to(device)
@@ -323,10 +283,10 @@ if __name__ == '__main__':
     train_gan(discriminator, generator, train_dl, d_optimizer, g_optimizer, loss_fn, params, args.model_dir)
 
     # track results
-    display_results.plot_graph(G_losses, D_losses, "Loss", args.model_dir)
-    display_results.plot_graph(G_preds, D_preds, "Predictions", args.model_dir)
+    display_results.plot_graph(G_losses, D_losses, "Loss")
+    display_results.plot_graph(G_preds, D_preds, "Predictions")
 
     d_grads_graph = collect_network_statistics(discriminator)
     g_grads_graph = collect_network_statistics(generator)
 
-    display_results.plot_graph(g_grads_graph, d_grads_graph, "Grads", args.model_dir)
+    display_results.plot_graph(g_grads_graph, d_grads_graph, "Grads")

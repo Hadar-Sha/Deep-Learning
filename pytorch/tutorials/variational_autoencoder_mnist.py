@@ -6,12 +6,12 @@ from torch import nn, optim
 from torch.nn import functional as F
 from torchvision import datasets, transforms
 from torchvision.utils import save_image
-
+import os
 
 parser = argparse.ArgumentParser(description='VAE MNIST Example')
 parser.add_argument('--batch-size', type=int, default=128, metavar='N',
                     help='input batch size for training (default: 128)')
-parser.add_argument('--epochs', type=int, default=10, metavar='N',
+parser.add_argument('--epochs', type=int, default=100, metavar='N',
                     help='number of epochs to train (default: 10)')
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='enables CUDA training')
@@ -26,13 +26,15 @@ torch.manual_seed(args.seed)
 
 device = torch.device("cuda" if args.cuda else "cpu")
 
+print(os.getcwd())
+
 kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
 train_loader = torch.utils.data.DataLoader(
-    datasets.MNIST('../data', train=True, download=True,
+    datasets.MNIST('./data', train=True, download=True,
                    transform=transforms.ToTensor()),
     batch_size=args.batch_size, shuffle=True, **kwargs)
 test_loader = torch.utils.data.DataLoader(
-    datasets.MNIST('../data', train=False, transform=transforms.ToTensor()),
+    datasets.MNIST('./data', train=False, transform=transforms.ToTensor()),
     batch_size=args.batch_size, shuffle=True, **kwargs)
 
 
@@ -71,7 +73,7 @@ optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
 # Reconstruction + KL divergence losses summed over all elements and batch
 def loss_function(recon_x, x, mu, logvar):
-    BCE = F.binary_cross_entropy(recon_x, x.view(-1, 784), reduction='sum')
+    BCE = F.binary_cross_entropy(recon_x, x.view(-1, 784))  # , reduction='sum')
 
     # see Appendix B from VAE paper:
     # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
@@ -116,10 +118,11 @@ def test(epoch):
                 comparison = torch.cat([data[:n],
                                       recon_batch.view(args.batch_size, 1, 28, 28)[:n]])
                 save_image(comparison.cpu(),
-                         'results/reconstruction_' + str(epoch) + '.png', nrow=n)
+                         './results/reconstruction_' + str(epoch) + '.png', nrow=n)
 
     test_loss /= len(test_loader.dataset)
     print('====> Test set loss: {:.4f}'.format(test_loss))
+
 
 if __name__ == "__main__":
     for epoch in range(1, args.epochs + 1):
@@ -127,6 +130,6 @@ if __name__ == "__main__":
         test(epoch)
         with torch.no_grad():
             sample = torch.randn(64, 20).to(device)
-            sample = model.decode(sample).cpu()
-            save_image(sample.view(64, 1, 28, 28),
-                       'results/sample_' + str(epoch) + '.png')
+            sample_out = model.decode(sample).cpu()
+            save_image(sample_out.view(64, 1, 28, 28),
+                       './results/sample_' + str(epoch) + '.png')

@@ -1,17 +1,19 @@
 import numpy as np
 from matplotlib.patches import Polygon
+from matplotlib import image
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import math
 import argparse
 import os
 from matplotlib import animation
+from torchvision.transforms import functional as F
 
 width = 1
 height = 0.2
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--model_dir', default='experiments/cgan_model', help="Directory containing params.json")
+# parser = argparse.ArgumentParser()
+# parser.add_argument('--model_dir', default='experiments/cgan_model', help="Directory containing params.json")
 
 plt.ioff()
 
@@ -84,9 +86,13 @@ def display_digit(colors, myaxis):
     colors = numpy_colors.tolist()
 
     patches = []
+    print(myaxis.axis)
+    # myaxis.axis = [0,0,1,1]
+    # myaxis = [0,0,1,1]
     myaxis.set_xlim([0, 2 * width])
     myaxis.set_ylim([0, 3*width])
     myaxis.set_aspect('equal', 'box')
+
     myaxis.axis('off')
 
     segments_centers = []
@@ -112,8 +118,83 @@ def display_digit(colors, myaxis):
     return
 
 
+def create_digit_image(colors):
+
+    fig_temp, myaxis = plt.subplots(figsize=(20, 30), dpi=10)  # figsize=(17, 27), dpi=10
+    # fig_temp.figsize = ()
+    print(fig_temp)
+
+    # for item in [fig_temp, myaxis]:
+    #     item.patch.set_visible(False)
+
+    numpy_colors = np.array(colors)
+
+    if numpy_colors.min() < 0 or numpy_colors.max() > 1:
+        numpy_colors = (numpy_colors - numpy_colors.min()) / (numpy_colors.max() - numpy_colors.min())
+
+    colors = numpy_colors.tolist()
+
+    patches = []
+    myaxis.set_xlim([0, 2 * width])
+    myaxis.set_ylim([0, 3 * width])
+    myaxis.set_aspect('equal', 'box')
+    myaxis.axis('off')
+
+    segments_centers = []
+    center = [width, 1.5*width]
+    bg_patch = create_background(colors[7])
+    patches.append(bg_patch)
+    myaxis.add_patch(bg_patch)
+
+    segments_centers.append([center[0], center[1] + width + height])
+    segments_centers.append([center[0], center[1]])
+    segments_centers.append([center[0], center[1] - width - height])
+    segments_centers.append([center[0] - width / 2 - height / 2, center[1] + width / 2 + height / 2])
+    segments_centers.append([center[0] + width / 2 + height / 2, center[1] + width / 2 + height / 2])
+    segments_centers.append([center[0] - width / 2 - height / 2, center[1] - width / 2 - height / 2])
+    segments_centers.append([center[0] + width / 2 + height / 2, center[1] - width / 2 - height / 2])
+
+    vertical_horizon = [0, 0, 0, 1, 1, 1, 1]
+    for i in range(len(segments_centers)):
+        polygon = create_segment(segments_centers[i], vertical_horizon[i], colors[i])
+        patches.append(polygon)
+        myaxis.add_patch(polygon)
+
+    fig_temp.canvas.draw()
+    # plt.rcParams['legend.fontsize'] = 10
+    print(fig_temp.get_size_inches())
+    print(fig_temp.dpi)
+    plt.tight_layout()
+    plt.show(block=False)
+    plt.pause(5)
+    # plt.savefig('./temp.png', bbox_inches='tight')
+
+    data = np.fromstring(fig_temp.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+    data = data.reshape(fig_temp.canvas.get_width_height()[::-1] + (3,))
+
+    plt.close('all')
+
+    # data = image.imread('./temp.png')
+    # ppp = plt.imshow(data)
+
+    print(type(data))
+    print(data.shape)
+    print(data.min())
+    print(data.max())
+    # print(data)
+
+    # data = data/255.0
+    data_tensor = F.to_tensor(data)
+    print(type(data_tensor))
+    print(data_tensor.shape)
+
+    return data_tensor
+
+    # return
+
+
 def create_figure():
-    fig = plt.figure()
+    fig = plt.figure(figsize=(20, 30))
     return fig
 
 
@@ -122,17 +203,18 @@ def close_figure(figure):
     return
 
 
-def feed_digits_to_figure(_, samples, fig, epoch, labels):
-    args = parser.parse_args()
+def feed_digits_to_figure(_, samples, fig, epoch, image_path, labels, type):
+    # args = parser.parse_args()
     fig.clear()
     fig.suptitle('epoch #{}'.format(epoch))
 
     num_of_samples = len(samples)
-    axes = np.zeros((4, 5)).tolist()
+    num_of_rows = math.floor(0.2*num_of_samples)
+    axes = np.zeros((num_of_rows, math.ceil(num_of_samples / num_of_rows))).tolist()
 
     for i in range(num_of_samples):
-        row, col = np.unravel_index(i, (4, math.ceil(num_of_samples / 4)))
-        axes[row][col] = fig.add_subplot(4, math.ceil(num_of_samples / 4), i + 1)
+        row, col = np.unravel_index(i, (num_of_rows, math.ceil(num_of_samples / num_of_rows)))
+        axes[row][col] = fig.add_subplot(num_of_rows, math.ceil(num_of_samples / num_of_rows), i + 1)
 
         if labels is not None:
             digit_val = str(labels[i])
@@ -140,26 +222,33 @@ def feed_digits_to_figure(_, samples, fig, epoch, labels):
         display_digit(samples[i], axes[row][col])
 
     # save graph
-    path = os.path.join(args.model_dir, 'images')
+    path = os.path.join(image_path, 'images')
     if not os.path.isdir(path):
         os.mkdir(path)
-    impath = os.path.join(path, 'test_samples_epoch_#{}.png'.format(epoch))
-    plt.savefig(impath)
+
+    if type is not None:
+        # if type == 'data':
+        impath = os.path.join(path, '{}_samples_epoch_#{}.png'.format(type, epoch))
+        # elif type == 'reconstructed':
+        #     impath = os.path.join(path, 'reconstruced_samples_epoch_#{}.png'.format(epoch))
+    else:
+        impath = os.path.join(path, 'test_samples_epoch_#{}.png'.format(epoch))
+    plt.savefig(impath, bbox_inches='tight')
     return
 
 
-def fill_figure(samples, fig, epoch, labels=None):
+def fill_figure(samples, fig, epoch, image_path, type=None, labels=None):
 
     im_ani = animation.FuncAnimation(fig, feed_digits_to_figure, frames=None,
-                         fargs=(samples, fig, epoch, labels), interval=2, repeat=False, blit=False)
+                         fargs=(samples, fig, epoch, image_path, labels, type), interval=2, repeat=False, blit=False)
 
     plt.draw()
     plt.pause(0.01)
 
 
-def plot_graph(g_losses, d_losses, gtype):
+def plot_graph(g_losses, d_losses, gtype, image_path):
     plt.close('all')
-    args = parser.parse_args()
+    # args = parser.parse_args()
     fig1 = plt.figure()
     print(fig1)
 
@@ -179,7 +268,7 @@ def plot_graph(g_losses, d_losses, gtype):
     plt.plot(d_losses, label="D")
 
     #save graph
-    path = os.path.join(args.model_dir, 'images')
+    path = os.path.join(image_path, 'images')
     if not os.path.isdir(path):
         os.mkdir(path)
     impath = os.path.join(path, '{}_graph.png'.format(gtype))
@@ -231,9 +320,13 @@ if __name__ == '__main__':
     colors.append([0, 0, 0])
 
     print(colors)
-    fig, ax = plt.subplots()
+    # fig, ax = plt.subplots()
+    #
+    # display_digit(colors, ax)
+    #
+    # plt.show()
+    # plt.close('all')
 
-    display_digit(colors, ax)
+    create_digit_image(colors)
 
-    plt.show()
 

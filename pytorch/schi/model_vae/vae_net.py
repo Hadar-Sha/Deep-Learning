@@ -8,35 +8,75 @@ import math
 from scipy import stats
 
 
-class NeuralNet(nn.Module):
+class VAENeuralNet(nn.Module):
     def __init__(self, params):
-        super(NeuralNet, self).__init__()
+        super(VAENeuralNet, self).__init__()
         self.fc1 = nn.Linear(params.input_size, params.hidden_size)
-        self.fc2 = nn.Linear(params.hidden_size, params.hidden_size)
-        self.fc3 = nn.Linear(params.hidden_size, params.hidden_size//2)
-        self.fc4 = nn.Linear(params.hidden_size // 2, params.num_classes)
+        self.fc21 = nn.Linear(params.hidden_size, params.output_size)
+        self.fc22 = nn.Linear(params.hidden_size, params.output_size)
+        self.fc3 = nn.Linear(params.output_size, params.hidden_size)
+        self.fc4 = nn.Linear(params.hidden_size, params.input_size)
 
         self.dropout_rate = params.dropout_rate
 
+    def encode(self, x):
+
+        h1 = F.relu(self.fc1(x))
+        return self.fc21(h1), self.fc22(h1)
+
+    def reparameterize(self, mu, logvar):
+        std = torch.exp(0.5*logvar)
+        eps = torch.randn_like(std)
+        return eps.mul(std).add_(mu)
+
+    def decode(self, z):
+        h3 = F.relu(self.fc3(z))
+        return torch.sigmoid(self.fc4(h3))
+
     def forward(self, x):
 
-        # first layer
-        out = F.relu(self.fc1(x))
-        out = F.dropout(out, self.dropout_rate, training=self.training)
-
-        # second layer
-        out = F.relu(self.fc2(out))
-        out = F.dropout(out, self.dropout_rate, training=self.training)
-
-        # third layer
-        out = F.relu(self.fc3(out))
-        out = F.dropout(out, self.dropout_rate, training=self.training)
-
-        out = self.fc4(out)
-        # out = F.relu(self.fc4(out))
-        out = F.log_softmax(out, dim=1)
+        mu, logvar = self.encode(x)
+        z = self.reparameterize(mu, logvar)
+        return self.decode(z), mu, logvar
 
         return out
+
+    def generation_with_interpolation(self, x_one, x_two, alpha):
+        hidden_one = self.encoder(x_one)
+        hidden_two = self.encoder(x_two)
+        mu_one = hidden_one[:, :20]
+        logvar_one = hidden_one[:, 20:]
+        mu_two = hidden_two[:, :20]
+        logvar_two = hidden_two[:, 20:]
+        mu = (1 - alpha) * mu_one + alpha * mu_two
+        logvar = (1 - alpha) * logvar_one + alpha * logvar_two
+        z = self.reparametrize(mu, logvar)
+        generated_image = self.decoder(z)
+        return generated_image
+
+    #     self.fc1 = nn.Linear(784, 400)
+    #     self.fc21 = nn.Linear(400, 20)
+    #     self.fc22 = nn.Linear(400, 20)
+    #     self.fc3 = nn.Linear(20, 400)
+    #     self.fc4 = nn.Linear(400, 784)
+    #
+    # def encode(self, x):
+    #     h1 = F.relu(self.fc1(x))
+    #     return self.fc21(h1), self.fc22(h1)
+    #
+    # def reparameterize(self, mu, logvar):
+    #     std = torch.exp(0.5*logvar)
+    #     eps = torch.randn_like(std)
+    #     return eps.mul(std).add_(mu)
+    #
+    # def decode(self, z):
+    #     h3 = F.relu(self.fc3(z))
+    #     return torch.sigmoid(self.fc4(h3))
+    #
+    # def forward(self, x):
+    #     mu, logvar = self.encode(x.view(-1, 784))
+    #     z = self.reparameterize(mu, logvar)
+    #     return self.decode(z), mu, logvar
 
 
 def convert_int_to_one_hot_vector(label, num_of_classes):
@@ -63,7 +103,7 @@ def convert_int_to_one_hot_vector(label, num_of_classes):
         return one_hot_matrix
 
 
-def loss_fn(outputs, labels, num_of_classes):
+def loss_fn(input_d, reconstructed, mean, logvar):
     """
     Compute the cross entropy loss given outputs and labels.
 
@@ -79,10 +119,32 @@ def loss_fn(outputs, labels, num_of_classes):
           demonstrates how you can easily define a custom loss function.
     """
 
-    kl_criterion = nn.KLDivLoss()
-    one_hot_vector = convert_int_to_one_hot_vector(labels, num_of_classes)
+    bce_criterion = nn.BCELoss()  # reduction = sum ?
+    bce_loss = bce_criterion(input_d, reconstructed)
 
-    return kl_criterion(outputs, one_hot_vector)
+    # see Appendix B from VAE paper:
+    # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
+    # https://arxiv.org/abs/1312.6114
+    # 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
+
+    # for gaussian distribution when
+    # generated data passed to the encorder is z~ N(0,1) and generated data is x~N(m,var)
+
+    kl_loss = -0.5 * torch.sum(1 + logvar - mean.pow(2) - logvar.exp())
+
+    return bce_loss + kl_loss
+
+
+# def loss_function(recon_x, x, mu, logvar):
+#     BCE = F.binary_cross_entropy(recon_x, x.view(-1, 784), reduction='sum')
+#
+#     # see Appendix B from VAE paper:
+#     # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
+#     # https://arxiv.org/abs/1312.6114
+#     # 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
+#     KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+#
+#     return BCE + KLD
 
 
 class HLoss(nn.Module):
@@ -254,6 +316,21 @@ def incorrect(images, outputs, labels):
         mat_out.extend(numpy_mat_out.tolist())
 
     return mat_out
+
+
+def vectors_to_samples(vectors):
+    vectors = vectors.reshape(vectors.size()[0], -1, 3)
+    vectors = vectors.cpu().numpy()
+    vectors = vectors.tolist()
+    return vectors
+
+
+def labels_to_titles(labels):
+    if len(labels.shape) > 1 and min(labels.shape) == 1:
+        labels = labels.view(labels.size()[0],)
+    # labels_np = (labels.numpy())
+    labels = (labels.cpu().numpy()).tolist()
+    return labels
 
 
 def incorrect_two_labels(images, outputs, labels):
