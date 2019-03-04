@@ -4,8 +4,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import math
-from scipy import stats
+# import math
+# from scipy import stats
 
 
 class VAENeuralNet(nn.Module):

@@ -15,7 +15,7 @@ import utils
 import model_vae.vae_net as vae_net
 import model_vae.one_label_data_loader as data_loader
 import display_digit as display_results
-from evaluate import evaluate
+# from evaluate import evaluate
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_dir', default='data/data-with-grayscale-4000', help="Directory containing the dataset")
@@ -62,7 +62,8 @@ def train(model, optimizer, loss_fn, dataloader, params, epoch, fig):
         reconstructed_batch, mean, log_of_var = model(train_batch)
         loss = loss_fn(reconstructed_batch, train_batch, mean, log_of_var)
 
-        print('loss:{:.4f}'.format(loss.item()))
+        # print('loss:{:.4f}'.format(loss.item()))
+        logging.info('loss:{:.4f}'.format(loss.item()))
 
         # clear previous gradients, compute gradients of all variables wrt loss
         optimizer.zero_grad()
@@ -78,6 +79,13 @@ def train(model, optimizer, loss_fn, dataloader, params, epoch, fig):
         # extract data from torch Variable, move to cpu, convert to numpy arrays
         train_batch_shaped = vae_net.vectors_to_samples(train_batch)
         reconstructed_batch_shaped = vae_net.vectors_to_samples(reconstructed_batch.detach())  # .data.cpu().numpy()
+
+        # batch = iter(dataloader).next()[0]
+        # generated_images = []
+        # for alpha in torch.arange(0.0, 1.0, 0.1):
+        #     generated_images.append(model.generation_with_interpolation(
+        #         x_one, x_two, alpha))
+        # generated_images = torch.cat(generated_images, 0).cpu().data
 
         display_results.fill_figure(train_batch_shaped, fig, epoch + 1, args.model_dir, 'data')
         display_results.fill_figure(reconstructed_batch_shaped, fig, epoch + 1, args.model_dir, 'reconstructed')
@@ -101,9 +109,9 @@ def train(model, optimizer, loss_fn, dataloader, params, epoch, fig):
     # logging.info("- Train metrics: " + metrics_string)
     #
     # # print to screen every 1% of iterations
-    # if (epoch+1) % (0.01*params.num_epochs) == 0:
-    #     print("train Epoch {}/{}".format(epoch + 1, params.num_epochs))
-    #     print(metrics_string)
+    if (epoch+1) % (0.01*params.num_epochs) == 0:
+        print("train Epoch {}/{}".format(epoch + 1, params.num_epochs))
+        print('loss:{:.4f}'.format(loss.item()))
 
 
 def train_vae(model, train_dataloader, optimizer, loss_fn, params, model_dir):
@@ -123,7 +131,7 @@ def train_vae(model, train_dataloader, optimizer, loss_fn, params, model_dir):
     for epoch in range(params.num_epochs):
         # Run one epoch
         logging.info("Epoch {}/{}".format(epoch + 1, params.num_epochs))
-        print("Epoch {}/{}".format(epoch + 1, params.num_epochs))
+        # print("Epoch {}/{}".format(epoch + 1, params.num_epochs))
 
         # compute number of batches in one epoch (one full pass over the training set)
         train(model, optimizer, loss_fn, train_dataloader, params, epoch, fig)

@@ -86,7 +86,7 @@ def display_digit(colors, myaxis):
     colors = numpy_colors.tolist()
 
     patches = []
-    print(myaxis.axis)
+    # print(myaxis.axis)
     # myaxis.axis = [0,0,1,1]
     # myaxis = [0,0,1,1]
     myaxis.set_xlim([0, 2 * width])
@@ -162,8 +162,8 @@ def create_digit_image(colors):
 
     fig_temp.canvas.draw()
     # plt.rcParams['legend.fontsize'] = 10
-    print(fig_temp.get_size_inches())
-    print(fig_temp.dpi)
+    # print(fig_temp.get_size_inches())
+    # print(fig_temp.dpi)
     plt.tight_layout()
     plt.show(block=False)
     plt.pause(5)
@@ -177,16 +177,16 @@ def create_digit_image(colors):
     # data = image.imread('./temp.png')
     # ppp = plt.imshow(data)
 
-    print(type(data))
-    print(data.shape)
-    print(data.min())
-    print(data.max())
+    # print(type(data))
+    # print(data.shape)
+    # print(data.min())
+    # print(data.max())
     # print(data)
 
     # data = data/255.0
     data_tensor = F.to_tensor(data)
-    print(type(data_tensor))
-    print(data_tensor.shape)
+    # print(type(data_tensor))
+    # print(data_tensor.shape)
 
     return data_tensor
 
