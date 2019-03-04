@@ -6,7 +6,8 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from torchvision.datasets import MNIST
-from torchvision.utils import save_image
+from torchvision.utils import save_image, make_grid
+import matplotlib.pyplot as plt
 
 if not os.path.exists('./mlp_img'):
     os.mkdir('./mlp_img')
@@ -68,7 +69,9 @@ class VariationalAutoencoder(nn.Module):
     def reparametrize(self, mu, logvar):
         var = logvar.exp()
         std = var.sqrt()
-        eps = Variable(torch.cuda.FloatTensor(std.size()).normal_())
+        if torch.cuda.is_available():
+            eps = Variable(torch.cuda.FloatTensor(std.size()).normal_())
+        eps = Variable(torch.FloatTensor(std.size()).normal_())
         return eps.mul(std).add(mu)
 
     def forward(self, x):
@@ -92,16 +95,22 @@ class VariationalAutoencoder(nn.Module):
         generated_image = self.decoder(z)
         return generated_image
 
-model = VariationalAutoencoder().cuda()
+
+model = VariationalAutoencoder()
+if torch.cuda.is_available():
+    model = VariationalAutoencoder().cuda()
+
 BCE = nn.BCELoss()
-optimizer = torch.optim.Adam(
-    model.parameters(), lr=learning_rate)
+optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+# fig = plt.figure(figsize=(16, 16))
 
 for epoch in range(num_epochs):
     for data in dataloader:
         img, _ = data
         img = img.view(img.size(0), -1)
-        img = Variable(img).cuda()
+        if torch.cuda.is_available():
+            img = Variable(img).cuda()
+        img = Variable(img)
         # ===================forward=====================
         x_hat, mu, logvar = model(img)
         NKLD = mu.pow(2).add(logvar.exp()).mul(-1).add(logvar.add(1))
@@ -115,6 +124,7 @@ for epoch in range(num_epochs):
     # ===================log========================
     print('epoch [{}/{}], loss:{:.4f}'
           .format(epoch + 1, num_epochs, loss.item()))
+
     if epoch % 10 == 0:
         x = to_img(img.cpu().data)
         x_hat = to_img(x_hat.cpu().data)
@@ -122,15 +132,23 @@ for epoch in range(num_epochs):
         save_image(x_hat, './mlp_img/x_hat_{}.png'.format(epoch))
         batch = iter(dataloader).next()[0]
         batch = batch.view(batch.size(0), -1)
-        batch = Variable(batch).cuda()
-        x_one = batch[0:1]
-        x_two = batch[1:2]
+
+        batch = Variable(batch)
+        if torch.cuda.is_available():
+            batch = Variable(batch).cuda()
+
+        x_one = batch[0:1]  # get first sample
+        x_two = batch[1:2]  # get second sample
         generated_images = []
         for alpha in torch.arange(0.0, 1.0, 0.1):
             generated_images.append(model.generation_with_interpolation(
                 x_one, x_two, alpha))
         generated_images = torch.cat(generated_images, 0).cpu().data
+
+        # plt.imshow(make_grid(generated_images.view(generated_images.size(0), 1, 28, 28), normalize=True))
+        # plt.axis('off')
         save_image(generated_images.view(-1, 1, 28, 28),
-                   './generated/output_interpolate_{}.png'.format(epoch),
+                   '.VAE/generated/output_interpolate_{}.png'.format(epoch),
                    nrow=1)
 torch.save(model.state_dict(), './sim_variational_autoencoder.pth')
+# plt.close()
