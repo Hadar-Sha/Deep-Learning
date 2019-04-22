@@ -18,12 +18,13 @@ height = 0.2
 plt.ioff()
 
 
-def create_background(color):
+def create_background(color, center=[width, 1.5*width]):
+
     points = np.zeros([4, 2], dtype=float)
-    points[0] = [0, 0]
-    points[1] = [0, 3*width]
-    points[2] = [2*width, 3*width]
-    points[3] = [2*width, 0]
+    points[0] = [center[0]-width, center[1]-1.5*width]
+    points[1] = [center[0]-width, center[1]+1.5*width]
+    points[2] = [center[0]+width, center[1]+1.5*width]
+    points[3] = [center[0]+width, center[1]-1.5*width]
 
     background = Polygon(points, True, facecolor=color)
     return background
@@ -73,7 +74,18 @@ def create_segment(segment_center, vertical_or_horizontal, color):
     return segment
 
 
-def display_digit(colors, myaxis):
+def convert_to_after_filer_grayscale(np_colors):
+    scale_green = 0.02
+    max_gray = 1 + scale_green
+    np_grays = (np_colors[:,0]+np_colors[:,1]*scale_green)/max_gray
+    np_grays = np.reshape(np_grays, (np_grays.shape[0],1))
+    grayscale_np_colors = np_grays*np.ones((1,3))
+    return grayscale_np_colors
+
+
+def display_digit(colors, myaxis, withgrayscale=False):
+
+    vertical_horizon = [0, 0, 0, 1, 1, 1, 1]
 
     # flat_colors = [item for sublist in colors for item in sublist]
 
@@ -84,17 +96,42 @@ def display_digit(colors, myaxis):
         numpy_colors = (numpy_colors - numpy_colors.min()) / (numpy_colors.max() - numpy_colors.min())
 
     colors = numpy_colors.tolist()
+    if withgrayscale:
+        gray_colors = convert_to_after_filer_grayscale(numpy_colors).tolist()
 
     patches = []
-    # print(myaxis.axis)
-    # myaxis.axis = [0,0,1,1]
-    # myaxis = [0,0,1,1]
-    myaxis.set_xlim([0, 2 * width])
-    myaxis.set_ylim([0, 3*width])
-    myaxis.set_aspect('equal', 'box')
 
+    if withgrayscale:
+        myaxis.set_xlim([0, 4 * width])
+        myaxis.set_ylim([0, 6 * width])
+    else:
+        myaxis.set_xlim([0, 2 * width])
+        myaxis.set_ylim([0, 3*width])
+
+    myaxis.set_aspect('equal', 'box')
     myaxis.axis('off')
 
+    if withgrayscale:
+        segments_gray_centers = []
+        gray_center = [3*width, 1.5 * width]
+        bg_patch = create_background(gray_colors[7], gray_center)
+        patches.append(bg_patch)
+        myaxis.add_patch(bg_patch)
+
+        segments_gray_centers.append([gray_center[0], gray_center[1] + width + height])
+        segments_gray_centers.append([gray_center[0], gray_center[1]])
+        segments_gray_centers.append([gray_center[0], gray_center[1] - width - height])
+        segments_gray_centers.append([gray_center[0] - width / 2 - height / 2, gray_center[1] + width / 2 + height / 2])
+        segments_gray_centers.append([gray_center[0] + width / 2 + height / 2, gray_center[1] + width / 2 + height / 2])
+        segments_gray_centers.append([gray_center[0] - width / 2 - height / 2, gray_center[1] - width / 2 - height / 2])
+        segments_gray_centers.append([gray_center[0] + width / 2 + height / 2, gray_center[1] - width / 2 - height / 2])
+
+        for i in range(len(segments_gray_centers)):
+            polygon = create_segment(segments_gray_centers[i], vertical_horizon[i], gray_colors[i])
+            patches.append(polygon)
+            myaxis.add_patch(polygon)
+
+    # else:
     segments_centers = []
     center = [width, 1.5*width]
     bg_patch = create_background(colors[7])
@@ -109,7 +146,6 @@ def display_digit(colors, myaxis):
     segments_centers.append([center[0] - width / 2 - height / 2, center[1] - width / 2 - height / 2])
     segments_centers.append([center[0] + width / 2 + height / 2, center[1] - width / 2 - height / 2])
 
-    vertical_horizon = [0, 0, 0, 1, 1, 1, 1]
     for i in range(len(segments_centers)):
         polygon = create_segment(segments_centers[i], vertical_horizon[i], colors[i])
         patches.append(polygon)
@@ -121,11 +157,6 @@ def display_digit(colors, myaxis):
 def create_digit_image(colors):
 
     fig_temp, myaxis = plt.subplots(figsize=(20, 30), dpi=10)  # figsize=(17, 27), dpi=10
-    # fig_temp.figsize = ()
-    print(fig_temp)
-
-    # for item in [fig_temp, myaxis]:
-    #     item.patch.set_visible(False)
 
     numpy_colors = np.array(colors)
 
@@ -161,9 +192,7 @@ def create_digit_image(colors):
         myaxis.add_patch(polygon)
 
     fig_temp.canvas.draw()
-    # plt.rcParams['legend.fontsize'] = 10
-    # print(fig_temp.get_size_inches())
-    # print(fig_temp.dpi)
+
     plt.tight_layout()
     plt.show(block=False)
     plt.pause(5)
@@ -173,24 +202,9 @@ def create_digit_image(colors):
     data = data.reshape(fig_temp.canvas.get_width_height()[::-1] + (3,))
 
     plt.close('all')
-
-    # data = image.imread('./temp.png')
-    # ppp = plt.imshow(data)
-
-    # print(type(data))
-    # print(data.shape)
-    # print(data.min())
-    # print(data.max())
-    # print(data)
-
-    # data = data/255.0
     data_tensor = F.to_tensor(data)
-    # print(type(data_tensor))
-    # print(data_tensor.shape)
 
     return data_tensor
-
-    # return
 
 
 def create_figure():
@@ -203,50 +217,50 @@ def close_figure(figure):
     return
 
 
-def feed_digits_to_figure(_, samples, fig, epoch, image_path, labels, type):
+def feed_digits_to_figure(_, samples, fig, epoch, image_path, labels, dtype, withgrayscale):
     # args = parser.parse_args()
     fig.clear()
     fig.suptitle('epoch #{}'.format(epoch))
 
     num_of_samples = len(samples)
-    num_of_rows = math.floor(0.2*num_of_samples)
+    num_of_rows = max(1, math.floor(0.2*num_of_samples))
     axes = np.zeros((num_of_rows, math.ceil(num_of_samples / num_of_rows))).tolist()
+    # axes = np.zeros((num_of_rows, max(1, math.ceil(num_of_samples / num_of_rows)))).tolist()
 
     for i in range(num_of_samples):
         row, col = np.unravel_index(i, (num_of_rows, math.ceil(num_of_samples / num_of_rows)))
         axes[row][col] = fig.add_subplot(num_of_rows, math.ceil(num_of_samples / num_of_rows), i + 1)
+        # row, col = np.unravel_index(i, (num_of_rows, max(1, math.ceil(num_of_samples / num_of_rows))))
+        # axes[row][col] = fig.add_subplot(num_of_rows, max(1, math.ceil(num_of_samples / num_of_rows)), i + 1)
 
         if labels is not None:
             digit_val = str(labels[i])
             axes[row][col].set_title(digit_val)
-        display_digit(samples[i], axes[row][col])
+        display_digit(samples[i], axes[row][col], withgrayscale)
 
     # save graph
     path = os.path.join(image_path, 'images')
     if not os.path.isdir(path):
         os.mkdir(path)
 
-    if type is not None:
-        # if type == 'data':
-        impath = os.path.join(path, '{}_samples_epoch_#{}.png'.format(type, epoch))
-        # elif type == 'reconstructed':
-        #     impath = os.path.join(path, 'reconstruced_samples_epoch_#{}.png'.format(epoch))
+    if dtype is not None:
+        impath = os.path.join(path, '{}_samples_epoch_#{}.png'.format(dtype, epoch))
     else:
         impath = os.path.join(path, 'test_samples_epoch_#{}.png'.format(epoch))
     plt.savefig(impath, bbox_inches='tight')
     return
 
 
-def fill_figure(samples, fig, epoch, image_path, type=None, labels=None):
+def fill_figure(samples, fig, epoch, image_path, withgrayscale=False, dtype=None, labels=None):
 
     im_ani = animation.FuncAnimation(fig, feed_digits_to_figure, frames=None,
-                         fargs=(samples, fig, epoch, image_path, labels, type), interval=2, repeat=False, blit=False)
+                         fargs=(samples, fig, epoch, image_path, labels, dtype, withgrayscale), interval=2, repeat=False, blit=False)
 
     plt.draw()
     plt.pause(0.01)
 
 
-def plot_graph(g_losses, d_losses, gtype, image_path):
+def plot_graph(losses_one, losses_two, gtype, image_path):
     plt.close('all')
     # args = parser.parse_args()
     fig1 = plt.figure()
@@ -256,16 +270,38 @@ def plot_graph(g_losses, d_losses, gtype, image_path):
         plt.title("Generator and Discriminator Loss During Training")
         plt.xlabel("iterations")
         plt.ylabel("Loss")
+    elif gtype == "General Loss":
+        plt.title("Loss During Training")
+        plt.xlabel("iterations")
+        plt.ylabel("Loss")
+    elif gtype == "VAE Loss":
+        plt.title("BCE and KL Loss During Training")
+        plt.xlabel("iterations")
+        plt.ylabel("Loss")
     elif gtype == "Predictions":
         plt.title("Generator and Discriminator predictions During Training")
         plt.xlabel("iterations")
         plt.ylabel("Predictions")
-    else:
-        plt.title("Generator and Discriminator min and max gradients During Training")
+    elif gtype == "Grads":
+        plt.title("min and max gradients During Training")
+        # plt.title("Generator and Discriminator min and max gradients During Training")
         plt.xlabel("layers")
         plt.ylabel("Grads")
-    plt.plot(g_losses, label="G")
-    plt.plot(d_losses, label="D")
+
+    if losses_one is not None and losses_two is not None:
+        if gtype == "Loss":
+            plt.plot(losses_one, label="G")
+            plt.plot(losses_two, label="D")
+        elif gtype == "VAE Loss":
+            plt.plot(losses_one, label="BCE")
+            plt.plot(losses_two, label="KL")
+    elif losses_one is not None:
+        plt.plot(losses_one)
+    elif losses_two is not None:
+        plt.plot(losses_two)
+    else:
+        print('no data was provided')
+        return
 
     #save graph
     path = os.path.join(image_path, 'images')
@@ -309,24 +345,24 @@ def fill_grid(samples, fig, axes, epoch, n_batch, save=True):
 if __name__ == '__main__':
 
     colors = []
-    colors.append([1, 0, 0])
-    colors.append([1, 0, 0])
-    colors.append([1, 0, 0])
-    colors.append([1, 0, 0])
-    colors.append([1, 0, 0])
+    colors.append([0.5, 0, 0])
+    colors.append([0, 0, 0.5])
+    colors.append([0.5, 0, 0])
+    colors.append([0.5, 0, 0])
+    colors.append([0.5, 0, 0])
     colors.append([0, 0, 0])
-    colors.append([1, 0, 0])
+    colors.append([0.5, 0, 0])
     # background
     colors.append([0, 0, 0])
 
     print(colors)
-    # fig, ax = plt.subplots()
+    fig, ax = plt.subplots()
     #
-    # display_digit(colors, ax)
+    display_digit(colors, ax, True)
     #
-    # plt.show()
+    plt.show()
     # plt.close('all')
 
-    create_digit_image(colors)
+    # create_digit_image(colors)
 
 

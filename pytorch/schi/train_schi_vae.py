@@ -11,15 +11,15 @@ from torch.autograd import Variable
 
 import math
 import utils
-import model_vae.vae_net as vae_net
-import model_vae.one_label_data_loader as data_loader
+import model_schi_vae.schi_vae_net as vae_net
+import model_schi_vae.one_label_data_loader as data_loader
 import display_digit as display_results
 # from evaluate import evaluate
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_dir', default='data/with-grayscale/data-with-grayscale-4000', help="Directory containing the dataset")
-parser.add_argument('--model_dir', default='experiments/vae_model', help="Directory containing params.json")
+parser.add_argument('--model_dir', default='experiments/schi_vae_model', help="Directory containing params.json")
 parser.add_argument('--restore_file', default=None,
                     help="Optional, name of the file in --model_dir containing weights to reload before \
                     training")  # 'best' or 'train'
@@ -178,6 +178,7 @@ def train_vae(model, train_dataloader, optimizer, loss_fn, params, model_dir):
             print("- Found new best loss")
             best_loss = loss_mean
             print("mean loss is {:05.3f}".format(loss_mean))
+            loss_metric_dict = {'loss': loss_mean}
 
             # utils.save_checkpoint({'epoch': epoch + 1,
             #                        'state_dict': model.state_dict(),
@@ -185,7 +186,7 @@ def train_vae(model, train_dataloader, optimizer, loss_fn, params, model_dir):
 
             # Save best val metrics in a json file in the model directory
             best_json_path = os.path.join(model_dir, "metrics_min_avg_loss_best_weights.json")
-            utils.save_dict_to_json(loss_mean, best_json_path)
+            utils.save_dict_to_json(loss_metric_dict, best_json_path)
 
             # best_csv_path = os.path.join(model_dir, "reconstructed_min_avg_loss_best_samples.csv")
             # utils.save_incorrect_to_csv(reconstructed_samples, best_csv_path)

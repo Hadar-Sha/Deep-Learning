@@ -11,9 +11,9 @@ import utils
 
 PYTHON = sys.executable
 parser = argparse.ArgumentParser()
-parser.add_argument('--parent_dir', default='experiments/vae_model/params',
+parser.add_argument('--parent_dir', default='experiments/vae_model',
                     help='Directory containing params.json')
-parser.add_argument('--data_dir', default='data/data-with-grayscale-4000', help="Directory containing the dataset")
+parser.add_argument('--data_dir', default='data/with-grayscale/data-with-grayscale-4000', help="Directory containing the dataset")
 
 
 def launch_training_job(parent_dir, data_dir, job_name, params):
@@ -48,36 +48,49 @@ if __name__ == "__main__":
     params = utils.Params(json_path)
 
     # Perform hypersearch over one parameter
-    learning_rates = [1e-4, 1e-3, 1e-2]
-    batch_sizes = [2**6, 2**7, 2**8, 2**9]
-    num_epochs = [10**2, 10**3, 10**4, 5*(10**4)]
 
-    # try later
-    # hidden_size, output_size
-
-    rand_lr = [learning_rates[random.randrange(len(learning_rates))]
-                  for item in range(15)]
-
-    rand_bs = [batch_sizes[random.randrange(len(batch_sizes))]
-                  for item in range(15)]
-
-    rand_ne = [num_epochs[random.randrange(len(num_epochs))]
-                  for item in range(15)]
-
-    chosen_vals = []
-    for i in range(15):
-        chosen_vals.append([rand_lr[i], rand_bs[i], rand_ne[i]])
+    # # learning_rates = [1e-4, 1e-3, 1e-2]
+    # batch_sizes = [2**5, 2**6, 2**7]  # [50, 100, 200]  # [2**6, 2**7, 2**8, 2**9]
+    # hidden_size = list(range(34, 65, 4))
+    # #hidden_size = [2**5,2**6, 2**7, 2**8, 2**9]
+    # # num_epochs = [10**3, 2*10**3, 4*10**3]
+    # num_epochs = 10**3
+    #
+    # # try later
+    # # hidden_size, output_size
+    #
+    # # rand_ne = [num_epochs[random.randrange(len(num_epochs))]
+    # #               for item in range(15)]
+    #
+    # rand_bs = [batch_sizes[random.randrange(len(batch_sizes))]
+    #               for item in range(15)]
+    #
+    # rand_hs = [hidden_size[random.randrange(len(hidden_size))]
+    #               for item in range(15)]
+    #
+    # chosen_vals = []
+    # for i in range(15):
+    #     chosen_vals.append([rand_bs[i], rand_hs[i]])
+    #     # chosen_vals.append([rand_ne[i], rand_bs[i], rand_hs[i]])
+    # learning_rate = 1e-3
+    num_epochs = 10 ** 3
+    chosen_vals = [[5, 46], [5, 42], [5, 34], [10, 38], [10, 54], [5, 38]]
+    # chosen_vals = [[5, 46], [5, 42], [5, 34], [10, 38], [10, 54], [5, 38]]
 
     for val in chosen_vals:
-        # print(val[0])
-        # print(val[1])
-        # print(val[2])
 
-        #Modify the relevant parameter in params
-        params.learning_rate = val[0]
-        params.batch_size = val[1]
-        params.num_epochs = val[2]
+        # Modify the relevant parameter in params
+
+        # params.num_epochs = val[0]
+        # params.batch_size = val[1]
+        # params.hidden_size = val[2]
+        params.batch_size = val[0]
+        params.hidden_size = val[1]
+        params.output_size = val[1] ** 2
+        params.num_epochs = num_epochs
+        # params.learning_rate = learning_rate
 
         # Launch job (name has to be unique)
-        job_name = "learning_rate_{}_batch_size_{}_num_epochs_{}".format(val[0], val[1], val[2])
+        job_name = "num_epochs_{}_batch_size_{}_hidden_size_{}_output_size_{}".format(num_epochs, val[0], val[1], val[1]**2)
+        # job_name = "num_epochs_{}_batch_size_{}_hidden_size_{}_output_size_{}".format(val[0], val[1], val[2], 2*val[2])
         launch_training_job(args.parent_dir, args.data_dir, job_name, params)

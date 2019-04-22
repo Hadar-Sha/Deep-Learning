@@ -13,8 +13,6 @@ parser.add_argument('--inFolder', default='./data/data-with-grayscale-4000'
 
 parser.add_argument('--subfolder', default='data/', help="Directory containing input files")
 parser.add_argument('--outFolder', default='./data/data-w-gray-only-9', help="Directory containing output files")
-# parser.add_argument('--dataSize', default=2429, type=int, help="")
-# parser.add_argument('--isDevidedByHundred', default=False, type=bool, help="")
 
 
 if __name__ == '__main__':

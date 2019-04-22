@@ -41,7 +41,8 @@ class NeuralNet(nn.Module):
 
 def convert_int_to_one_hot_vector(label, num_of_classes):
 
-    if min(list(label.size())) == 1:
+    if len(list(label.size())) < 3:
+    # if min(list(label.size())) == 1:
         label_shaped = label.view(-1, 1)
 
         one_hot_vector = torch.FloatTensor(list(label.size())[0], num_of_classes)
