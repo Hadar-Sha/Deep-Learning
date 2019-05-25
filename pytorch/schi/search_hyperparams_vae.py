@@ -50,7 +50,11 @@ if __name__ == "__main__":
     # Perform hypersearch over one parameter
 
     # # learning_rates = [1e-4, 1e-3, 1e-2]
-    # batch_sizes = [2**5, 2**6, 2**7]  # [50, 100, 200]  # [2**6, 2**7, 2**8, 2**9]
+    batch_sizes = list(range(5, 35, 5))*2  # [2**5, 2**6, 2**7]  # [50, 100, 200]  # [2**6, 2**7, 2**8, 2**9]
+    vae_beta = list(range(0, 299, 25))
+    vae_beta[0] = 1
+    num_epochs = 10 ** 3
+    hidden_size = 24
     # hidden_size = list(range(34, 65, 4))
     # #hidden_size = [2**5,2**6, 2**7, 2**8, 2**9]
     # # num_epochs = [10**3, 2*10**3, 4*10**3]
@@ -63,18 +67,21 @@ if __name__ == "__main__":
     # #               for item in range(15)]
     #
     # rand_bs = [batch_sizes[random.randrange(len(batch_sizes))]
-    #               for item in range(15)]
+    #               for item in range(12)]
     #
     # rand_hs = [hidden_size[random.randrange(len(hidden_size))]
     #               for item in range(15)]
     #
+    chosen_vals = []
+    for i in range(12):
+        chosen_vals.append([batch_sizes[i], hidden_size, vae_beta[i]])
+
     # chosen_vals = []
     # for i in range(15):
     #     chosen_vals.append([rand_bs[i], rand_hs[i]])
     #     # chosen_vals.append([rand_ne[i], rand_bs[i], rand_hs[i]])
     # learning_rate = 1e-3
-    num_epochs = 10 ** 3
-    chosen_vals = [[5, 46], [5, 42], [5, 34], [10, 38], [10, 54], [5, 38]]
+
     # chosen_vals = [[5, 46], [5, 42], [5, 34], [10, 38], [10, 54], [5, 38]]
 
     for val in chosen_vals:
@@ -86,11 +93,14 @@ if __name__ == "__main__":
         # params.hidden_size = val[2]
         params.batch_size = val[0]
         params.hidden_size = val[1]
-        params.output_size = val[1] ** 2
+        params.output_size = val[1]
+        # params.output_size = val[1] ** 2
         params.num_epochs = num_epochs
+        params.vae_beta = val[2]
         # params.learning_rate = learning_rate
 
         # Launch job (name has to be unique)
-        job_name = "num_epochs_{}_batch_size_{}_hidden_size_{}_output_size_{}".format(num_epochs, val[0], val[1], val[1]**2)
+        job_name = "num_epochs_{}_batch_size_{}_hidden_size_{}_vae_beta_{}".format(num_epochs, val[0], val[1], val[2])
+        # job_name = "num_epochs_{}_batch_size_{}_hidden_size_{}_output_size_{}".format(num_epochs, val[0], val[1], val[1]**2)
         # job_name = "num_epochs_{}_batch_size_{}_hidden_size_{}_output_size_{}".format(val[0], val[1], val[2], 2*val[2])
         launch_training_job(args.parent_dir, args.data_dir, job_name, params)

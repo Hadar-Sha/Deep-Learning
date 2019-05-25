@@ -14,11 +14,15 @@ import torch.nn as nn
 # from tqdm import tqdm
 
 import utils
-import model.net as net
-import model.one_label_data_loader as data_loader
+import model_weighted_schi_distance.net as net
+import model_weighted_schi_distance.one_label_data_loader as data_loader
+# import model.net as net
+# import model.one_label_data_loader as data_loader
 from evaluate import evaluate
+import display_digit as display_results
 
 parser = argparse.ArgumentParser()
+parser.add_argument('--parent_dir', default="C:/Users/H/Documents/Haifa Univ/Thesis/DL-Pytorch-data", help='path to experiments and data folder. not for Server')
 parser.add_argument('--data_dir', default='data/data', help="Directory containing the dataset")
 parser.add_argument('--model_dir', default='experiments/base_model', help="Directory containing params.json")
 parser.add_argument('--restore_file', default=None,
@@ -74,7 +78,21 @@ def train(model, optimizer, loss_fn, dataloader, metrics, params, epoch):
         # performs updates using calculated gradients
         optimizer.step()
 
+        prop_for_loss = train_batch.shape[0] / params.batch_size
+        # update the average loss
+        loss_avg.update(loss.item(), prop_for_loss)
+
+        # # compute all metrics on this batch
+        # summary_batch = {'loss': loss.item()}
+        # # summary_batch['loss'] = loss.item()
+        # summ.append(summary_batch)
+        # # print(summ)
+        #
+        # proportions_batch = labels_batch.shape[0] / params.batch_size
+        # prop.append(proportions_batch)
+
         # Evaluate summaries only once in a while
+        # if (epoch + 1) % (0.01 * params.num_epochs) == 0:
         if i % params.save_summary_steps == 0:
             # extract data from torch Variable, move to cpu, convert to numpy arrays
             output_batch = output_batch.data.cpu().numpy()
@@ -88,12 +106,10 @@ def train(model, optimizer, loss_fn, dataloader, metrics, params, epoch):
                              for metric in metrics}
             summary_batch['loss'] = loss.item()
             summ.append(summary_batch)
-
-        prop = train_batch.shape[0]/params.batch_size
-        # update the average loss
-        loss_avg.update(loss.item(), prop)
+            # print(summ)
 
     # compute mean of all metrics in summary
+    # print(summ)
     metrics_mean = {metric: np.sum([x[metric] for x in summ] / np.sum(prop)) for metric in summ[0]}
     metrics_string = " ; ".join("{}: {:05.3f}".format(k, v) for k, v in metrics_mean.items())
     logging.info("- Train metrics: " + metrics_string)
@@ -102,6 +118,11 @@ def train(model, optimizer, loss_fn, dataloader, metrics, params, epoch):
     if (epoch+1) % (0.01*params.num_epochs) == 0:
         print("train Epoch {}/{}".format(epoch + 1, params.num_epochs))
         print(metrics_string)
+
+    # compute mean of all metrics in summary (loss, bce part, kl part)
+    if isinstance(loss, torch.autograd.Variable):
+        loss_v = loss.data.cpu().numpy()
+    losses.append(loss_v.item())
 
 
 def train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_fn, metrics, incorrect, params, model_dir,
@@ -138,6 +159,9 @@ def train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_
         # Evaluate for one epoch on validation set
         dev_metrics, incorrect_samples = evaluate(model, loss_fn, dev_dataloader, metrics, incorrect, params, epoch)
 
+        grads_graph = collect_network_statistics(model)
+        grads_per_epoch.append(grads_graph)
+
         dev_acc = dev_metrics['accuracy']
         is_best = dev_acc >= best_dev_acc
 
@@ -168,11 +192,52 @@ def train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_
         last_csv_path = os.path.join(model_dir, "incorrect_last_samples.csv")
         utils.save_incorrect_to_csv(incorrect_samples, last_csv_path)
 
+        # compute mean of all metrics in summary (loss, bce part, kl part)
+        accuracy.append(dev_acc)
+        # if isinstance(loss, torch.autograd.Variable):
+        #     loss_v = loss.data.cpu().numpy()
+
+
+def collect_network_statistics(net):
+
+    status_net = []
+    net_grads_graph = []
+
+    for param_tensor in net.state_dict():
+
+        status_net.append([param_tensor,
+                                       (net.state_dict()[param_tensor].norm()).item(),
+                                       list(net.state_dict()[param_tensor].size())])
+
+        all_net_grads = ((net.state_dict()[param_tensor]).cpu().numpy()).tolist()
+
+        # if needed, flatten the list to get one nim and one max
+        flat_net_grads = []
+        if isinstance(all_net_grads, (list,)):
+
+            for elem in all_net_grads:
+                if isinstance(elem, (list,)) and isinstance(elem[0], (list,)):
+                    for item in elem:
+                        flat_net_grads.extend(item)
+                elif isinstance(elem, (list,)):
+                    flat_net_grads.extend(elem)
+                else:
+                    flat_net_grads.extend([elem])
+        else:
+            flat_net_grads = all_net_grads
+
+        net_grads_graph.append([min(flat_net_grads), max(flat_net_grads)])
+
+    return net_grads_graph
+
 
 if __name__ == '__main__':
 
     # Load the parameters from json file
     args = parser.parse_args()
+    if args.parent_dir and not torch.cuda.is_available():
+        os.chdir(args.parent_dir)
+
     json_path = os.path.join(args.model_dir, 'params.json')
     assert os.path.isfile(json_path), "No json configuration file found at {}".format(json_path)
     params = utils.Params(json_path)
@@ -180,10 +245,10 @@ if __name__ == '__main__':
     # use GPU if available
     params.cuda = torch.cuda.is_available()
 
-    # Set the random seed for reproducible experiments
-    torch.manual_seed(230)
-    if params.cuda:
-        torch.cuda.manual_seed(230)
+    # # Set the random seed for reproducible experiments
+    # torch.manual_seed(230)
+    # if params.cuda:
+    #     torch.cuda.manual_seed(230)
 
     # Set the logger
     utils.set_logger(os.path.join(args.model_dir, 'train.log'))
@@ -203,16 +268,31 @@ if __name__ == '__main__':
     model = net.NeuralNet(params).cuda() if params.cuda else net.NeuralNet(params)
 
     print(model)
+    logging.info("network structure is")
+    logging.info("{}".format(model))
 
     optimizer = torch.optim.SGD(model.parameters(), lr=params.learning_rate)
 
-    # fetch loss f1700-50-57-57unction and metrics
+    # fetch loss function and metrics
+    # loss_fn = net.loss_fn_two_labels
     loss_fn = net.loss_fn
 
     metrics = net.metrics
     incorrect = net.incorrect
 
+    losses = []
+    accuracy = []
+    grads_per_epoch = []
+
     # Train the model
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))
     train_and_evaluate(model, train_dl, dev_dl, optimizer, loss_fn, metrics, incorrect, params, args.model_dir,
                        args.restore_file)
+
+    display_results.plot_graph(losses, None, "General Loss", args.model_dir)
+    display_results.plot_graph(accuracy, None, "General dev accuracy", args.model_dir)
+
+    grads_np = np.array(grads_per_epoch)
+    for i in range(grads_np.shape[1]):
+        display_results.plot_graph(grads_np[:, i], None, "Grads_layer_{}".format(i+1), args.model_dir)
+

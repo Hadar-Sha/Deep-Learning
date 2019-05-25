@@ -131,7 +131,7 @@ if __name__ == '__main__':
     utils.load_checkpoint(os.path.join(args.model_dir, args.restore_file + '.pth.tar'), model)
 
     # Evaluate
-    test_metrics, incorrect_samples = evaluate(model, loss_fn, test_dl, metrics, incorrect, params)
+    test_metrics, incorrect_samples = evaluate(model, loss_fn, test_dl, metrics, incorrect, params, params.num_epochs)
     save_path = os.path.join(args.model_dir, "metrics_test_{}.json".format(args.restore_file))
     utils.save_dict_to_json(test_metrics, save_path)
 

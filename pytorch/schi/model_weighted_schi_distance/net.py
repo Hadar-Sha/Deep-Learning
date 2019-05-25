@@ -8,20 +8,36 @@ import math
 from scipy import stats
 
 
+# DISTANCE_MAT = torch.tensor([
+DISTANCE_MAT = np.array([
+            [0, 4, 3, 3, 4, 3, 2, 3, 1, 2],
+            [4, 0, 7, 3, 2, 5, 6, 1, 5, 4],
+            [3, 7, 0, 4, 5, 4, 3, 6, 2, 3],
+            [3, 3, 4, 0, 3, 2, 3, 2, 2, 1],
+            [4, 2, 5, 3, 0, 3, 4, 1, 3, 2],
+            [3, 5, 4, 2, 3, 0, 1, 4, 2, 1],
+            [2, 6, 3, 3, 4, 1, 0, 5, 1, 2],
+            [3, 1, 6, 2, 1, 4, 5, 0, 4, 3],
+            [1, 5, 2, 2, 3, 2, 1, 4, 0, 1],
+            [2, 4, 3, 1, 2, 1, 2, 3, 1, 0]])
+# dtype=torch.float)
+
+
 class NeuralNet(nn.Module):
     def __init__(self, params):
         super(NeuralNet, self).__init__()
-        self.fc1 = nn.Linear(params.input_size, params.hidden_size)
+        self.fcIn = nn.Linear(params.input_size, params.hidden_size)
         self.fc2 = nn.Linear(params.hidden_size, params.hidden_size)
-        self.fc3 = nn.Linear(params.hidden_size, params.hidden_size//2)
-        self.fc4 = nn.Linear(params.hidden_size // 2, params.num_classes)  # , bias=False)
+        self.fc3 = nn.Linear(params.hidden_size, params.hidden_size)  # //2)
+        # self.fc4 = nn.Linear(params.hidden_size, params.hidden_size)  # params.num_classes)  # , bias=False)
+        self.fcOut = nn.Linear(params.hidden_size, params.num_classes)  # , bias=False)
 
         self.dropout_rate = params.dropout_rate
 
     def forward(self, x):
 
         # first layer
-        out = F.relu(self.fc1(x))
+        out = F.relu(self.fcIn(x))
         out = F.dropout(out, self.dropout_rate, training=self.training)
 
         # second layer
@@ -32,9 +48,15 @@ class NeuralNet(nn.Module):
         out = F.relu(self.fc3(out))
         out = F.dropout(out, self.dropout_rate, training=self.training)
 
-        out = self.fc4(out)
+        # # forth layer
         # out = F.relu(self.fc4(out))
-        out = F.log_softmax(out, dim=1)
+        # out = F.dropout(out, self.dropout_rate, training=self.training)
+
+        # last layer
+        out = self.fcOut(out)  # fc4(out)
+        out = F.softmax(out, dim=1)
+        # out = F.relu(self.fc4(out))
+        # out = F.log_softmax(out, dim=1)
 
         return out
 
@@ -42,12 +64,9 @@ class NeuralNet(nn.Module):
 def convert_int_to_one_hot_vector(label, num_of_classes):
 
     if len(list(label.size())) < 3:
-    # if min(list(label.size())) == 1:
         label_shaped = label.view(-1, 1)
 
         one_hot_vector = torch.zeros([list(label.size())[0], num_of_classes], device=label.device)
-        # one_hot_vector.zero_()  # set all values to zero
-
         one_hot_vector.scatter_(1, label_shaped, 1)
         one_hot_vector = one_hot_vector.type(torch.FloatTensor)
 
@@ -56,14 +75,10 @@ def convert_int_to_one_hot_vector(label, num_of_classes):
         return one_hot_vector
 
     else:
-        # print(label.size())
         # this is for 3d tensor . continue here!!!!!!
         labels_shaped = label.view(label.size(0), label.size(1), -1)
-        # print(labels_shaped.size())
 
         one_hot_matrix = torch.zeros([list(labels_shaped.size())[0], list(labels_shaped.size())[1], num_of_classes], device=label.device)
-        # one_hot_matrix.zero_()  # set all values to zero
-        # print(one_hot_matrix.size())
         one_hot_matrix.scatter_(2, labels_shaped, 1)
         # added to keep a 2d dimension of labels
         one_hot_matrix = one_hot_matrix.view(-1, list(labels_shaped.size())[1] * num_of_classes)
@@ -89,21 +104,48 @@ def loss_fn(outputs, labels, num_of_classes):
     Note: you may use a standard loss function from http://pytorch.org/docs/master/nn.html#loss-functions. This example
           demonstrates how you can easily define a custom loss function.
     """
+    schi_criterion = SCHILoss()
 
-    kl_criterion = nn.KLDivLoss()
-    one_hot_vector = convert_int_to_one_hot_vector(labels, num_of_classes)
+    return schi_criterion(outputs, labels)
 
-    return kl_criterion(outputs, one_hot_vector)
+    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # distance_mat = torch.from_numpy(DISTANCE_MAT).float().to(device)
+
+    # mult = distance_mat[labels] * outputs
+    # mult_sum = torch.sum(mult, dim=1)
+    # mult_sum_avg = torch.mean(mult_sum)
+
+    # return mult_sum_avg
 
 
-class HLoss(nn.Module):
+class SCHILoss(nn.Module):
     def __init__(self):
-        super(HLoss, self).__init__()
+        super(SCHILoss, self).__init__()
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.distance_mat = torch.from_numpy(DISTANCE_MAT).float().to(self.device)
 
-    def forward(self, x):
-        val = -x*torch.exp(x)
+    def forward(self, out, label):
+        val = self.distance_mat[label] * out
         val = torch.sum(val, dim=1)
         return torch.mean(val)
+
+
+class SCHITwoLabelsLoss(nn.Module):
+    def __init__(self):
+        super(SCHITwoLabelsLoss, self).__init__()
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.distance_mat = torch.from_numpy(DISTANCE_MAT).float().to(self.device)
+
+    def forward(self, out_bef, out_aft, label_bef, label_aft):
+        val_bef = self.distance_mat[label_bef] * out_bef
+        val_bef = torch.sum(val_bef, dim=1)
+        max_val_bef = torch.max(self.distance_mat[label_bef], dim=1)[0]
+        val_bef = torch.mean(val_bef - max_val_bef)
+
+        val_aft = self.distance_mat[label_aft] * out_aft
+        val_aft = torch.sum(val_aft, dim=1)
+        val_aft = torch.mean(val_aft)
+        return val_bef + val_aft
 
 
 def loss_fn_two_labels(outputs, labels, num_of_classes):
@@ -119,69 +161,31 @@ def loss_fn_two_labels(outputs, labels, num_of_classes):
             loss (Variable): cross entropy loss for all images in the batch
     """
 
-    # kl_criterion = nn.KLDivLoss(size_average=True, reduce=True)
-    kl_criterion = nn.KLDivLoss()
-    min_entropy_criterion = HLoss()
-
     label_before_filter = torch.index_select(labels, 1, torch.tensor([0], device=labels.device))
     label_after_filter = torch.index_select(labels, 1, torch.tensor([1], device=labels.device))
 
-    # all_labels_mat = np.arange(num_of_classes)*np.ones((outputs.size()[0], 1), dtype=int)
+    out_before_filter = torch.index_select(outputs, 1, torch.tensor(list(range(num_of_classes)), device=outputs.device))
+    out_after_filter = torch.index_select(outputs, 1, torch.tensor(list(range(num_of_classes, 2*num_of_classes)), device=outputs.device))
+
+    schi_two_labels_criterion = SCHITwoLabelsLoss()
+
+    return schi_two_labels_criterion(out_before_filter, out_after_filter, label_before_filter, label_after_filter)
+
+    # before_filter_dist_mat = []
+    # after_filter_dist_mat = []
+    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # distance_mat = torch.from_numpy(DISTANCE_MAT).float().to(device)
     #
-    # temp_bef = all_labels_mat - label_before_filter.cpu().numpy()
-    # temp_aft = all_labels_mat - label_after_filter.cpu().numpy()
-
-    # other_labels_before = torch.from_numpy(all_labels_mat[np.nonzero(temp_bef)].reshape(outputs.size()[0], num_of_classes-1))
-    # other_labels_after = torch.from_numpy(all_labels_mat[np.nonzero(temp_aft)].reshape(outputs.size()[0], num_of_classes-1))
+    # mult_before = distance_mat[label_before_filter] * out_before_filter
+    # mult_sum_before = torch.sum(mult_before, dim=1)
+    # max_before = torch.max(distance_mat[label_before_filter])
+    # mult_sum_avg_before = torch.mean(mult_sum_before - max_before)
     #
-    # other_labels_before = other_labels_before.type(torch.LongTensor)
-
-#     other_labels_before_numpy = np.setdiff1d(all_labels_mat, label_before_numpy)
-#     other_labels_after_numpy = np.setdiff1d(all_labels_mat, label_after_numpy)
-#
-#     other_labels_before = torch.from_numpy(other_labels_before_numpy)
-#     other_labels_after = torch.from_numpy(other_labels_after_numpy)
-#
-    # alpha = 0.5
-
-    # many_hot_vector_before_filter = convert_int_to_one_hot_vector(other_labels_before, num_of_classes)
-    one_hot_vector_after_filter = convert_int_to_one_hot_vector(label_after_filter, num_of_classes)
-    # one_hot_vector_before_filter = convert_int_to_one_hot_vector(label_before_filter, num_of_classes)  # unneeded
-
-    out_before_filter = torch.index_select(outputs, 1, torch.tensor(list(range(10)), device=outputs.device))
-    out_after_filter = torch.index_select(outputs, 1, torch.tensor(list(range(10, 20)), device=outputs.device))
-
-    # # min_dist = float('inf')
-    # min_ind = 0
+    # mult_after = distance_mat[label_after_filter] * out_after_filter
+    # mult_sum_after = torch.sum(mult_after, dim=1)
+    # mult_sum_avg_after = torch.mean(mult_sum_after)
     #
-    # # for each option of 9 other labels (all besides the label after filter)
-    # # calculate the kl distance from the output and keep the minimal one for the loss function
-    #
-    # min_dist = kl_criterion(out_before_filter, many_hot_vector_before_filter[:, 0])
-    # # ind_array = np.random.permutation(num_of_classes-1).tolist()
-    # for i in range(num_of_classes-1):
-    #     # print(ind_array[i])
-    #     # other_one_hot_vector_before_filter = many_hot_vector_before_filter[:, ind_array[i]]
-    #     other_one_hot_vector_before_filter = many_hot_vector_before_filter[:, i]
-    #     dist_before = kl_criterion(out_before_filter, other_one_hot_vector_before_filter)
-    #     if dist_before < min_dist:
-    #         min_dist = dist_before
-    #         min_ind = i
-
-    # func = kl_criterion(out_after_filter, one_hot_vector_after_filter) + \
-    #         min_dist + min_entropy_criterion(out_before_filter)
-
-    func = min_entropy_criterion(out_before_filter) + kl_criterion(out_after_filter, one_hot_vector_after_filter) + \
-           (1 - torch.exp(- kl_criterion(out_before_filter, one_hot_vector_after_filter)))
-
-    # completing_after_filter = (torch.ones(labels.shape[0], num_of_classes) - one_hot_vector_after_filter)\
-    #                            / (num_of_classes-1)
-
-    # func = kl_criterion(out_after_filter, one_hot_vector_after_filter) + \
-    #        kl_criterion(out_before_filter, completing_after_filter) + \
-    #        min_entropy_criterion(out_before_filter)
-
-    return func
+    # return mult_sum_avg_before + mult_sum_avg_after
 
 
 def accuracy(outputs, labels):

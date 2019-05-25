@@ -25,7 +25,7 @@ parser.add_argument('--restore_file', default='best',
                     training")  # 'best' or 'train'
 # added by me
 parser.add_argument('--model_out_dir', default='experiments/transfer_training_model/out-grayscale',
-                    help="Directory containing params.json")
+                    help="Directory to write transfer results")
 
 
 def load_model(model_dir, restore_file):
@@ -97,10 +97,10 @@ if __name__ == '__main__':
     # use GPU if available
     params.cuda = torch.cuda.is_available()
 
-    # Set the random seed for reproducible experiments
-    torch.manual_seed(230)
-    if params.cuda:
-        torch.cuda.manual_seed(230)
+    # # Set the random seed for reproducible experiments
+    # torch.manual_seed(230)
+    # if params.cuda:
+    #     torch.cuda.manual_seed(230)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -127,7 +127,7 @@ if __name__ == '__main__':
     for param_tensor in model.state_dict():
         status_before_transfer.append([param_tensor,
                    (model.state_dict()[param_tensor].norm()).item(), list(model.state_dict()[param_tensor].size())])
-        status_before_transfer.append(((model.state_dict()[param_tensor]).numpy()).tolist())
+        status_before_transfer.append(((model.state_dict()[param_tensor]).cpu().numpy()).tolist())
 
     # changing last fully connected layer
     num_ftrs = model.fc4.in_features
@@ -154,7 +154,7 @@ if __name__ == '__main__':
     for param_tensor in model.state_dict():
         status_after_transfer.append([param_tensor,
              (model.state_dict()[param_tensor].norm()).item(), list(model.state_dict()[param_tensor].size())])
-        status_after_transfer.append(((model.state_dict()[param_tensor]).numpy()).tolist())
+        status_after_transfer.append(((model.state_dict()[param_tensor]).cpu().numpy()).tolist())
 
     filepath = os.path.join(args.model_out_dir, 'wb_ext.csv')
     with open(filepath, "w", newline='') as myfile:

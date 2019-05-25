@@ -18,6 +18,7 @@ import display_digit as display_results
 
 
 parser = argparse.ArgumentParser()
+parser.add_argument('--parent_dir', default="C:/Users/H/Documents/Haifa Univ/Thesis/DL-Pytorch-data", help='path to experiments and data folder. not for Server')
 parser.add_argument('--data_dir', default='data/with-grayscale/data-with-grayscale-4000', help="Directory containing the dataset")
 parser.add_argument('--model_dir', default='experiments/vae_model', help="Directory containing params.json")
 parser.add_argument('--restore_file', default=None,
@@ -61,11 +62,14 @@ def train(model, optimizer, loss_fn, dataloader, params, epoch, fig):
             labels_batch = labels_batch.view(labels_batch.size(0))
 
         # compute model output and loss
-        reconstructed_batch, mean, log_of_var = model(train_batch)
-        loss, bce_loss_part, kl_loss_part = loss_fn(reconstructed_batch, train_batch, mean, log_of_var)
+        # reconstructed_batch, mean, log_of_var, uni_p_a, uni_p_b = model(train_batch)
+        # loss, uniform_loss_part, kl_loss_part = \
+        #     loss_fn(uni_p_a, uni_p_b, mean, log_of_var, params.vae_beta, params.batch_size, params.input_size)
 
-        # print('loss:{:.4f}'.format(loss.item()))
-        # logging.info('loss:{:.4f}'.format(loss.item()))
+        # compute model output and loss
+        reconstructed_batch, mean, log_of_var = model(train_batch)
+        loss, bce_loss_part, kl_loss_part = \
+            loss_fn(reconstructed_batch, train_batch, mean, log_of_var, params.vae_beta, params.batch_size, params.input_size)
 
         # clear previous gradients, compute gradients of all variables wrt loss
         optimizer.zero_grad()
@@ -78,6 +82,7 @@ def train(model, optimizer, loss_fn, dataloader, params, epoch, fig):
         loss_avg.update(loss.item(), prop_for_loss)
 
         # save loss of this batch
+        # summary_batch = {'loss': loss.item(), 'UNI': uniform_loss_part.item(), 'KL': kl_loss_part.item()}
         summary_batch = {'loss': loss.item(), 'BCE': bce_loss_part.item(), 'KL': kl_loss_part.item()}
         summ.append(summary_batch)
 
@@ -120,6 +125,10 @@ def train(model, optimizer, loss_fn, dataloader, params, epoch, fig):
         loss_v = loss.data.cpu().numpy()
     losses.append(loss_v.item())
 
+    # if isinstance(uniform_loss_part, torch.autograd.Variable):
+    #     uni_v = uniform_loss_part.data.cpu().numpy()
+    # uni_losses.append(uni_v)
+
     if isinstance(bce_loss_part, torch.autograd.Variable):
         bce_v = bce_loss_part.data.cpu().numpy()
     bce_losses.append(bce_v)
@@ -129,8 +138,6 @@ def train(model, optimizer, loss_fn, dataloader, params, epoch, fig):
     kl_losses.append(kl_v)
 
     metrics_mean = {metric: np.sum([x[metric] for x in summ] / np.sum(prop)) for metric in summ[0]}
-    # stats = get_stats(bce_loss_part, kl_loss_part)
-    # stats
     metrics_string = " ; ".join("{}: {:05.3f}".format(k, v) for k, v in metrics_mean.items())
     logging.info("- Train metrics: " + metrics_string)
 
@@ -178,6 +185,7 @@ def train_vae(model, train_dataloader, optimizer, loss_fn, params, model_dir):
             print("- Found new best loss")
             best_loss = loss_mean
             print("mean loss is {:05.3f}".format(loss_mean))
+            loss_metric_dict = {'loss': loss_mean}
 
             # utils.save_checkpoint({'epoch': epoch + 1,
             #                        'state_dict': model.state_dict(),
@@ -185,7 +193,7 @@ def train_vae(model, train_dataloader, optimizer, loss_fn, params, model_dir):
 
             # Save best val metrics in a json file in the model directory
             best_json_path = os.path.join(model_dir, "metrics_min_avg_loss_best_weights.json")
-            utils.save_dict_to_json(loss_mean, best_json_path)
+            utils.save_dict_to_json(loss_metric_dict, best_json_path)
 
             # best_csv_path = os.path.join(model_dir, "reconstructed_min_avg_loss_best_samples.csv")
             # utils.save_incorrect_to_csv(reconstructed_samples, best_csv_path)
@@ -253,6 +261,12 @@ if __name__ == '__main__':
 
     # Load the parameters from json file
     args = parser.parse_args()
+
+    if args.parent_dir and not torch.cuda.is_available():
+        os.chdir(args.parent_dir)
+        # args.data_dir = os.path.join(args.parent_dir, args.data_dir)
+        # args.model_dir = os.path.join(args.parent_dir, args.model_dir)
+
     json_path = os.path.join(args.model_dir, 'params.json')
     assert os.path.isfile(json_path), "No json configuration file found at {}".format(json_path)
     params = utils.Params(json_path)
@@ -260,10 +274,10 @@ if __name__ == '__main__':
     # use GPU if available
     params.cuda = torch.cuda.is_available()
 
-    # # Set the random seed for reproducible experiments
-    # torch.manual_seed(230)
-    # if params.cuda:
-    #     torch.cuda.manual_seed(230)
+    # Set the random seed for reproducible experiments
+    torch.manual_seed(230)
+    if params.cuda:
+        torch.cuda.manual_seed(230)
 
     # Set the logger
     utils.set_logger(os.path.join(args.model_dir, 'train.log'))
@@ -283,17 +297,27 @@ if __name__ == '__main__':
     model = vae_net.VAENeuralNet(params).cuda() if params.cuda else vae_net.VAENeuralNet(params)
     # model.apply(vae_net.weights_init)
     print(model)
+
+    # last_layer_a = model.fc4
+    # stdv = 1. / math.sqrt(last_layer_a.weight.size(1))
+    # torch.nn.init.uniform_(last_layer_a.weight.data, 0, stdv)
+    # last_layer_b = model.fc42
+    # stdv_b = 1. / math.sqrt(last_layer_b.weight.size(1))
+    # torch.nn.init.uniform_(last_layer_b.weight.data, 0, stdv_b)
+
     logging.info("network structure is")
     logging.info("{}".format(model))
 
     optimizer = optim.Adam(model.parameters(), lr=params.learning_rate, betas=(params.beta1, params.beta2))
 
     # fetch loss function and metrics
+    # loss_fn = vae_net.uniform_loss_fn
     loss_fn = vae_net.loss_fn
 
     # metrics = net.metrics
     # incorrect = net.incorrect
     losses = []
+    # uni_losses = []
     bce_losses = []
     kl_losses = []
 
@@ -302,6 +326,7 @@ if __name__ == '__main__':
     train_vae(model, train_dl, optimizer, loss_fn, params, args.model_dir)
 
     display_results.plot_graph(losses, None, "General Loss", args.model_dir)
+    # display_results.plot_graph(uni_losses, kl_losses, "VAE Loss", args.model_dir)
     display_results.plot_graph(bce_losses, kl_losses, "VAE Loss", args.model_dir)
 
     grads_graph = collect_network_statistics(model)

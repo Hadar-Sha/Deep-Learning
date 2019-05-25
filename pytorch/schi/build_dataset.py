@@ -2,11 +2,13 @@ import csv
 import os
 import numpy as np
 import argparse
+import torch
 
 NUM_OF_CLASSES = 10
 NUM_OF_OUTPUT_FILES = 3
 
 parser = argparse.ArgumentParser()
+parser.add_argument('--parent_dir', default="C:/Users/H/Documents/Haifa Univ/Thesis/DL-Pytorch-data/", help='path to experiments and data folder. not for Server')
 parser.add_argument('--parFolder', default='C:/Users/H/Documents/Haifa Univ/Thesis/deep-learning/deep-input/exp-and-synthetic-with-grayscale/'
                     , help="parent Directory containing input files")
 
@@ -187,7 +189,7 @@ def complete_to_mult(all_vals):
 
 if __name__ == '__main__':
 
-    trainDevTestSizes = [0.7, 0.15, 0.15]  # [2 / 3, 1 / 6, 1 / 6]  # [0.7, 0.15, 0.15]  # [0.6, 0.2, 0.2]  #
+    trainDevTestSizes = [5 / 7, 1 / 7, 1 / 7]  #[0.7, 0.15, 0.15]  # [2 / 3, 1 / 6, 1 / 6]  # [0.7, 0.15, 0.15]  # [0.6, 0.2, 0.2]  #
     totalVals = [0] * 3
     lens = [0] * 3
     neededVals = [0] * 3
@@ -205,7 +207,7 @@ if __name__ == '__main__':
     os.chdir(folder)
 
     # create paths to output files
-    series = 'exp-synthetic'
+    series = 'synthetic-gray'  # 'synthetic-BW'  # 'exp-synthetic'
     filesPaths = []
     for it in ['train', 'dev', 'test']:
         path = '{}/'.format(it) + '{}-data-{}.csv'.format(series, it)
@@ -223,10 +225,12 @@ if __name__ == '__main__':
         infilepath = folder + file
         outFiles = [[] for _ in range(NUM_OF_OUTPUT_FILES)]  # will contain mat of values for train / dev / test
 
-        infileLen, outfileNew, digitsCountList = read_and_divide_input_to_classes(infilepath, -2)
+        infileLen, outfileNew, digitsCountList = read_and_divide_input_to_classes(infilepath, -1)  # -2)
         print(infileLen)
 
         splited_data = split_data_to_output_files(digitsCountList, outfileNew, trainDevTestSizes)
+        if args.parent_dir and not torch.cuda.is_available():
+            args.outFolder = args.parent_dir + args.outFolder
         write_splitted_to_files(splited_data, args.outFolder, filesPaths)
 
     if len(os.listdir(folder)) > 1:
@@ -235,6 +239,8 @@ if __name__ == '__main__':
         syntheticFileLen, syntheticFileNew, syntheticDigitsCountList = read_and_divide_input_to_classes(syntheticFile, -1)
 
         extra_splited_data = split_extra_to_output(neededVals, syntheticDigitsCountList, trainDevTestSizes, syntheticFileNew)
+        if args.parent_dir and not torch.cuda.is_available():
+            args.outFolder = args.parent_dir + args.outFolder
         write_splitted_to_files(extra_splited_data, args.outFolder, filesPaths)
 
         for i in range(len(totalVals)):
@@ -249,4 +255,6 @@ if __name__ == '__main__':
             extraNeededVals = complete_to_mult(allVals)
 
             second_extra_splited_data = split_extra_to_output(extraNeededVals, extraDigitsCountList, dummyProportions, extraFileNew)
+            if args.parent_dir and not torch.cuda.is_available():
+                args.outFolder = args.parent_dir + args.outFolder
             write_splitted_to_files(second_extra_splited_data, args.outFolder, filesPaths)

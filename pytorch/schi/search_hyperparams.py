@@ -47,12 +47,21 @@ if __name__ == "__main__":
     params = utils.Params(json_path)
 
     # Perform hypersearch over one parameter
-    learning_rates = [1e-4, 1e-3, 1e-2]
+    # learning_rates = [1e-3, 1e-2]  # 1e-4
+    hidden_sizes = list(range(24, 124, 2))
+    dropout_rate = 0
+    num_epochs = 10000
+    learning_rate = 1e-2
 
-    for learning_rate in learning_rates:
+    # for learning_rate in learning_rates:
+    for hidden_size in hidden_sizes:
         # Modify the relevant parameter in params
         params.learning_rate = learning_rate
+        params.hidden_size = hidden_size
+        params.dropout_rate = dropout_rate
+        params.num_epochs = num_epochs
 
         # Launch job (name has to be unique)
-        job_name = "learning_rate_{}".format(learning_rate)
+        job_name = "learning_rate_{}_hidden_size_{}_dropout_{}_num_epochs_{}"\
+            .format(learning_rate, hidden_size, dropout_rate, num_epochs)
         launch_training_job(args.parent_dir, args.data_dir, job_name, params)

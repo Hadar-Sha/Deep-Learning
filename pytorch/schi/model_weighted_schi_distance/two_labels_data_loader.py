@@ -30,8 +30,10 @@ class SchiDigitDataset(Dataset):
         temp_images = self.mat[:, :24]
         self.images = np.float32(temp_images)
 
-        digit_labels = self.mat[:, 24]
-        self.digit_labels = digit_labels.reshape(len(digit_labels), 1)
+        digit_labels = self.mat[:, 24:]
+
+        # digit_labels contains two labels, before and after filter
+        self.digit_labels = digit_labels.reshape(len(digit_labels), 2)
 
         self.transform = transform
 
@@ -41,33 +43,22 @@ class SchiDigitDataset(Dataset):
     def __getitem__(self, idx):
         image = self.images[idx, :]
         label = self.digit_labels[idx]
-
-        if self.transform:
-            image = self.transform(image)
-
         return image, label
 
 
 class Normalize(object):
     def __call__(self, sample):
-        sample = sample/255.0  # 1.0
-        return sample
-
-
-# class Normalize(object):
-#     def __call__(self, sample):
-#         sample = sample/255.0
-#         return sample
-#         # image, label = sample['image'], sample['label']
-#         # image_normalized = np.divide(image, 255.)
-#         # return image_normalized, label
+        image, label = sample['image'], sample['label']
+        image_normalized = np.divide(image, 255.)
+        return image_normalized, label
 
 
 class ToTensor(object):
     """Convert ndarrays in sample to Tensors."""
 
     def __call__(self, sample):
-        tensorimage = torch.from_numpy(sample)
+        image, confuse_label, hide_label = sample['image'], sample['label']
+        tensorimage = torch.from_numpy(image)
         tensorimage = tensorimage.type(torch.FloatTensor)
 
         return tensorimage
@@ -98,13 +89,11 @@ def fetch_dataloader(types, data_dir, params):
 
             # prevent shuffling in dev or test
             if split == 'train':
-                dl = DataLoader(dataset=SchiDigitDataset(csv_file=path,
-                                transform=transforms.Compose([Normalize(), ToTensor()])),
+                dl = DataLoader(dataset=SchiDigitDataset(csv_file=path, transform=transforms.Compose([ToTensor()])),
                                 batch_size=params.batch_size, shuffle=True)
 
             else:
-                dl = DataLoader(dataset=SchiDigitDataset(csv_file=path,
-                                transform=transforms.Compose([Normalize(), ToTensor()])),
+                dl = DataLoader(dataset=SchiDigitDataset(csv_file=path, transform=transforms.Compose([ToTensor()])),
                                 batch_size=params.batch_size, shuffle=False)
 
             dataloaders[split] = dl
