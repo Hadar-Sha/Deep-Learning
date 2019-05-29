@@ -7,10 +7,10 @@ import sys
 
 import numpy as np
 import torch
-import torch.nn as nn
-import torch.optim as optim
+
 from torch.autograd import Variable
-import torch.nn as nn
+from pytorchtools import EarlyStopping
+
 # from tqdm import tqdm
 
 import utils
@@ -149,6 +149,8 @@ def train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_
 
     best_dev_acc = 0.0
 
+    early_stopping = EarlyStopping(patience=round(0.01 * params.num_epochs), verbose=False)
+
     for epoch in range(params.num_epochs):
         # Run one epoch
         logging.info("Epoch {}/{}".format(epoch + 1, params.num_epochs))
@@ -159,11 +161,20 @@ def train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_
         # Evaluate for one epoch on validation set
         dev_metrics, incorrect_samples = evaluate(model, loss_fn, dev_dataloader, metrics, incorrect, params, epoch)
 
+        dev_loss = dev_metrics['loss']
+        early_stopping(dev_loss, model)
+
+        if early_stopping.early_stop:
+            # need_to_stop = True
+            print("Early stopping")
+            logging.info("Early stopping")
+            break
+
         grads_graph = collect_network_statistics(model)
         grads_per_epoch.append(grads_graph)
 
         dev_acc = dev_metrics['accuracy']
-        is_best = dev_acc >= best_dev_acc
+        is_best = dev_acc > best_dev_acc
 
         # Save weights
         utils.save_checkpoint({'epoch': epoch + 1,

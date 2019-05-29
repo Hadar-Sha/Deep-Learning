@@ -7,11 +7,15 @@ import os
 import numpy as np
 import torch
 from torch.autograd import Variable
+# from pytorchtools import EarlyStopping
 import utils
-import model.net as net
-import model.one_label_data_loader as data_loader
+# import model.net as net
+# import model.one_label_data_loader as data_loader
+import model_weighted_schi_distance.net as net
+import model_weighted_schi_distance.one_label_data_loader as data_loader
 
 parser = argparse.ArgumentParser()
+parser.add_argument('--parent_dir', default="C:/Users/H/Documents/Haifa Univ/Thesis/DL-Pytorch-data", help='path to experiments and data folder. not for Server')
 parser.add_argument('--data_dir', default='data', help="Directory containing the dataset")
 parser.add_argument('--model_dir', default='experiments/base_model', help="Directory containing params.json")
 parser.add_argument('--restore_file', default='best', help="name of the file in --model_dir \
@@ -41,6 +45,9 @@ def evaluate(model, loss_fn, dataloader, metrics, incorrect, params, epoch):
 
     # incorrect samples of current loop
     incorrect_samples = []
+    # need_to_stop = False
+
+    # early_stopping = EarlyStopping(patience=(0.01 * params.num_epochs), verbose=True)
 
     # compute metrics over the dataset
     for data_batch, labels_batch in dataloader:
@@ -86,7 +93,7 @@ def evaluate(model, loss_fn, dataloader, metrics, incorrect, params, epoch):
         print("eval Epoch {}/{}".format(epoch + 1, params.num_epochs))
         print(metrics_string)
 
-    return metrics_mean, incorrect_samples
+    return metrics_mean, incorrect_samples  # , need_to_stop
 
 
 if __name__ == '__main__':
@@ -95,6 +102,9 @@ if __name__ == '__main__':
     """
     # Load the parameters
     args = parser.parse_args()
+    if args.parent_dir and not torch.cuda.is_available():
+        os.chdir(args.parent_dir)
+
     json_path = os.path.join(args.model_dir, 'params.json')
     assert os.path.isfile(json_path), "No json configuration file found at {}".format(json_path)
     params = utils.Params(json_path)
@@ -102,9 +112,9 @@ if __name__ == '__main__':
     # use GPU if available
     params.cuda = torch.cuda.is_available()     # use GPU is available
 
-    # Set the random seed for reproducible experiments
-    torch.manual_seed(230)
-    if params.cuda: torch.cuda.manual_seed(230)
+    # # Set the random seed for reproducible experiments
+    # torch.manual_seed(230)
+    # if params.cuda: torch.cuda.manual_seed(230)
         
     # Get the logger
     utils.set_logger(os.path.join(args.model_dir, 'evaluate.log'))

@@ -51,6 +51,7 @@ class SchiDigitDataset(Dataset):
 class Normalize(object):
 
     def __call__(self, sample):
+        # normalize to [-1,1]
         sample = (sample - 127.5)/127.5
         return sample
 
@@ -59,6 +60,7 @@ class ToTensor(object):
     """Convert ndarrays in sample to Tensors."""
 
     def __call__(self, sample):
+        # image, label = sample['image'], sample['label']
         tensorimage = torch.from_numpy(sample)
         tensorimage = tensorimage.type(torch.FloatTensor)
 

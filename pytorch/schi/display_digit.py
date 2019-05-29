@@ -264,7 +264,7 @@ def plot_graph(losses_one, losses_two, gtype, image_path):
     plt.close('all')
     # args = parser.parse_args()
     fig1 = plt.figure()
-    print(fig1)
+    # print(fig1)
 
     if gtype == "Loss":
         plt.title("Generator and Discriminator Loss During Training")
