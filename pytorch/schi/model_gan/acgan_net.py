@@ -10,7 +10,6 @@ from torch.autograd.variable import Variable
 class DiscriminatorNet(nn.Module):
     def __init__(self, params):
         super(DiscriminatorNet, self).__init__()
-        # self.is_one_hot = params.is_one_hot
 
         self.in_layer = nn.Sequential(
             nn.Linear(params.input_size, params.hidden_size*2),
@@ -24,35 +23,6 @@ class DiscriminatorNet(nn.Module):
             nn.LeakyReLU(params.leaky_relu_slope),
             nn.Dropout(params.dropout_rate)
         )
-        self.hidden2 = nn.Sequential(
-            nn.Linear(params.hidden_size, params.hidden_size),
-            # nn.ReLU(),
-            nn.LeakyReLU(params.leaky_relu_slope),
-            nn.Dropout(params.dropout_rate)
-        )
-        # self.hidden3 = nn.Sequential(
-        #     nn.Linear(params.hidden_size, params.hidden_size),
-        #     # nn.ReLU(),
-        #     nn.LeakyReLU(params.leaky_relu_slope),
-        #     nn.Dropout(params.dropout_rate)
-        # )
-
-        # # if not self.is_one_hot:
-        # # self.label_emb = nn.Embedding(params.num_classes, params.num_classes)
-        # # else:
-        # self.fc_insert_label = nn.Sequential(
-        #     nn.Linear(params.num_classes, params.num_classes),
-        #     # nn.ReLU(),
-        #     nn.LeakyReLU(params.leaky_relu_slope),
-        #     # nn.Dropout(params.dropout_rate)
-        # )
-        #
-        # # self.hidden_with_label = nn.Sequential(
-        # #     nn.Linear(params.hidden_size + params.hidden_size, params.hidden_size),
-        # #     # nn.ReLU(),
-        # #     nn.LeakyReLU(params.leaky_relu_slope),
-        # #     nn.Dropout(params.dropout_rate)
-        # # )
 
         self.out_layer_real_fake = nn.Sequential(
             nn.Linear(params.hidden_size, 1),
@@ -66,21 +36,11 @@ class DiscriminatorNet(nn.Module):
             nn.Softmax(dim=1)
         )
 
-    def forward(self, x):  # , labels):
+    def forward(self, x):
 
-        # print(x.type())
         x_ = self.in_layer(x)
         x_ = self.hidden1(x_)
-        # x_ = self.hidden2(x_)
-        # x_ = self.hidden3(x_)
 
-        # if not self.is_one_hot:
-        #     y_ = self.label_emb(labels)
-        # else:
-        # y_ = self.fc_insert_label(labels)
-
-        # out = torch.cat([x_, y_], 1)
-        # out = self.hidden_with_label(out)
         out_real_fake = self.out_layer_real_fake(x_)
         out_class = self.out_layer_class(x_)
 
@@ -111,17 +71,7 @@ def linear_transformation(x):
 class GeneratorNet(nn.Module):
     def __init__(self, params):
         super(GeneratorNet, self).__init__()
-        # self.is_one_hot = params.is_one_hot
 
-        # # if not self.is_one_hot:
-        # self.label_emb = nn.Embedding(params.num_classes, params.num_classes)
-        # # else:
-        # self.fc_insert_label = nn.Sequential(
-        #     nn.Linear(params.num_classes, params.num_classes),
-        #     # nn.ReLU(),
-        #     nn.LeakyReLU(params.leaky_relu_slope),
-        #     # nn.Dropout(params.dropout_rate)
-        # )
         self.hidden_with_label = nn.Sequential(
             nn.Linear(params.noise_dim + params.num_classes, params.hidden_size),
             # nn.ReLU(),
@@ -129,56 +79,25 @@ class GeneratorNet(nn.Module):
             nn.Dropout(params.dropout_rate)
         )
 
-        # self.in_layer = nn.Sequential(
-        #     nn.Linear(100, params.hidden_size // 2),
-        #     # nn.Linear(params.num_classes, params.hidden_size // 2),
-        #     nn.ReLU(),
-        #     # nn.LeakyReLU(params.leaky_relu_slope),
-        #     nn.Dropout(params.dropout_rate)
-        # )
         self.hidden1 = nn.Sequential(
-            nn.Linear(params.hidden_size, params.hidden_size*2),
+            nn.Linear(params.hidden_size, params.hidden_size),  # *2),
             # nn.ReLU(),
             nn.LeakyReLU(params.leaky_relu_slope),
             nn.Dropout(params.dropout_rate)
         )
-        self.hidden2 = nn.Sequential(
-            nn.Linear(params.hidden_size*2, params.hidden_size*2),
-            # nn.ReLU(),
-            nn.LeakyReLU(params.leaky_relu_slope),
-            nn.Dropout(params.dropout_rate)
-        )
-        # self.hidden3 = nn.Sequential(
-        #     nn.Linear(params.hidden_size, params.hidden_size//2),
-        #     nn.ReLU(),
-        #     # nn.LeakyReLU(params.leaky_relu_slope),
-        #     nn.Dropout(params.dropout_rate)
-        # )
+
         self.out_layer = nn.Sequential(
-            nn.Linear(params.hidden_size*2, params.input_size),
-            # nn.Linear(params.noise_dim + params.num_classes, params.input_size),
+            nn.Linear(params.hidden_size, params.input_size),
             nn.Tanh()
         )
-        # self.linear_normalization = linear_transformation()
 
     def forward(self, x, labels):
 
-        # if not self.is_one_hot:
-        #     y_ = self.label_emb(labels)
-        # else:
-        #     y_ = self.fc_insert_label(labels)
-
         out = torch.cat([x, labels], 1)
-
-        # out = out.to(torch.device("cpu"))
-        # print(out.type())
 
         out = self.hidden_with_label(out)
         out = self.hidden1(out)
-        # out = self.hidden2(out)
-        # out = self.hidden3(out)
         out = self.out_layer(out)
-        # out = linear_transformation(out)
 
         return out
 
@@ -197,10 +116,8 @@ def noise(size, dim):
 def convert_int_to_one_hot_vector(label, num_of_classes):
 
     if len(list(label.size())) < 3:
-    # if min(list(label.size())) == 1:
         label_shaped = label.view(-1, 1)
 
-        # if torch.cuda.is_available():
         one_hot_vector = torch.zeros([list(label.size())[0], num_of_classes], device=label.device)
 
         one_hot_vector.scatter_(1, label_shaped, 1)
@@ -255,7 +172,6 @@ def vectors_to_samples(vectors):
 def labels_to_titles(labels):
     if len(labels.shape) > 1 and min(labels.shape) == 1:
         labels = labels.view(labels.size()[0],)
-    # labels_np = (labels.numpy())
     labels = (labels.cpu().numpy()).tolist()
     return labels
 
@@ -317,7 +233,6 @@ def real_fake_loss_fn(outputs, labels):
 
 def class_selection_loss_fn(outputs, labels):
 
-    # labels =
     cross_entropy_criterion = nn.CrossEntropyLoss()
     if torch.cuda.is_available():
         cross_entropy_criterion = nn.CrossEntropyLoss().cuda()
@@ -327,7 +242,6 @@ def class_selection_loss_fn(outputs, labels):
 
 # compute the current classification accuracy
 def compute_acc(outputs, labels):
-    # correct = 0
     outputs_ = outputs.data.max(1)[1]
     correct = outputs_.eq(labels.data).cpu().sum()
     acc = float(correct) / float(len(labels.data))  # * 100.0

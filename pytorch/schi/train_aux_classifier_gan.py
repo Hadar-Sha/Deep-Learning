@@ -20,7 +20,7 @@ import model_gan.one_label_data_loader as data_loader
 parser = argparse.ArgumentParser()
 parser.add_argument('--parent_dir', default="C:/Users/H/Documents/Haifa Univ/Thesis/DL-Pytorch-data", help='path to experiments and data folder. not for Server')
 parser.add_argument('--data_dir', default='data/with-grayscale/data-with-grayscale-4000', help="Directory containing the dataset")
-parser.add_argument('--model_dir', default='experiments/cgan_model', help="Directory containing params.json")
+parser.add_argument('--model_dir', default='experiments/acgan_model', help="Directory containing params.json")
 parser.add_argument('--restore_file', default=None,
                     help="Optional, name of the file in --model_dir containing weights to reload before \
                     training")  # 'best' or 'train'
@@ -57,7 +57,7 @@ def train_discriminator(d, optimizer, real_data, fake_data, real_labels, fake_la
     optimizer.step()
 
     # Return error0
-    return total_fake_error + total_fake_error, prediction_r_f_real, prediction_r_f_fake, class_accuracy
+    return total_real_error + total_fake_error, prediction_r_f_real, prediction_r_f_fake, class_accuracy
 
 
 def train_generator(d, optimizer, fake_data, fake_labels, r_f_loss_fn, c_loss_fn):
@@ -127,6 +127,9 @@ def train(d_model, g_model, d_optimizer, g_optimizer, r_f_loss_fn, c_loss_fn, da
         epoch:
         fig:
     """
+    test_samples = None
+    prop = []
+    summ = []
 
     for i, (real_batch, real_label) in enumerate(dataloader):
 
@@ -154,9 +157,7 @@ def train(d_model, g_model, d_optimizer, g_optimizer, r_f_loss_fn, c_loss_fn, da
 
         # Train D
         d_error, d_pred_real, d_pred_fake, class_accuracy = \
-            train_discriminator(d_model, d_optimizer, real_data, fake_data, real_label, noisy_label, r_f_loss_fn, c_loss_fn)# Train D
-        # d_error, d_pred_real, d_pred_fake, class_accuracy = \
-        #     train_discriminator(d_model, d_optimizer, real_data, fake_data, real_one_hot_v, noisy_one_hot_v, r_f_loss_fn, c_loss_fn)
+            train_discriminator(d_model, d_optimizer, real_data, fake_data, real_label, noisy_label, r_f_loss_fn, c_loss_fn)
 
         # 2. Train Generator
 
@@ -164,7 +165,6 @@ def train(d_model, g_model, d_optimizer, g_optimizer, r_f_loss_fn, c_loss_fn, da
 
         # Train G
         g_error, d_pred_fake_g = train_generator(d_model, g_optimizer, fake_data, noisy_label, r_f_loss_fn, c_loss_fn)
-        # g_error, d_pred_fake_g = train_generator(d_model, g_optimizer, fake_data, noisy_one_hot_v, r_f_loss_fn, c_loss_fn)
 
         # # Log error
         stats = {}
@@ -175,11 +175,6 @@ def train(d_model, g_model, d_optimizer, g_optimizer, r_f_loss_fn, c_loss_fn, da
         stats['d_pred_fake'] = get_stats(d_pred_fake, 'pred')
         stats['d_pred_fake_g'] = get_stats(d_pred_fake_g, 'pred')
 
-        # stats = get_stats(d_error, g_error, d_pred_real, d_pred_fake, d_pred_fake_g)
-
-        stats_string = " ; ".join("{}: {:05.3f}".format(k, v) for k, v in stats.items())
-        logging.info("metrics: " + stats_string)
-
         # Save Losses for plotting later
         G_losses.append(d_error.item())
         D_losses.append(g_error.item())
@@ -188,16 +183,26 @@ def train(d_model, g_model, d_optimizer, g_optimizer, r_f_loss_fn, c_loss_fn, da
         G_preds.append(d_pred_fake.data.mean())
         D_preds.append(d_pred_real.data.mean())
 
-    # Display Progress
-    # Display Images
-    test_samples = g_model(test_noise, test_one_hot_v).data.cpu()
+        # Display Progress
+        # Display Images
+
+        if i % params.save_summary_steps == 0:
+            proportions_batch = real_label.shape[0] / params.batch_size
+            prop.append(proportions_batch)
+            summ.append(stats)
+
+    stats_mean = {metric: np.sum([x[metric] for x in summ] / np.sum(prop)) for metric in summ[0]}
+    stats_string = " ; ".join("{}: {:05.3f}".format(k, v) for k, v in stats_mean.items())
+    logging.info("train metrics: " + stats_string)
     if (epoch + 1) % (0.01 * params.num_epochs) == 0:
-        test_samples_reshaped = gan_net.vectors_to_samples(test_samples)  # ?
-
-        display_results.fill_figure(test_samples_reshaped, fig, epoch+1, args.model_dir, None, gan_net.labels_to_titles(test_labels))
-
         print("Epoch {}/{}".format(epoch + 1, params.num_epochs))
         print(stats_string)
+
+        test_samples = g_model(test_noise, test_one_hot_v).data.cpu()
+        test_samples_reshaped = gan_net.vectors_to_samples(test_samples)  # ?
+        test_titles = gan_net.labels_to_titles(test_labels)
+
+        display_results.fill_figure(test_samples_reshaped, fig, epoch + 1, args.model_dir, labels=test_titles)
 
     return test_samples
 
@@ -213,15 +218,17 @@ def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, r_f_
         test_samples = train(d_model, g_model, d_optimizer, g_optimizer, r_f_loss_fn, c_loss_fn, train_dataloader,
                              params, epoch, fig)
 
-        utils.save_checkpoint({'epoch': epoch + 1,
-                               'state_dict': d_model.state_dict(),
-                               'optim_dict': d_optimizer.state_dict()}, is_best=False, checkpoint=model_dir, ntype='d')
-
-        utils.save_checkpoint({'epoch': epoch + 1,
-                               'state_dict': g_model.state_dict(),
-                               'optim_dict': g_optimizer.state_dict()}, is_best=False, checkpoint=model_dir, ntype='g')
-
         if test_samples is not None:
+            utils.save_checkpoint({'epoch': epoch + 1,
+                                   'state_dict': d_model.state_dict(),
+                                   'optim_dict': d_optimizer.state_dict()}, is_best=False, checkpoint=model_dir,
+                                  ntype='d')
+
+            utils.save_checkpoint({'epoch': epoch + 1,
+                                   'state_dict': g_model.state_dict(),
+                                   'optim_dict': g_optimizer.state_dict()}, is_best=False, checkpoint=model_dir,
+                                  ntype='g')
+
             np_test_samples = np.array(test_samples)
             np_test_samples = np.around(np_test_samples * 127.5 + 127.5).astype(int)
             np_test_out = (test_noise.cpu().numpy())
@@ -333,9 +340,9 @@ if __name__ == '__main__':
     num_test_samples = 20
     test_noise = gan_net.noise(num_test_samples, params.noise_dim)
 
-    # test_labels = list(range(num_test_samples))
-    # test_labels = [it % params.num_classes for it in test_labels]
-    test_labels = [0 for _ in range(num_test_samples)]
+    test_labels = list(range(num_test_samples))
+    test_labels = [it % params.num_classes for it in test_labels]
+    # test_labels = [0 for _ in range(num_test_samples)]
     test_labels = torch.Tensor(test_labels)
     test_labels = test_labels.type(torch.LongTensor)
     test_labels = test_labels.to(device)
