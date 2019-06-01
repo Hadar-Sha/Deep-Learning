@@ -24,10 +24,12 @@ import display_digit as display_results
 parser = argparse.ArgumentParser()
 parser.add_argument('--parent_dir', default="C:/Users/H/Documents/Haifa Univ/Thesis/DL-Pytorch-data", help='path to experiments and data folder. not for Server')
 parser.add_argument('--data_dir', default='data/data', help="Directory containing the dataset")
-parser.add_argument('--model_dir', default='experiments/base_model', help="Directory containing params.json")
+parser.add_argument('--model_dir', default='experiments/base_model_weighted_schi_dist', help="Directory containing params.json")
+# parser.add_argument('--early_stop', action='store_false', help="Optional, do early stop")
 parser.add_argument('--restore_file', default=None,
                     help="Optional, name of the file in --model_dir containing weights to reload before \
                     training")  # 'best' or 'train'
+
 
 
 def train(model, optimizer, loss_fn, dataloader, metrics, params, epoch):
@@ -164,7 +166,7 @@ def train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_
         dev_loss = dev_metrics['loss']
         early_stopping(dev_loss, model)
 
-        if early_stopping.early_stop:
+        if args.early_stop and early_stopping.early_stop:
             # need_to_stop = True
             print("Early stopping")
             logging.info("Early stopping")
