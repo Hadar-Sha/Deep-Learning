@@ -105,6 +105,8 @@ def loss_fn(outputs, labels, num_of_classes):
           demonstrates how you can easily define a custom loss function.
     """
     schi_criterion = SCHILoss()
+    if torch.cuda.is_available():
+        schi_criterion = SCHILoss().cuda()
 
     return schi_criterion(outputs, labels)
 
@@ -168,6 +170,8 @@ def loss_fn_two_labels(outputs, labels, num_of_classes):
     out_after_filter = torch.index_select(outputs, 1, torch.tensor(list(range(num_of_classes, 2*num_of_classes)), device=outputs.device))
 
     schi_two_labels_criterion = SCHITwoLabelsLoss()
+    if torch.cuda.is_available():
+        schi_two_labels_criterion = SCHITwoLabelsLoss().cuda()
 
     return schi_two_labels_criterion(out_before_filter, out_after_filter, label_before_filter, label_after_filter)
 

@@ -12,9 +12,6 @@ from torchvision.transforms import functional as F
 width = 1
 height = 0.2
 
-# parser = argparse.ArgumentParser()
-# parser.add_argument('--model_dir', default='experiments/cgan_model', help="Directory containing params.json")
-
 plt.ioff()
 
 
@@ -87,10 +84,7 @@ def display_digit(colors, myaxis, withgrayscale=False):
 
     vertical_horizon = [0, 0, 0, 1, 1, 1, 1]
 
-    # flat_colors = [item for sublist in colors for item in sublist]
-
     numpy_colors = np.array(colors)
-    # numpy_colors = np.array([np.array(xi) for xi in colors])
 
     if numpy_colors.min() < 0 or numpy_colors.max() > 1:
         numpy_colors = (numpy_colors - numpy_colors.min()) / (numpy_colors.max() - numpy_colors.min())
@@ -218,20 +212,16 @@ def close_figure(figure):
 
 
 def feed_digits_to_figure(_, samples, fig, epoch, image_path, labels, dtype, withgrayscale):
-    # args = parser.parse_args()
     fig.clear()
     fig.suptitle('epoch #{}'.format(epoch))
 
     num_of_samples = len(samples)
     num_of_rows = max(1, math.floor(0.2*num_of_samples))
     axes = np.zeros((num_of_rows, math.ceil(num_of_samples / num_of_rows))).tolist()
-    # axes = np.zeros((num_of_rows, max(1, math.ceil(num_of_samples / num_of_rows)))).tolist()
 
     for i in range(num_of_samples):
         row, col = np.unravel_index(i, (num_of_rows, math.ceil(num_of_samples / num_of_rows)))
         axes[row][col] = fig.add_subplot(num_of_rows, math.ceil(num_of_samples / num_of_rows), i + 1)
-        # row, col = np.unravel_index(i, (num_of_rows, max(1, math.ceil(num_of_samples / num_of_rows))))
-        # axes[row][col] = fig.add_subplot(num_of_rows, max(1, math.ceil(num_of_samples / num_of_rows)), i + 1)
 
         if labels is not None:
             digit_val = str(labels[i])
@@ -262,9 +252,7 @@ def fill_figure(samples, fig, epoch, image_path, withgrayscale=False, dtype=None
 
 def plot_graph(losses_one, losses_two, gtype, image_path):
     plt.close('all')
-    # args = parser.parse_args()
     fig1 = plt.figure()
-    # print(fig1)
 
     if gtype == "Loss":
         plt.title("Generator and Discriminator Loss During Training")
@@ -284,7 +272,6 @@ def plot_graph(losses_one, losses_two, gtype, image_path):
         plt.ylabel("Predictions")
     elif gtype == "Grads":
         plt.title("min and max gradients During Training")
-        # plt.title("Generator and Discriminator min and max gradients During Training")
         plt.xlabel("layers")
         plt.ylabel("Grads")
 
@@ -315,54 +302,54 @@ def plot_graph(losses_one, losses_two, gtype, image_path):
     return
 
 
-def create_grid(num_of_samples):
-    fig, axes = plt.subplots(4, math.ceil(num_of_samples / 4), subplot_kw=dict(), clear=True)
-    return fig, axes
+# def create_grid(num_of_samples):
+#     fig, axes = plt.subplots(4, math.ceil(num_of_samples / 4), subplot_kw=dict(), clear=True)
+#     return fig, axes
+#
+#
+# def fill_grid(samples, fig, axes, epoch, n_batch, save=True):
+#     num_of_samples = len(samples)
+#     args = parser.parse_args()
+#
+#     for i in range(num_of_samples):
+#         row, col = np.unravel_index(i, (4, math.ceil(num_of_samples/4)))
+#         display_digit(samples[i], axes[row, col])
+#
+#     if save:
+#         path = os.path.join(args.model_dir, 'images')
+#         if not os.path.isdir(path):
+#             os.mkdir(path)
+#         fig.savefig('{}/{}_epoch_{}_batch_{}.png'.format(path, '', epoch, n_batch))
+#
+#     plt.draw()
+#     plt.show()
+#     plt.pause(0.001)
+#     plt.close(fig)
+#
+#     return
 
 
-def fill_grid(samples, fig, axes, epoch, n_batch, save=True):
-    num_of_samples = len(samples)
-    args = parser.parse_args()
-
-    for i in range(num_of_samples):
-        row, col = np.unravel_index(i, (4, math.ceil(num_of_samples/4)))
-        display_digit(samples[i], axes[row, col])
-
-    if save:
-        path = os.path.join(args.model_dir, 'images')
-        if not os.path.isdir(path):
-            os.mkdir(path)
-        fig.savefig('{}/{}_epoch_{}_batch_{}.png'.format(path, '', epoch, n_batch))
-
-    plt.draw()
-    plt.show()
-    plt.pause(0.001)
-    plt.close(fig)
-
-    return
-
-
-if __name__ == '__main__':
-
-    colors = []
-    colors.append([0.5, 0, 0])
-    colors.append([0, 0, 0.5])
-    colors.append([0.5, 0, 0])
-    colors.append([0.5, 0, 0])
-    colors.append([0.5, 0, 0])
-    colors.append([0, 0, 0])
-    colors.append([0.5, 0, 0])
-    # background
-    colors.append([0, 0, 0])
-
-    print(colors)
-    fig, ax = plt.subplots()
-    #
-    display_digit(colors, ax, True)
-    #
-    plt.show()
-    # plt.close('all')
-
-    # create_digit_image(colors)
+# if __name__ == '__main__':
+#
+#     colors = []
+#     colors.append([0.5, 0, 0])
+#     colors.append([0, 0, 0.5])
+#     colors.append([0.5, 0, 0])
+#     colors.append([0.5, 0, 0])
+#     colors.append([0.5, 0, 0])
+#     colors.append([0, 0, 0])
+#     colors.append([0.5, 0, 0])
+#     # background
+#     colors.append([0, 0, 0])
+#
+#     print(colors)
+#     fig, ax = plt.subplots()
+#     #
+#     display_digit(colors, ax, True)
+#     #
+#     plt.show()
+#     # plt.close('all')
+#
+#     # create_digit_image(colors)
 
 

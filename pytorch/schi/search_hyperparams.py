@@ -14,9 +14,10 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--parent_dir', default='experiments/learning_rate',
                     help='Directory containing params.json')
 parser.add_argument('--data_dir', default='data/64x64_SIGNS', help="Directory containing the dataset")
+parser.add_argument('--early_stop', type=bool, default=True, help="Optional, do early stop")
 
 
-def launch_training_job(parent_dir, data_dir, job_name, params):
+def launch_training_job(parent_dir, data_dir, early_stop, job_name, params):
     """Launch training of the model with a set of hyperparameters in parent_dir/job_name
 
     Args:
@@ -34,8 +35,9 @@ def launch_training_job(parent_dir, data_dir, job_name, params):
     params.save(json_path)
 
     # Launch training with this config
-    cmd = "{python} train.py --model_dir={model_dir} --data_dir {data_dir}".format(python=PYTHON, model_dir=model_dir,
-                                                                                   data_dir=data_dir)
+    # adding compatibility to do early stop when searching for hyperparams
+    cmd = "{python} train.py --model_dir={model_dir} --data_dir {data_dir} --early_stop {early_stop}".format(python=PYTHON, model_dir=model_dir,
+                                                                                   data_dir=data_dir, early_stop=early_stop)
     print(cmd)
     check_call(cmd, shell=True)
 
@@ -65,4 +67,4 @@ if __name__ == "__main__":
             # Launch job (name has to be unique)
             job_name = "learning_rate_{}_hidden_size_{}_dropout_{}_num_epochs_{}"\
                 .format(learning_rate, hidden_size, dropout_rate, num_epochs)
-            launch_training_job(args.parent_dir, args.data_dir, job_name, params)
+            launch_training_job(args.parent_dir, args.data_dir, args.early_stop, job_name, params)

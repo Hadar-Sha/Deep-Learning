@@ -41,22 +41,29 @@ class SchiDigitDataset(Dataset):
     def __getitem__(self, idx):
         image = self.images[idx, :]
         label = self.digit_labels[idx]
+
+        if self.transform:
+            image = self.transform(image)
+
         return image, label
 
 
 class Normalize(object):
     def __call__(self, sample):
-        image, label = sample['image'], sample['label']
-        image_normalized = np.divide(image, 255.)
-        return image_normalized, label
+        sample = sample / 255.
+        return sample
+        # image, label = sample['image'], sample['label']
+        # image_normalized = np.divide(image, 255.)
+        # return image_normalized, label
 
 
 class ToTensor(object):
     """Convert ndarrays in sample to Tensors."""
 
     def __call__(self, sample):
-        image, label = sample['image'], sample['label']
-        tensorimage = torch.from_numpy(image)
+        # image, label = sample['image'], sample['label']
+        # tensorimage = torch.from_numpy(image)
+        tensorimage = torch.from_numpy(sample)
         tensorimage = tensorimage.type(torch.FloatTensor)
 
         return tensorimage

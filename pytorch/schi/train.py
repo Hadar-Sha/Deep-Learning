@@ -25,11 +25,10 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--parent_dir', default="C:/Users/H/Documents/Haifa Univ/Thesis/DL-Pytorch-data", help='path to experiments and data folder. not for Server')
 parser.add_argument('--data_dir', default='data/data', help="Directory containing the dataset")
 parser.add_argument('--model_dir', default='experiments/base_model_weighted_schi_dist', help="Directory containing params.json")
-# parser.add_argument('--early_stop', action='store_false', help="Optional, do early stop")
+parser.add_argument('--early_stop', type=bool, default=False, help="Optional, do early stop")  # action='store_true'
 parser.add_argument('--restore_file', default=None,
                     help="Optional, name of the file in --model_dir containing weights to reload before \
                     training")  # 'best' or 'train'
-
 
 
 def train(model, optimizer, loss_fn, dataloader, metrics, params, epoch):
@@ -250,6 +249,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if args.parent_dir and not torch.cuda.is_available():
         os.chdir(args.parent_dir)
+
+    # print(args.early_stop)
+    # exit()
 
     json_path = os.path.join(args.model_dir, 'params.json')
     assert os.path.isfile(json_path), "No json configuration file found at {}".format(json_path)
