@@ -275,16 +275,16 @@ def plot_graph(losses_one, losses_two, gtype, image_path):
         plt.xlabel("layers")
         plt.ylabel("Grads")
 
-    if losses_one is not None and losses_two is not None:
+    if losses_one is not None and (not losses_one) is False and losses_two is not None and (not losses_two) is False:
         if gtype == "Loss":
             plt.plot(losses_one, label="G")
             plt.plot(losses_two, label="D")
         elif gtype == "VAE Loss":
             plt.plot(losses_one, label="BCE")
             plt.plot(losses_two, label="KL")
-    elif losses_one is not None:
+    elif losses_one is not None and (not losses_one) is False:
         plt.plot(losses_one)
-    elif losses_two is not None:
+    elif losses_two is not None and (not losses_two) is False:
         plt.plot(losses_two)
     else:
         print('no data was provided')

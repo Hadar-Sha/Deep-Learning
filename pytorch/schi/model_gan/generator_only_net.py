@@ -38,6 +38,7 @@ class GeneratorNet(nn.Module):
         self.hidden_with_label = nn.Sequential(
             nn.Linear(params.noise_dim + params.num_classes, params.hidden_size),
             nn.Tanh()
+            # nn.Sigmoid()
             # nn.ReLU(),
             # nn.LeakyReLU(params.leaky_relu_slope),
 
@@ -47,6 +48,7 @@ class GeneratorNet(nn.Module):
         self.hidden1 = nn.Sequential(
             nn.Linear(params.hidden_size, params.hidden_size),  # *2),
             nn.Tanh()
+            # nn.Sigmoid()
             # nn.ReLU(),
             # nn.LeakyReLU(params.leaky_relu_slope),
 
@@ -56,7 +58,9 @@ class GeneratorNet(nn.Module):
         self.out_layer = nn.Sequential(
             nn.Linear(params.hidden_size, params.input_size),
             nn.Tanh()
+            # nn.Softmax(dim=1)
         )
+        self.noise_dist = 'normal'
 
     def forward(self, x, labels):
 
@@ -72,10 +76,13 @@ class GeneratorNet(nn.Module):
 
 
 # Noise
-def noise(size, dim):
-    # n = Variable(torch.randn(size, dim))  # recommended to sample from normal distribution and not from uniform dist
-    n = Variable(-1 + 2 * torch.rand(size, dim))  # make sense for binary samples
-    # n = Variable(torch.randint(2, (size, dim), dtype=torch.float))  # make sense for binary samples
+def noise(size, dim, noise_type='normal'):
+    if noise_type == 'normal':
+        n = Variable(torch.randn(size, dim))  # recommended to sample from normal distribution and not from uniform dist
+    elif noise_type == 'uniform':
+        n = Variable(-1 + 2 * torch.rand(size, dim))  # make sense for binary samples
+    elif noise_type == 'binary':
+        n = Variable(-1 + 2 * torch.randint(2, (size, dim), dtype=torch.float))  # make sense for binary samples
     # n = Variable(torch.rand(size, 100))
     # n = Variable(torch.randint(256, (size, 100)))
     # n = n/255
@@ -178,6 +185,29 @@ def weights_init(m):
     if torch.cuda.is_available():
         for pa in m.parameters():
             pa.cuda()
+
+
+def bce_loss_fn(outputs, real):
+    """
+    Compute the cross entropy loss given outputs and labels.
+
+    Args:
+        outputs: (Variable) dimension batch_size x 10 - output of the model
+        labels: (Variable) dimension batch_size, where each element is a value in [0- 9]
+        num_of_classes: (int) value describing number of different classes (10)
+
+    Returns:
+        loss (Variable): cross entropy loss for all images in the batch
+
+    Note: you may use a standard loss function from http://pytorch.org/docs/master/nn.html#loss-functions. This example
+          demonstrates how you can easily define a custom loss function.
+    """
+
+    bce_criterion = nn.BCELoss()
+    if torch.cuda.is_available():
+        bce_criterion = nn.BCELoss().cuda()
+
+    return bce_criterion(outputs, real)
 
 
 def mse_loss_fn(outputs, real):

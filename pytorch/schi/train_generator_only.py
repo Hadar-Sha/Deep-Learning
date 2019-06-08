@@ -15,12 +15,13 @@ import utils
 import model_gan.generator_only_net as gan_net
 # import model_gan.two_labels_data_loader as data_loader
 import model_gan.one_label_data_loader as data_loader
+# import model_gan.single_sample_data_loader as data_loader
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--parent_dir', default="C:/Users/H/Documents/Haifa Univ/Thesis/DL-Pytorch-data", help='path to experiments and data folder. not for Server')
 parser.add_argument('--data_dir', default='data/black-white', help="Directory containing the dataset")
-parser.add_argument('--model_dir', default='experiments/generator_model', help="Directory containing params.json")
+parser.add_argument('--model_dir', default='experiments/generator_model/debug', help="Directory containing params.json")
 parser.add_argument('--restore_file', default=None,
                     help="Optional, name of the file in --model_dir containing weights to reload before \
                     training")  # 'best' or 'train'
@@ -97,7 +98,8 @@ def train(g_model, g_optimizer, mse_loss_fn, dataloader, params, epoch, fig):
         # noisy_label = noisy_label.view(real_data.size(0), -1)
         noisy_one_hot_v = gan_net.convert_int_to_one_hot_vector(noisy_label, params.num_classes).to(device)
 
-        fake_data = g_model(noisy_input, noisy_one_hot_v)  # .detach()
+        fake_data = g_model(noisy_input, real_one_hot_v)  # .detach()
+        # fake_data = g_model(noisy_input, noisy_one_hot_v)  # .detach()
 
         # 2. Train Generator
 
@@ -140,10 +142,12 @@ def train(g_model, g_optimizer, mse_loss_fn, dataloader, params, epoch, fig):
         display_results.fill_figure(real_samples_reshaped, fig, epoch + 1, args.model_dir, labels=real_titles,
                                     dtype='real')
 
-    return test_samples, real_data
+    return test_samples, real_data, stats_mean['g_error']
 
 
 def train_g(g_model, train_dataloader, g_optimizer, mse_loss_fn, params, model_dir):
+
+    best_loss = np.inf
 
     fig = display_results.create_figure()
 
@@ -151,7 +155,39 @@ def train_g(g_model, train_dataloader, g_optimizer, mse_loss_fn, params, model_d
         # Run one epoch
         logging.info("Epoch {}/{}".format(epoch + 1, params.num_epochs))
 
-        test_samples, real_samples = train(g_model, g_optimizer, mse_loss_fn, train_dataloader, params, epoch, fig)
+        test_samples, real_samples, loss_mean = train(g_model, g_optimizer, mse_loss_fn, train_dataloader, params, epoch, fig)
+
+        is_best = loss_mean <= best_loss
+
+        if is_best:
+            logging.info("- Found new best loss")
+            print("Epoch {}/{}".format(epoch + 1, params.num_epochs))
+            print("- Found new best loss")
+            best_loss = loss_mean
+            print("mean loss is {:05.3f}".format(loss_mean))
+            loss_metric_dict = {'loss': loss_mean}
+
+            utils.save_checkpoint({'epoch': epoch + 1,
+                                   'state_dict': g_model.state_dict(),
+                                   'optim_dict': g_optimizer.state_dict()}, is_best=is_best, checkpoint=model_dir)
+
+            # Save best val metrics in a json file in the model directory
+            best_json_path = os.path.join(model_dir, "metrics_min_avg_loss_best_weights.json")
+            utils.save_dict_to_json(loss_metric_dict, best_json_path)
+
+            if test_samples is not None:
+                np_test_samples = np.array(test_samples)
+                np_test_samples = np.around(np_test_samples * 127.5 + 127.5).astype(int)
+                np_test_out = (test_noise.cpu().numpy())
+                np_test_labels = (test_labels.view(test_labels.shape[0], -1).cpu().numpy())
+
+                data_path = os.path.join(model_dir, 'data')
+                if not os.path.isdir(data_path):
+                    os.mkdir(data_path)
+
+                test_all_data = (np.concatenate((np_test_samples, np_test_out, np_test_labels), axis=1)).tolist()
+                last_csv_path = os.path.join(data_path, "best_samples_epoch_{}.csv".format(epoch + 1))
+                utils.save_incorrect_to_csv(test_all_data, last_csv_path)
 
         if test_samples is not None:
 
@@ -261,6 +297,7 @@ if __name__ == '__main__':
     g_optimizer = optim.Adam(generator.parameters(), lr=params.g_learning_rate, betas=(params.beta1, params.beta2))
 
     # fetch loss functions
+    # mse_loss_fn = gan_net.bce_loss_fn
     mse_loss_fn = gan_net.mse_loss_fn
 
     # Train the model
@@ -288,8 +325,9 @@ if __name__ == '__main__':
 
     # track results
     display_results.plot_graph(G_losses, D_losses, "Loss", args.model_dir)
-    display_results.plot_graph(G_preds, D_preds, "Predictions", args.model_dir)
+    # display_results.plot_graph(G_preds, D_preds, "Predictions", args.model_dir)
 
     g_grads_graph = collect_network_statistics(generator)
+    # print (not g_grads_graph)
 
     display_results.plot_graph(g_grads_graph, [], "Grads", args.model_dir)
