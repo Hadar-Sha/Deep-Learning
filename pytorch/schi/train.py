@@ -292,6 +292,8 @@ if __name__ == '__main__':
     # loss_fn = net.loss_fn_two_labels
     loss_fn = net.loss_fn
 
+    # comment to self - print to file the name of loss function !!!!!!
+
     metrics = net.metrics
     incorrect = net.incorrect
 

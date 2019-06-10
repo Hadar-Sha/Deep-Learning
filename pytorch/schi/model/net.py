@@ -42,11 +42,9 @@ class NeuralNet(nn.Module):
 def convert_int_to_one_hot_vector(label, num_of_classes):
 
     if len(list(label.size())) < 3:
-    # if min(list(label.size())) == 1:
         label_shaped = label.view(-1, 1)
 
         one_hot_vector = torch.zeros([list(label.size())[0], num_of_classes], device=label.device)
-        # one_hot_vector.zero_()  # set all values to zero
 
         one_hot_vector.scatter_(1, label_shaped, 1)
         one_hot_vector = one_hot_vector.type(torch.FloatTensor)
@@ -56,14 +54,10 @@ def convert_int_to_one_hot_vector(label, num_of_classes):
         return one_hot_vector
 
     else:
-        # print(label.size())
-        # this is for 3d tensor . continue here!!!!!!
+        # this is for 3d tensor .
         labels_shaped = label.view(label.size(0), label.size(1), -1)
-        # print(labels_shaped.size())
 
         one_hot_matrix = torch.zeros([list(labels_shaped.size())[0], list(labels_shaped.size())[1], num_of_classes], device=label.device)
-        # one_hot_matrix.zero_()  # set all values to zero
-        # print(one_hot_matrix.size())
         one_hot_matrix.scatter_(2, labels_shaped, 1)
         # added to keep a 2d dimension of labels
         one_hot_matrix = one_hot_matrix.view(-1, list(labels_shaped.size())[1] * num_of_classes)
@@ -108,7 +102,13 @@ class HLoss(nn.Module):
 
 def loss_fn_two_labels(outputs, labels, num_of_classes):
     """
-        Compute the cross entropy loss given outputs and labels.
+        Compute the loss given outputs and labels.
+        we will achieve max KL dist between out_bef_filt and lab_aft_filt by the following:
+        we wish the output to be not equal to lab_aft_filt.
+        given lab_aft_filt in [0-9] we can create a binary vector of size [num_of_classes] with all entrances = 1 if
+        entrance != lab_aft_filt and entrance = 0 otherwise.
+        we normalize this vector v to have sum = 1 by dividing in (num_of_classes-1)
+        we then calculate KL loss between out_bef_filt and v
 
         Args:
             outputs: (Variable) dimension batch_size x 10 - output of the model
@@ -116,7 +116,7 @@ def loss_fn_two_labels(outputs, labels, num_of_classes):
             num_of_classes: (int) value describing number of different classes (10)
 
         Returns:
-            loss (Variable): cross entropy loss for all images in the batch
+            loss (Variable): loss for all samples in the batch
     """
 
     # kl_criterion = nn.KLDivLoss(size_average=True, reduce=True)
@@ -126,60 +126,115 @@ def loss_fn_two_labels(outputs, labels, num_of_classes):
     label_before_filter = torch.index_select(labels, 1, torch.tensor([0], device=labels.device))
     label_after_filter = torch.index_select(labels, 1, torch.tensor([1], device=labels.device))
 
-    # all_labels_mat = np.arange(num_of_classes)*np.ones((outputs.size()[0], 1), dtype=int)
-    #
-    # temp_bef = all_labels_mat - label_before_filter.cpu().numpy()
-    # temp_aft = all_labels_mat - label_after_filter.cpu().numpy()
-
-    # other_labels_before = torch.from_numpy(all_labels_mat[np.nonzero(temp_bef)].reshape(outputs.size()[0], num_of_classes-1))
-    # other_labels_after = torch.from_numpy(all_labels_mat[np.nonzero(temp_aft)].reshape(outputs.size()[0], num_of_classes-1))
-    #
-    # other_labels_before = other_labels_before.type(torch.LongTensor)
-
-#     other_labels_before_numpy = np.setdiff1d(all_labels_mat, label_before_numpy)
-#     other_labels_after_numpy = np.setdiff1d(all_labels_mat, label_after_numpy)
-#
-#     other_labels_before = torch.from_numpy(other_labels_before_numpy)
-#     other_labels_after = torch.from_numpy(other_labels_after_numpy)
-#
-    # alpha = 0.5
-
-    # many_hot_vector_before_filter = convert_int_to_one_hot_vector(other_labels_before, num_of_classes)
     one_hot_vector_after_filter = convert_int_to_one_hot_vector(label_after_filter, num_of_classes)
-    # one_hot_vector_before_filter = convert_int_to_one_hot_vector(label_before_filter, num_of_classes)  # unneeded
+    one_hot_vector_before_filter = convert_int_to_one_hot_vector(label_before_filter, num_of_classes)  # unneeded
 
     out_before_filter = torch.index_select(outputs, 1, torch.tensor(list(range(10)), device=outputs.device))
     out_after_filter = torch.index_select(outputs, 1, torch.tensor(list(range(10, 20)), device=outputs.device))
 
-    # # min_dist = float('inf')
-    # min_ind = 0
-    #
-    # # for each option of 9 other labels (all besides the label after filter)
-    # # calculate the kl distance from the output and keep the minimal one for the loss function
-    #
-    # min_dist = kl_criterion(out_before_filter, many_hot_vector_before_filter[:, 0])
-    # # ind_array = np.random.permutation(num_of_classes-1).tolist()
-    # for i in range(num_of_classes-1):
-    #     # print(ind_array[i])
-    #     # other_one_hot_vector_before_filter = many_hot_vector_before_filter[:, ind_array[i]]
-    #     other_one_hot_vector_before_filter = many_hot_vector_before_filter[:, i]
-    #     dist_before = kl_criterion(out_before_filter, other_one_hot_vector_before_filter)
-    #     if dist_before < min_dist:
-    #         min_dist = dist_before
-    #         min_ind = i
+    completing_after_filter = (torch.ones(labels.shape[0], num_of_classes) - one_hot_vector_after_filter)\
+                               / (num_of_classes-1)
 
-    # func = kl_criterion(out_after_filter, one_hot_vector_after_filter) + \
-    #         min_dist + min_entropy_criterion(out_before_filter)
+    func = kl_criterion(out_after_filter, one_hot_vector_after_filter) + \
+           kl_criterion(out_before_filter, completing_after_filter) + \
+           min_entropy_criterion(out_before_filter)
+
+    return func
+
+
+def loss_fn_two_labels_exp_kl(outputs, labels, num_of_classes):
+    """
+        Compute the loss given outputs and labels.
+        we will achieve max KL dist between out_bef_filt and lab_aft_filt by the mathematical expression:
+        1 - exp(-kl(out_bef_filt,lab_aft_filt)
+
+        Args:
+            outputs: (Variable) dimension batch_size x 10 - output of the model
+            labels: (Variable) dimension batch_size, where each element is a value in [0- 9]
+            num_of_classes: (int) value describing number of different classes (10)
+
+        Returns:
+            loss (Variable): loss for all samples in the batch
+    """
+
+    kl_criterion = nn.KLDivLoss()
+    min_entropy_criterion = HLoss()
+
+    label_before_filter = torch.index_select(labels, 1, torch.tensor([0], device=labels.device))
+    label_after_filter = torch.index_select(labels, 1, torch.tensor([1], device=labels.device))
+
+    one_hot_vector_after_filter = convert_int_to_one_hot_vector(label_after_filter, num_of_classes)
+    one_hot_vector_before_filter = convert_int_to_one_hot_vector(label_before_filter, num_of_classes)  # unneeded
+
+    out_before_filter = torch.index_select(outputs, 1, torch.tensor(list(range(10)), device=outputs.device))
+    out_after_filter = torch.index_select(outputs, 1, torch.tensor(list(range(10, 20)), device=outputs.device))
 
     func = min_entropy_criterion(out_before_filter) + kl_criterion(out_after_filter, one_hot_vector_after_filter) + \
            (1 - torch.exp(- kl_criterion(out_before_filter, one_hot_vector_after_filter)))
 
-    # completing_after_filter = (torch.ones(labels.shape[0], num_of_classes) - one_hot_vector_after_filter)\
-    #                            / (num_of_classes-1)
+    return func
 
-    # func = kl_criterion(out_after_filter, one_hot_vector_after_filter) + \
-    #        kl_criterion(out_before_filter, completing_after_filter) + \
-    #        min_entropy_criterion(out_before_filter)
+
+def loss_fn_two_labels_min(outputs, labels, num_of_classes):
+    """
+        Compute the loss given outputs and labels.
+        we will achieve max KL dist between out_bef_filt and lab_aft_filt by the following:
+        we wish the output to be not equal to lab_aft_filt.
+        given lab_aft_filt in [0-9] we can create a list of all other possible labels.
+        we will get (num_of_classes-1) labels per each sample.
+        we then calculate KL loss between out_bef_filt and each other possible label and return
+        the mininal KL distance to a cetrain label which is not lab_aft_filt
+
+        Args:
+            outputs: (Variable) dimension batch_size x 10 - output of the model
+            labels: (Variable) dimension batch_size, where each element is a value in [0- 9]
+            num_of_classes: (int) value describing number of different classes (10)
+
+        Returns:
+            loss (Variable): loss for all images in the batch
+    """
+
+    # kl_criterion = nn.KLDivLoss(size_average=True, reduce=True)
+    kl_criterion = nn.KLDivLoss()
+    min_entropy_criterion = HLoss()
+
+    label_before_filter = torch.index_select(labels, 1, torch.tensor([0], device=labels.device))
+    label_after_filter = torch.index_select(labels, 1, torch.tensor([1], device=labels.device))
+
+    all_labels_mat = np.arange(num_of_classes)*np.ones((outputs.size()[0], 1), dtype=int)
+
+    temp_bef = all_labels_mat - label_before_filter.cpu().numpy()
+    temp_aft = all_labels_mat - label_after_filter.cpu().numpy()
+
+    other_labels_before = torch.from_numpy(all_labels_mat[np.nonzero(temp_bef)].reshape(outputs.size()[0], num_of_classes-1))
+    other_labels_after = torch.from_numpy(all_labels_mat[np.nonzero(temp_aft)].reshape(outputs.size()[0], num_of_classes-1))
+
+    other_labels_before = other_labels_before.type(torch.LongTensor)
+
+    many_hot_vector_before_filter = convert_int_to_one_hot_vector(other_labels_before, num_of_classes)
+    one_hot_vector_after_filter = convert_int_to_one_hot_vector(label_after_filter, num_of_classes)
+    one_hot_vector_before_filter = convert_int_to_one_hot_vector(label_before_filter, num_of_classes)  # unneeded
+
+    out_before_filter = torch.index_select(outputs, 1, torch.tensor(list(range(10)), device=outputs.device))
+    out_after_filter = torch.index_select(outputs, 1, torch.tensor(list(range(10, 20)), device=outputs.device))
+
+    # min_ind = 0
+
+    # for each option of 9 other labels (all besides the label after filter)
+    # calculate the kl distance from the output and keep the minimal one for the loss function
+
+    min_dist = kl_criterion(out_before_filter, many_hot_vector_before_filter[:, 0])
+    # ind_array = np.random.permutation(num_of_classes-1).tolist()
+    for i in range(num_of_classes-1):
+        # other_one_hot_vector_before_filter = many_hot_vector_before_filter[:, ind_array[i]]
+        other_one_hot_vector_before_filter = many_hot_vector_before_filter[:, i]
+        dist_before = kl_criterion(out_before_filter, other_one_hot_vector_before_filter)
+        if dist_before < min_dist:
+            min_dist = dist_before
+            # min_ind = i
+
+    func = kl_criterion(out_after_filter, one_hot_vector_after_filter) + \
+            min_dist + min_entropy_criterion(out_before_filter)
 
     return func
 

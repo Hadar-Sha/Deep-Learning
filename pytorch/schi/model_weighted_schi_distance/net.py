@@ -120,6 +120,30 @@ def loss_fn(outputs, labels, num_of_classes):
     # return mult_sum_avg
 
 
+def loss_fn_low_entropy(outputs, labels, num_of_classes):
+    """
+    Compute the cross entropy loss given outputs and labels.
+
+    Args:
+        outputs: (Variable) dimension batch_size x 10 - output of the model
+        labels: (Variable) dimension batch_size, where each element is a value in [0- 9]
+        num_of_classes: (int) value describing number of different classes (10)
+
+    Returns:
+        loss (Variable): cross entropy loss for all images in the batch
+
+    Note: you may use a standard loss function from http://pytorch.org/docs/master/nn.html#loss-functions. This example
+          demonstrates how you can easily define a custom loss function.
+    """
+    schi_criterion = SCHILoss()
+    min_entropy_criterion = HLoss()
+    if torch.cuda.is_available():
+        schi_criterion = SCHILoss().cuda()
+        min_entropy_criterion = HLoss().cuda()
+
+    return schi_criterion(outputs, labels) + min_entropy_criterion(outputs)
+
+
 class SCHILoss(nn.Module):
     def __init__(self):
         super(SCHILoss, self).__init__()
@@ -148,6 +172,16 @@ class SCHITwoLabelsLoss(nn.Module):
         val_aft = torch.sum(val_aft, dim=1)
         val_aft = torch.mean(val_aft)
         return val_bef + val_aft
+
+
+class HLoss(nn.Module):
+    def __init__(self):
+        super(HLoss, self).__init__()
+
+    def forward(self, x):
+        val = -x*torch.exp(x)
+        val = torch.sum(val, dim=1)
+        return torch.mean(val)
 
 
 def loss_fn_two_labels(outputs, labels, num_of_classes):
@@ -190,6 +224,35 @@ def loss_fn_two_labels(outputs, labels, num_of_classes):
     # mult_sum_avg_after = torch.mean(mult_sum_after)
     #
     # return mult_sum_avg_before + mult_sum_avg_after
+
+
+def loss_fn_two_labels_low_entropy(outputs, labels, num_of_classes):
+    """
+        Compute the cross entropy loss given outputs and labels.
+
+        Args:
+            outputs: (Variable) dimension batch_size x 10 - output of the model
+            labels: (Variable) dimension batch_size, where each element is a value in [0- 9]
+            num_of_classes: (int) value describing number of different classes (10)
+
+        Returns:
+            loss (Variable): cross entropy loss for all images in the batch
+    """
+
+    label_before_filter = torch.index_select(labels, 1, torch.tensor([0], device=labels.device))
+    label_after_filter = torch.index_select(labels, 1, torch.tensor([1], device=labels.device))
+
+    out_before_filter = torch.index_select(outputs, 1, torch.tensor(list(range(num_of_classes)), device=outputs.device))
+    out_after_filter = torch.index_select(outputs, 1, torch.tensor(list(range(num_of_classes, 2*num_of_classes)), device=outputs.device))
+
+    schi_two_labels_criterion = SCHITwoLabelsLoss()
+    min_entropy_criterion = HLoss()
+    if torch.cuda.is_available():
+        schi_two_labels_criterion = SCHITwoLabelsLoss().cuda()
+        min_entropy_criterion = HLoss().cuda()
+
+    return schi_two_labels_criterion(out_before_filter, out_after_filter, label_before_filter, label_after_filter) \
+           + min_entropy_criterion(out_before_filter) + min_entropy_criterion(out_after_filter)
 
 
 def accuracy(outputs, labels):
