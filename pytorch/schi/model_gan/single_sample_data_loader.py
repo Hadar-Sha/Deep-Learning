@@ -15,7 +15,7 @@ from torch.utils.data import Dataset, DataLoader
 class SchiDigitDataset(Dataset):
     """Face Landmarks dataset."""
 
-    def __init__(self, csv_file, transform=None):
+    def __init__(self, csv_file, num_samples, transform=None):
         # for reading data labels. reading the samples will be in get item
 
         """
@@ -24,9 +24,35 @@ class SchiDigitDataset(Dataset):
             transform (callable, optional): Optional transform to be applied
                 on a sample.
         """
+        self.num_classes = 10
+
         temp_mat = pd.read_csv(csv_file, header=None)
         self.mat = temp_mat.values
-        self.mat = self.mat[0:50000:5000, :]
+
+        # self.mat = self.mat[0:self.mat.shape[0]:round(0.1*self.mat.shape[0]), :] # 10 samples
+        # self.mat = self.mat[0:50000:2500, :]
+        # self.mat = self.mat[0:50000:500, :]
+        # self.mat = self.mat[0:50000:250, :]
+
+        if num_samples == 0:
+            self.mat = self.mat[round(0.8*self.mat.shape[0]):round(0.9*self.mat.shape[0]), :]  # temp get only samples with label = 8
+            # self.mat = self.mat[round(0.9*self.mat.shape[0]):, :]  # temp get only samples with label = 9
+
+        elif num_samples > 0:
+            interval = 1/self.num_classes
+            # interval = 1/num_samples
+            rand_ind = np.zeros(num_samples, dtype=int)
+            for i in range(self.num_classes):
+                seq = list(range(i * round(interval*self.mat.shape[0]), (i + 1) * round(interval*self.mat.shape[0])))
+                random.seed(1)
+                rand_ind[2 * i:2 * i + 2] = random.sample(seq, round(num_samples/self.num_classes))
+                # low = i * round(interval*self.mat.shape[0])
+                # high = (i + 1) * round(interval*self.mat.shape[0])
+                # # for j in range(round(num_samples/self.num_classes)):
+                # rand_ind[round(num_samples/self.num_classes) * i: round(num_samples/self.num_classes) * (i + 1)] = \
+                #         np.random.randint(low, high, size=round(num_samples/self.num_classes))
+
+            self.mat = self.mat[rand_ind, :]
 
         temp_images = self.mat[:, :24]
         self.images = temp_images.astype(float)
@@ -95,14 +121,17 @@ def fetch_dataloader(types, data_dir, params):
             file = my_list[0]
             path = os.path.join(newpath, file)
 
+            # added to sample limited samples only
+            num_samples = params.num_samples
+
             # Normalize() was added, wasn't in discriminator net
             # prevent shuffling in dev or test
             if split == 'train':
-                dl = DataLoader(dataset=SchiDigitDataset(csv_file=path, transform=transforms.Compose(
+                dl = DataLoader(dataset=SchiDigitDataset(csv_file=path, num_samples=num_samples, transform=transforms.Compose(
                     [Normalize(), ToTensor()])), batch_size=params.batch_size, shuffle=True)
 
             else:
-                dl = DataLoader(dataset=SchiDigitDataset(csv_file=path, transform=transforms.Compose(
+                dl = DataLoader(dataset=SchiDigitDataset(csv_file=path, num_samples=num_samples, transform=transforms.Compose(
                     [Normalize(), ToTensor()])), batch_size=params.batch_size, shuffle=False)
 
             dataloaders[split] = dl

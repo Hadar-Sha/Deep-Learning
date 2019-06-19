@@ -55,6 +55,11 @@ class GeneratorNet(nn.Module):
             # nn.Dropout(params.dropout_rate)
         )
 
+        self.hidden2 = nn.Sequential(
+            nn.Linear(params.hidden_size, params.hidden_size),
+            nn.Tanh()
+        )
+
         self.out_layer = nn.Sequential(
             nn.Linear(params.hidden_size, params.input_size),
             nn.Tanh()
@@ -70,6 +75,7 @@ class GeneratorNet(nn.Module):
 
         out = self.hidden_with_label(out)
         out = self.hidden1(out)
+        out = self.hidden2(out)
         out = self.out_layer(out)
 
         return out

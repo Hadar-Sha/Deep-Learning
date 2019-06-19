@@ -87,7 +87,11 @@ def display_digit(colors, myaxis, withgrayscale=False):
     numpy_colors = np.array(colors)
 
     if numpy_colors.min() < 0 or numpy_colors.max() > 1:
-        numpy_colors = (numpy_colors - numpy_colors.min()) / (numpy_colors.max() - numpy_colors.min())
+        if (numpy_colors.max() - numpy_colors.min()) > 0:
+            numpy_colors = (numpy_colors + 1) / 2
+            # numpy_colors = (numpy_colors - numpy_colors.min()) / (numpy_colors.max() - numpy_colors.min())
+        else:
+            return
 
     colors = numpy_colors.tolist()
     if withgrayscale:
@@ -213,7 +217,10 @@ def close_figure(figure):
 
 def feed_digits_to_figure(_, samples, fig, epoch, image_path, labels, dtype, withgrayscale):
     fig.clear()
-    fig.suptitle('epoch #{}'.format(epoch))
+    if dtype is not None:
+        fig.suptitle('batch #{}'.format(epoch))
+    else:
+        fig.suptitle('epoch #{}'.format(epoch))
 
     num_of_samples = len(samples)
     num_of_rows = max(1, math.floor(0.2*num_of_samples))
@@ -234,7 +241,7 @@ def feed_digits_to_figure(_, samples, fig, epoch, image_path, labels, dtype, wit
         os.mkdir(path)
 
     if dtype is not None:
-        impath = os.path.join(path, '{}_samples_epoch_#{}.png'.format(dtype, epoch))
+        impath = os.path.join(path, '{}_samples_batch_#{}.png'.format(dtype, epoch))
     else:
         impath = os.path.join(path, 'test_samples_epoch_#{}.png'.format(epoch))
     plt.savefig(impath, bbox_inches='tight')
@@ -250,8 +257,8 @@ def fill_figure(samples, fig, epoch, image_path, withgrayscale=False, dtype=None
     plt.pause(0.01)
 
 
-def plot_graph(losses_one, losses_two, gtype, image_path):
-    plt.close('all')
+def plot_graph(losses_one, losses_two, gtype, image_path, epoch=None):
+    # plt.close('all')
     fig1 = plt.figure()
 
     if gtype == "Loss":
@@ -270,6 +277,10 @@ def plot_graph(losses_one, losses_two, gtype, image_path):
         plt.title("Generator and Discriminator predictions During Training")
         plt.xlabel("iterations")
         plt.ylabel("Predictions")
+    elif gtype == "Grads_Best" and epoch is not None:
+        plt.title("min and max gradients with best metrics epoch {}".format(epoch))
+        plt.xlabel("layers")
+        plt.ylabel("Grads")
     elif gtype == "Grads":
         plt.title("min and max gradients During Training")
         plt.xlabel("layers")
@@ -329,7 +340,13 @@ def plot_graph(losses_one, losses_two, gtype, image_path):
 #     return
 
 
-# if __name__ == '__main__':
+if __name__ == '__main__':
+    colors = np.array([231,231,231,173,173,173,231,231,231,231,231,231,231,231,231,231,231,231,231,231,231,173,173,173])
+    colors = colors/255.
+
+    colors = np.reshape(colors, (8, 3))
+
+    colors = colors.tolist()
 #
 #     colors = []
 #     colors.append([0.5, 0, 0])
@@ -342,12 +359,12 @@ def plot_graph(losses_one, losses_two, gtype, image_path):
 #     # background
 #     colors.append([0, 0, 0])
 #
-#     print(colors)
-#     fig, ax = plt.subplots()
+    print(colors)
+    fig, ax = plt.subplots()
+    #
+    display_digit(colors, ax, True)
 #     #
-#     display_digit(colors, ax, True)
-#     #
-#     plt.show()
+    plt.show()
 #     # plt.close('all')
 #
 #     # create_digit_image(colors)

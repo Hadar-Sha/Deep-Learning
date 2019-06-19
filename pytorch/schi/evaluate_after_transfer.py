@@ -13,6 +13,7 @@ import model.net as net
 import model.two_labels_data_loader as data_loader
 
 parser = argparse.ArgumentParser()
+parser.add_argument('--parent_dir', default="C:/Users/H/Documents/Haifa Univ/Thesis/DL-Pytorch-data", help='path to experiments and data folder. not for Server')
 parser.add_argument('--data_dir', default='data', help="Directory containing the dataset")
 parser.add_argument('--model_dir', default='experiments/base_model', help="Directory containing params.json")
 parser.add_argument('--restore_file', default='best', help="name of the file in --model_dir \
@@ -100,6 +101,8 @@ if __name__ == '__main__':
     """
     # Load the parameters
     args = parser.parse_args()
+    if args.parent_dir and not torch.cuda.is_available():
+        os.chdir(args.parent_dir)
     json_path = os.path.join(args.model_dir, 'params.json')
     assert os.path.isfile(json_path), "No json configuration file found at {}".format(json_path)
     params = utils.Params(json_path)
