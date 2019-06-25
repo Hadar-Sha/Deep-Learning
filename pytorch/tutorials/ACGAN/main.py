@@ -22,10 +22,10 @@ from folder import ImageFolder
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--dataset', required=True, help='cifar10 | imagenet')
-parser.add_argument('--dataroot', required=True, help='path to dataset')
-parser.add_argument('--workers', type=int, help='number of data loading workers', default=2)
-parser.add_argument('--batchSize', type=int, default=1, help='input batch size')
+parser.add_argument('--dataset', default='cifar10', help='cifar10 | imagenet')  # , required=True
+parser.add_argument('--dataroot', default='./data-cifar', help='path to dataset')  # , required=True
+parser.add_argument('--workers', type=int, help='number of data loading workers', default=1)  # default=2
+parser.add_argument('--batchSize', type=int, default=1, help='input batch size')  # default=1
 parser.add_argument('--imageSize', type=int, default=128, help='the height / width of the input image to network')
 parser.add_argument('--nz', type=int, default=110, help='size of the latent z vector')
 parser.add_argument('--ngf', type=int, default=64)
@@ -34,7 +34,7 @@ parser.add_argument('--niter', type=int, default=25, help='number of epochs to t
 parser.add_argument('--lr', type=float, default=0.0002, help='learning rate, default=0.0002')
 parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for adam. default=0.5')
 parser.add_argument('--cuda', action='store_true', help='enables cuda')
-parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
+parser.add_argument('--ngpu', type=int, default=0, help='number of GPUs to use')  # default=1
 parser.add_argument('--netG', default='', help="path to netG (to continue training)")
 parser.add_argument('--netD', default='', help="path to netD (to continue training)")
 parser.add_argument('--outf', default='.', help='folder to output images and model checkpoints')
@@ -73,7 +73,8 @@ if opt.dataset == 'imagenet':
     dataset = ImageFolder(
         root=opt.dataroot,
         transform=transforms.Compose([
-            transforms.Scale(opt.imageSize),
+            transforms.Resize(opt.imageSize),
+            # transforms.Scale(opt.imageSize),
             transforms.CenterCrop(opt.imageSize),
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
@@ -84,7 +85,8 @@ elif opt.dataset == 'cifar10':
     dataset = dset.CIFAR10(
         root=opt.dataroot, download=True,
         transform=transforms.Compose([
-            transforms.Scale(opt.imageSize),
+            transforms.Resize(opt.imageSize),
+            # transforms.Scale(opt.imageSize),
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ]))
@@ -93,7 +95,7 @@ else:
 
 assert dataset
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=opt.batchSize,
-                                         shuffle=True, num_workers=int(opt.workers))
+                                         shuffle=True)  # , num_workers=int(opt.workers))
 
 # some hyper parameters
 ngpu = int(opt.ngpu)
@@ -232,8 +234,8 @@ for epoch in range(opt.niter):
         all_loss_G = avg_loss_G * curr_iter
         all_loss_D = avg_loss_D * curr_iter
         all_loss_A = avg_loss_A * curr_iter
-        all_loss_G += errG.data[0]
-        all_loss_D += errD.data[0]
+        all_loss_G += errG.item()
+        all_loss_D += errD.item()
         all_loss_A += accuracy
         avg_loss_G = all_loss_G / (curr_iter + 1)
         avg_loss_D = all_loss_D / (curr_iter + 1)
@@ -241,7 +243,7 @@ for epoch in range(opt.niter):
 
         print('[%d/%d][%d/%d] Loss_D: %.4f (%.4f) Loss_G: %.4f (%.4f) D(x): %.4f D(G(z)): %.4f / %.4f Acc: %.4f (%.4f)'
               % (epoch, opt.niter, i, len(dataloader),
-                 errD.data[0], avg_loss_D, errG.data[0], avg_loss_G, D_x, D_G_z1, D_G_z2, accuracy, avg_loss_A))
+                 errD.item(), avg_loss_D, errG.item(), avg_loss_G, D_x, D_G_z1, D_G_z2, accuracy, avg_loss_A))
         if i % 100 == 0:
             vutils.save_image(
                 real_cpu, '%s/real_samples.png' % opt.outf)

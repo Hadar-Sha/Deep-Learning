@@ -12,13 +12,14 @@ class DiscriminatorNet(nn.Module):
         super(DiscriminatorNet, self).__init__()
 
         self.in_layer = nn.Sequential(
-            nn.Linear(params.input_size, params.hidden_size*2),
+            nn.Linear(params.input_size, params.hidden_size),  # *2),
             # nn.ReLU(),
             nn.LeakyReLU(params.leaky_relu_slope),
             nn.Dropout(params.dropout_rate)
         )
         self.hidden1 = nn.Sequential(
-            nn.Linear(params.hidden_size*2, params.hidden_size),
+            nn.Linear(params.hidden_size, params.hidden_size),
+            # nn.Linear(params.hidden_size*2, params.hidden_size),
             # nn.ReLU(),
             nn.LeakyReLU(params.leaky_relu_slope),
             nn.Dropout(params.dropout_rate)
@@ -75,15 +76,17 @@ class GeneratorNet(nn.Module):
         self.hidden_with_label = nn.Sequential(
             nn.Linear(params.noise_dim + params.num_classes, params.hidden_size),
             # nn.ReLU(),
-            nn.LeakyReLU(params.leaky_relu_slope),
-            nn.Dropout(params.dropout_rate)
+            # nn.LeakyReLU(params.leaky_relu_slope),
+            # nn.Dropout(params.dropout_rate)
+            nn.Tanh()
         )
 
         self.hidden1 = nn.Sequential(
             nn.Linear(params.hidden_size, params.hidden_size),  # *2),
             # nn.ReLU(),
-            nn.LeakyReLU(params.leaky_relu_slope),
-            nn.Dropout(params.dropout_rate)
+            # nn.LeakyReLU(params.leaky_relu_slope),
+            # nn.Dropout(params.dropout_rate)
+            nn.Tanh()
         )
 
         self.out_layer = nn.Sequential(
@@ -103,8 +106,14 @@ class GeneratorNet(nn.Module):
 
 
 # Noise
-def noise(size, dim):
-    n = Variable(torch.randn(size, dim))  # recommended to sample from normal distribution and not from uniform dist
+def noise(size, dim, noise_type='normal'):
+    if noise_type == 'normal':
+        n = Variable(torch.randn(size, dim))  # recommended to sample from normal distribution and not from uniform dist
+    elif noise_type == 'uniform':
+        n = Variable(-1 + 2 * torch.rand(size, dim))  # make sense for binary samples
+    elif noise_type == 'binary':
+        n = Variable(-1 + 2 * torch.randint(2, (size, dim), dtype=torch.float))  # make sense for binary samples
+    # n = Variable(torch.randn(size, dim))  # recommended to sample from normal distribution and not from uniform dist
     # n = Variable(torch.rand(size, 100))
     # n = Variable(torch.randint(256, (size, 100)))
     # n = n/255

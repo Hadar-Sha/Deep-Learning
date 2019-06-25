@@ -115,7 +115,7 @@ class _netD(nn.Module):
         # aux-classifier fc
         self.fc_aux = nn.Linear(13*13*512, num_classes)
         # softmax and sigmoid
-        self.softmax = nn.Softmax()
+        # self.softmax = nn.Softmax()
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, input):
@@ -139,7 +139,9 @@ class _netD(nn.Module):
             flat6 = conv6.view(-1, 13*13*512)
             fc_dis = self.fc_dis(flat6)
             fc_aux = self.fc_aux(flat6)
-        classes = self.softmax(fc_aux)
+        classes = nn.Softmax(fc_aux)
+        # classes = nn.Softmax(fc_aux, dim=1)
+        # classes = self.softmax(fc_aux)
         realfake = self.sigmoid(fc_dis).view(-1, 1).squeeze(1)
         return realfake, classes
 
@@ -249,7 +251,7 @@ class _netD_CIFAR10(nn.Module):
         # aux-classifier fc
         self.fc_aux = nn.Linear(4*4*512, num_classes)
         # softmax and sigmoid
-        self.softmax = nn.Softmax()
+        # self.softmax = nn.Softmax()
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, input):
@@ -273,6 +275,8 @@ class _netD_CIFAR10(nn.Module):
             flat6 = conv6.view(-1, 4*4*512)
             fc_dis = self.fc_dis(flat6)
             fc_aux = self.fc_aux(flat6)
-        classes = self.softmax(fc_aux)
+        # classes = self.softmax(fc_aux)
+        # classes = nn.Softmax(fc_aux, dim=1)
+        classes = nn.Softmax(fc_aux)
         realfake = self.sigmoid(fc_dis).view(-1, 1).squeeze(1)
         return realfake, classes

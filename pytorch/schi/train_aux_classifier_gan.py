@@ -19,8 +19,8 @@ import model_gan.one_label_data_loader as data_loader
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--parent_dir', default="C:/Users/H/Documents/Haifa Univ/Thesis/DL-Pytorch-data", help='path to experiments and data folder. not for Server')
-parser.add_argument('--data_dir', default='data/with-grayscale/data-with-grayscale-4000', help="Directory containing the dataset")
-parser.add_argument('--model_dir', default='experiments/acgan_model', help="Directory containing params.json")
+parser.add_argument('--data_dir', default='data/grayscale-balanced', help="Directory containing the dataset")
+parser.add_argument('--model_dir', default='experiments/acgan_model/debug', help="Directory containing params.json")
 parser.add_argument('--restore_file', default=None,
                     help="Optional, name of the file in --model_dir containing weights to reload before \
                     training")  # 'best' or 'train'
@@ -81,40 +81,19 @@ def train_generator(d, optimizer, fake_data, fake_labels, r_f_loss_fn, c_loss_fn
 def get_stats(val, val_type):
 
     if isinstance(val, torch.autograd.Variable) and val_type == 'error':
-        val = val.data.cpu().numpy()
+        ret_val = val.data.cpu().numpy()
 
     elif isinstance(val, torch.autograd.Variable) and val_type == 'pred':
-        val = val.data.mean()
+        ret_val = val.data.mean()
 
     else:
         print('invalid input')
-        val = None
+        ret_val = None
 
-    return val
-
-
-# def get_stats(d_error, g_error, d_pred_real, d_pred_fake, d_pred_fake_g):
-#     stats = {}
-#     if isinstance(d_error, torch.autograd.Variable):
-#         d_error = d_error.data.cpu().numpy()
-#         stats['d_error'] = d_error
-#     if isinstance(g_error, torch.autograd.Variable):
-#         g_error = g_error.data.cpu().numpy()
-#         stats['g_error'] = g_error
-#     if isinstance(d_pred_real, torch.autograd.Variable):
-#         d_pred_real = d_pred_real.data.mean()
-#         stats['d_pred_real'] = d_pred_real
-#     if isinstance(d_pred_fake, torch.autograd.Variable):
-#         d_pred_fake = d_pred_fake.data.mean()
-#         stats['d_pred_fake'] = d_pred_fake
-#     if isinstance(d_pred_fake_g, torch.autograd.Variable):
-#         d_pred_fake_g = d_pred_fake_g.data.mean()
-#         stats['d_pred_fake_g'] = d_pred_fake_g
-#
-#     return stats
+    return ret_val
 
 
-def train(d_model, g_model, d_optimizer, g_optimizer, r_f_loss_fn, c_loss_fn, dataloader, params, epoch, fig):
+def train(d_model, d_optimizer, g_model, g_optimizer, r_f_loss_fn, c_loss_fn, dataloader, params, epoch, fig):
     """Train the model on `num_steps` batches
 
     Args:
@@ -130,6 +109,7 @@ def train(d_model, g_model, d_optimizer, g_optimizer, r_f_loss_fn, c_loss_fn, da
     test_samples = None
     prop = []
     summ = []
+    num_of_batches = len(dataloader.dataset)//dataloader.batch_size
 
     for i, (real_batch, real_label) in enumerate(dataloader):
 
@@ -175,10 +155,10 @@ def train(d_model, g_model, d_optimizer, g_optimizer, r_f_loss_fn, c_loss_fn, da
         stats['d_pred_fake'] = get_stats(d_pred_fake, 'pred')
         stats['d_pred_fake_g'] = get_stats(d_pred_fake_g, 'pred')
 
-        # Save Losses for plotting later
-        G_losses.append(d_error.item())
-        D_losses.append(g_error.item())
-        accuracy_vals.append(class_accuracy)
+        # # Save Losses for plotting later
+        # D_losses.append(d_error.item())
+        # G_losses.append(g_error.item())
+        # accuracy_vals.append(class_accuracy)
 
         G_preds.append(d_pred_fake.data.mean())
         D_preds.append(d_pred_real.data.mean())
@@ -191,23 +171,47 @@ def train(d_model, g_model, d_optimizer, g_optimizer, r_f_loss_fn, c_loss_fn, da
             prop.append(proportions_batch)
             summ.append(stats)
 
+        if ((i + 1) % round(0.1*num_of_batches) == 0) and (epoch == 0):
+            # Display data Images
+            real_samples_reshaped = gan_net.vectors_to_samples(real_data)  # ?
+            real_titles = gan_net.labels_to_titles(real_label)
+
+            display_results.fill_figure(real_samples_reshaped, fig, i + 1, args.model_dir, -1, 1, labels=real_titles,
+                                        dtype='real')
+
     stats_mean = {metric: np.sum([x[metric] for x in summ] / np.sum(prop)) for metric in summ[0]}
+    # Save Losses for plotting later
+    D_losses.append(d_error.item())
+    G_losses.append(g_error.item())
+    accuracy_vals.append(class_accuracy)
+
     stats_string = " ; ".join("{}: {:05.3f}".format(k, v) for k, v in stats_mean.items())
     logging.info("train metrics: " + stats_string)
-    if (epoch + 1) % (0.01 * params.num_epochs) == 0:
+    if ((epoch + 1) % (0.01 * params.num_epochs) == 0) or ((epoch + 1) <= min(10, (0.001 * params.num_epochs))):
+        # Display Progress
         print("Epoch {}/{}".format(epoch + 1, params.num_epochs))
         print(stats_string)
 
+        # Display test Images
         test_samples = g_model(test_noise, test_one_hot_v).data.cpu()
         test_samples_reshaped = gan_net.vectors_to_samples(test_samples)  # ?
         test_titles = gan_net.labels_to_titles(test_labels)
 
-        display_results.fill_figure(test_samples_reshaped, fig, epoch + 1, args.model_dir, labels=test_titles)
+        display_results.fill_figure(test_samples_reshaped, fig, epoch + 1, args.model_dir, -1, 1, labels=test_titles)
 
-    return test_samples
+    return test_samples, stats_mean['d_error'] + stats_mean['g_error']
+    # stats['d_pred_real'], stats['d_pred_fake']  # check !!! maybe more values needed
 
 
 def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, r_f_loss_fn, c_loss_fn, params, model_dir):
+
+    # best_pred_real = np.inf
+    # best_pred_fake = np.inf
+    best_loss = np.inf
+    dest_min = 0
+    dest_max = 255
+    curr_min = -1
+    curr_max = 1
 
     fig = display_results.create_figure()
 
@@ -215,8 +219,45 @@ def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, r_f_
         # Run one epoch
         logging.info("Epoch {}/{}".format(epoch + 1, params.num_epochs))
 
-        test_samples = train(d_model, g_model, d_optimizer, g_optimizer, r_f_loss_fn, c_loss_fn, train_dataloader,
-                             params, epoch, fig)
+        test_samples, loss_mean_sum = train(d_model, d_optimizer, g_model, g_optimizer, r_f_loss_fn, c_loss_fn,
+                                            train_dataloader, params, epoch, fig)
+        is_best = loss_mean_sum <= best_loss
+
+        if is_best:
+            logging.info("- Found new best loss")
+            print("Epoch {}/{}".format(epoch + 1, params.num_epochs))
+            print("- Found new best loss")
+            best_loss = loss_mean_sum
+            print("mean loss is {:05.3f}".format(loss_mean_sum))
+            loss_metric_dict = {'loss': loss_mean_sum}
+
+            utils.save_checkpoint({'epoch': epoch + 1,
+                                   'state_dict': g_model.state_dict(),
+                                   'optim_dict': g_optimizer.state_dict()}, is_best=is_best, checkpoint=model_dir)
+
+            # Save best val metrics in a json file in the model directory
+            best_json_path = os.path.join(model_dir, "metrics_min_avg_loss_best_weights.json")
+            utils.save_dict_to_json(loss_metric_dict, best_json_path)
+
+            best_d_grads_graph = collect_network_statistics(discriminator)
+            best_g_grads_graph = collect_network_statistics(g_model)
+            display_results.plot_graph(best_g_grads_graph, best_d_grads_graph, "Grads_Best", args.model_dir, epoch=epoch+1)
+
+            if test_samples is not None:
+                np_test_samples = np.array(test_samples)
+                np_test_samples = \
+                    dest_min + (dest_max - dest_min) * (np_test_samples - curr_min) / (curr_max - curr_min)
+                np_test_samples = np.around(np_test_samples).astype(int)
+                np_test_out = (test_noise.cpu().numpy())
+                np_test_labels = (test_labels.view(test_labels.shape[0], -1).cpu().numpy())
+
+                data_path = os.path.join(model_dir, 'data')
+                if not os.path.isdir(data_path):
+                    os.mkdir(data_path)
+
+                test_all_data = (np.concatenate((np_test_samples, np_test_out, np_test_labels), axis=1)).tolist()
+                last_csv_path = os.path.join(data_path, "best_samples_epoch_{}.csv".format(epoch + 1))
+                utils.save_incorrect_to_csv(test_all_data, last_csv_path)
 
         if test_samples is not None:
             utils.save_checkpoint({'epoch': epoch + 1,
@@ -230,7 +271,9 @@ def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, r_f_
                                   ntype='g')
 
             np_test_samples = np.array(test_samples)
-            np_test_samples = np.around(np_test_samples * 127.5 + 127.5).astype(int)
+            np_test_samples = \
+                dest_min + (dest_max - dest_min) * (np_test_samples - curr_min) / (curr_max - curr_min)
+            np_test_samples = np.around(np_test_samples).astype(int)
             np_test_out = (test_noise.cpu().numpy())
             np_test_labels = (test_labels.view(test_labels.shape[0], -1).cpu().numpy())
 
@@ -274,7 +317,7 @@ def collect_network_statistics(net):
         else:
             flat_net_grads = all_net_grads
 
-        net_grads_graph.append([min(flat_net_grads), max(flat_net_grads)])
+        net_grads_graph.append([min(flat_net_grads), np.median(flat_net_grads), max(flat_net_grads)])
 
     return net_grads_graph
 

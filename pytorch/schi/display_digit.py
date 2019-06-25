@@ -71,27 +71,28 @@ def create_segment(segment_center, vertical_or_horizontal, color):
     return segment
 
 
-def convert_to_after_filer_grayscale(np_colors):
-    scale_green = 0.02
+def convert_to_after_filer_grayscale(np_colors, scale_green=0.02):
+    # scale_green = 0.02
     max_gray = 1 + scale_green
-    np_grays = (np_colors[:,0]+np_colors[:,1]*scale_green)/max_gray
-    np_grays = np.reshape(np_grays, (np_grays.shape[0],1))
-    grayscale_np_colors = np_grays*np.ones((1,3))
+    np_grays = (np_colors[:, 0]+np_colors[:, 1] * scale_green)/max_gray
+    np_grays = np.reshape(np_grays, (np_grays.shape[0], 1))
+    grayscale_np_colors = np_grays * np.ones((1, 3))
     return grayscale_np_colors
 
 
-def display_digit(colors, myaxis, withgrayscale=False):
+def display_digit(colors, myaxis, curr_min_val, curr_max_val, withgrayscale=False):
 
     vertical_horizon = [0, 0, 0, 1, 1, 1, 1]
 
     numpy_colors = np.array(colors)
 
+    # convert to [0,1] to draw
     if numpy_colors.min() < 0 or numpy_colors.max() > 1:
-        if (numpy_colors.max() - numpy_colors.min()) > 0:
-            numpy_colors = (numpy_colors + 1) / 2
-            # numpy_colors = (numpy_colors - numpy_colors.min()) / (numpy_colors.max() - numpy_colors.min())
-        else:
+        if (curr_max_val - curr_min_val) <= 0:
+            print('wrong min and max input values')
             return
+        else:
+            numpy_colors = (numpy_colors - curr_min_val) / (curr_max_val - curr_min_val)
 
     colors = numpy_colors.tolist()
     if withgrayscale:
@@ -111,7 +112,7 @@ def display_digit(colors, myaxis, withgrayscale=False):
 
     if withgrayscale:
         segments_gray_centers = []
-        gray_center = [3*width, 1.5 * width]
+        gray_center = [3 * width, 1.5 * width]
         bg_patch = create_background(gray_colors[7], gray_center)
         patches.append(bg_patch)
         myaxis.add_patch(bg_patch)
@@ -152,14 +153,27 @@ def display_digit(colors, myaxis, withgrayscale=False):
     return
 
 
-def create_digit_image(colors):
+def create_digit_image(colors, curr_min_val=0, curr_max_val=1):
 
+    # fig_temp, myaxis = plt.subplots(figsize=(2, 3), dpi=100)  # figsize=(17, 27), dpi=10
     fig_temp, myaxis = plt.subplots(figsize=(20, 30), dpi=10)  # figsize=(17, 27), dpi=10
+    fig_temp.subplots_adjust(0, 0, 1, 1)
+    # plt.subplots_adjust(wspace=0, hspace=0)
+    # myaxis.patch.set_facecolor('w')
+    # myaxis.patch.set_alpha(1)
 
     numpy_colors = np.array(colors)
 
+    # convert to [0,1] to draw
     if numpy_colors.min() < 0 or numpy_colors.max() > 1:
-        numpy_colors = (numpy_colors - numpy_colors.min()) / (numpy_colors.max() - numpy_colors.min())
+        if (curr_max_val - curr_min_val) <= 0:
+            print('wrong min and max input values')
+            return
+        else:
+            numpy_colors = (numpy_colors - curr_min_val) / (curr_max_val - curr_min_val)
+
+    # if numpy_colors.min() < 0 or numpy_colors.max() > 1:
+    #     numpy_colors = (numpy_colors - numpy_colors.min()) / (numpy_colors.max() - numpy_colors.min())
 
     colors = numpy_colors.tolist()
 
@@ -198,9 +212,10 @@ def create_digit_image(colors):
 
     data = np.fromstring(fig_temp.canvas.tostring_rgb(), dtype=np.uint8, sep='')
     data = data.reshape(fig_temp.canvas.get_width_height()[::-1] + (3,))
+    rel_data = data[6:291, 5:195, :]  # crop out background
 
     plt.close('all')
-    data_tensor = F.to_tensor(data)
+    data_tensor = F.to_tensor(rel_data)
 
     return data_tensor
 
@@ -215,7 +230,7 @@ def close_figure(figure):
     return
 
 
-def feed_digits_to_figure(_, samples, fig, epoch, image_path, labels, dtype, withgrayscale):
+def feed_digits_to_figure(_, samples, fig, epoch, image_path, curr_min_val, curr_max_val, labels, dtype, withgrayscale):
     fig.clear()
     if dtype is not None:
         fig.suptitle('batch #{}'.format(epoch))
@@ -223,8 +238,12 @@ def feed_digits_to_figure(_, samples, fig, epoch, image_path, labels, dtype, wit
         fig.suptitle('epoch #{}'.format(epoch))
 
     num_of_samples = len(samples)
-    num_of_rows = max(1, math.floor(0.2*num_of_samples))
+    num_of_rows = max(1, math.floor(math.sqrt(num_of_samples)))
+    # num_of_rows = max(1, math.floor(0.2*num_of_samples))
     axes = np.zeros((num_of_rows, math.ceil(num_of_samples / num_of_rows))).tolist()
+    plt.subplots_adjust(wspace=0.1, hspace=0.1)
+    # plt.subplots_adjust(wspace=0.01, hspace=0.01)
+    # plt.subplots_adjust(left=0.01, bottom=0.01, right=0.01, top=0.01, wspace=0.01, hspace=0.01)
 
     for i in range(num_of_samples):
         row, col = np.unravel_index(i, (num_of_rows, math.ceil(num_of_samples / num_of_rows)))
@@ -233,7 +252,7 @@ def feed_digits_to_figure(_, samples, fig, epoch, image_path, labels, dtype, wit
         if labels is not None:
             digit_val = str(labels[i])
             axes[row][col].set_title(digit_val)
-        display_digit(samples[i], axes[row][col], withgrayscale)
+        display_digit(samples[i], axes[row][col], curr_min_val, curr_max_val, withgrayscale)
 
     # save graph
     path = os.path.join(image_path, 'images')
@@ -248,10 +267,10 @@ def feed_digits_to_figure(_, samples, fig, epoch, image_path, labels, dtype, wit
     return
 
 
-def fill_figure(samples, fig, epoch, image_path, withgrayscale=False, dtype=None, labels=None):
+def fill_figure(samples, fig, epoch, image_path, curr_min_val, curr_max_val, withgrayscale=False, dtype=None, labels=None):
 
     im_ani = animation.FuncAnimation(fig, feed_digits_to_figure, frames=None,
-                         fargs=(samples, fig, epoch, image_path, labels, dtype, withgrayscale), interval=2, repeat=False, blit=False)
+                         fargs=(samples, fig, epoch, image_path, curr_min_val, curr_max_val, labels, dtype, withgrayscale), interval=2, repeat=False, blit=False)
 
     plt.draw()
     plt.pause(0.01)
@@ -286,17 +305,42 @@ def plot_graph(losses_one, losses_two, gtype, image_path, epoch=None):
         plt.xlabel("layers")
         plt.ylabel("Grads")
 
-    if losses_one is not None and (not losses_one) is False and losses_two is not None and (not losses_two) is False:
-        if gtype == "Loss":
-            plt.plot(losses_one, label="G")
-            plt.plot(losses_two, label="D")
-        elif gtype == "VAE Loss":
-            plt.plot(losses_one, label="BCE")
-            plt.plot(losses_two, label="KL")
-    elif losses_one is not None and (not losses_one) is False:
-        plt.plot(losses_one)
-    elif losses_two is not None and (not losses_two) is False:
-        plt.plot(losses_two)
+    if (not losses_one) is False and (not losses_two) is False:
+    # if losses_one is not None and (not losses_one) is False and losses_two is not None and (not losses_two) is False:
+        if gtype == "VAE Loss":
+            bce_h, = plt.plot(losses_one, label="BCE")
+            kl_h, = plt.plot(losses_two, label="KL")
+            plt.legend(handles=[bce_h, kl_h], fontsize="small")
+        elif gtype == "Grads_Best" or gtype == "Grads":
+            plt.plot(losses_one)
+            plt.plot(losses_two)
+        else:
+            g_h = plt.plot(losses_one, label="G")
+            d_h = plt.plot(losses_two, label="D")
+            # plt.legend(handles=[g_h, d_h])
+            plt.legend([g_h, d_h], ['G', 'D'], fontsize="small")
+    elif (not losses_one) is False:
+    # elif losses_one is not None and (not losses_one) is False:
+        if gtype == "VAE Loss":
+            bce_h, = plt.plot(losses_one, label="BCE")
+            plt.legend(handles=[bce_h])
+        elif gtype == "Grads_Best" or gtype == "Grads":
+            plt.plot(losses_one)
+        else:
+            g_h, = plt.plot(losses_one, label="G")
+            plt.legend(handles=[g_h])
+        # plt.plot(losses_one)
+    elif (not losses_two) is False:
+    # elif losses_two is not None and (not losses_two) is False:
+        if gtype == "VAE Loss":
+            kl_h, = plt.plot(losses_two, label="KL")
+            plt.legend(handles=[kl_h])
+        elif gtype == "Grads_Best" or gtype == "Grads":
+            plt.plot(losses_two)
+        else:
+            d_h, = plt.plot(losses_two, label="D")
+            plt.legend(handles=[d_h])
+        # plt.plot(losses_two)
     else:
         print('no data was provided')
         return
@@ -313,58 +357,36 @@ def plot_graph(losses_one, losses_two, gtype, image_path, epoch=None):
     return
 
 
-# def create_grid(num_of_samples):
-#     fig, axes = plt.subplots(4, math.ceil(num_of_samples / 4), subplot_kw=dict(), clear=True)
-#     return fig, axes
-#
-#
-# def fill_grid(samples, fig, axes, epoch, n_batch, save=True):
-#     num_of_samples = len(samples)
-#     args = parser.parse_args()
-#
-#     for i in range(num_of_samples):
-#         row, col = np.unravel_index(i, (4, math.ceil(num_of_samples/4)))
-#         display_digit(samples[i], axes[row, col])
-#
-#     if save:
-#         path = os.path.join(args.model_dir, 'images')
-#         if not os.path.isdir(path):
-#             os.mkdir(path)
-#         fig.savefig('{}/{}_epoch_{}_batch_{}.png'.format(path, '', epoch, n_batch))
-#
-#     plt.draw()
-#     plt.show()
-#     plt.pause(0.001)
-#     plt.close(fig)
-#
-#     return
-
-
 if __name__ == '__main__':
-    colors = np.array([231,231,231,173,173,173,231,231,231,231,231,231,231,231,231,231,231,231,231,231,231,173,173,173])
-    colors = colors/255.
 
-    colors = np.reshape(colors, (8, 3))
-
-    colors = colors.tolist()
-#
-#     colors = []
-#     colors.append([0.5, 0, 0])
-#     colors.append([0, 0, 0.5])
-#     colors.append([0.5, 0, 0])
-#     colors.append([0.5, 0, 0])
-#     colors.append([0.5, 0, 0])
-#     colors.append([0, 0, 0])
-#     colors.append([0.5, 0, 0])
-#     # background
-#     colors.append([0, 0, 0])
-#
-    print(colors)
-    fig, ax = plt.subplots()
+    # colors = np.array([231,231,231,173,173,173,231,231,231,231,231,231,231,231,231,231,231,231,231,231,231,173,173,173])
+    # colors = colors/255.
     #
-    display_digit(colors, ax, True)
+    # colors = np.reshape(colors, (8, 3))
+    #
+    # colors = colors.tolist()
+
+    colors = []
+    colors.append([0.5, 0, 0])
+    colors.append([0, 0, 0.5])
+    colors.append([0.5, 0, 0])
+    colors.append([0.5, 0, 0])
+    colors.append([0.5, 0, 0])
+    colors.append([0, 0, 0])
+    colors.append([0.5, 0, 0])
+    # background
+    colors.append([0, 0, 0])
+
+    print(colors)
+    # fig, ax = plt.subplots()
+
+    data_tensor = create_digit_image(colors)
+
+    print(data_tensor.min())
+    print(data_tensor.max())
+    # display_digit(colors, ax, True)
 #     #
-    plt.show()
+#     plt.show()
 #     # plt.close('all')
 #
 #     # create_digit_image(colors)

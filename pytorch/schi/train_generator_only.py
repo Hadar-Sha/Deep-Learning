@@ -7,15 +7,14 @@ import numpy as np
 import torch
 import torch.optim as optim
 from torch.autograd import Variable
-# from tqdm import tqdm
 
 # from utils_gan import Logger
 import display_digit as display_results
 import utils
 import model_gan.generator_only_net as gan_net
 # import model_gan.two_labels_data_loader as data_loader
-# import model_gan.one_label_data_loader as data_loader
-import model_gan.single_sample_data_loader as data_loader
+import model_gan.one_label_data_loader as data_loader
+# import model_gan.single_sample_data_loader as data_loader
 
 
 parser = argparse.ArgumentParser()
@@ -25,8 +24,6 @@ parser.add_argument('--model_dir', default='experiments/generator_model/debug', 
 parser.add_argument('--restore_file', default=None,
                     help="Optional, name of the file in --model_dir containing weights to reload before \
                     training")  # 'best' or 'train'
-
-# data-two-labels-big # grayscale-logits # data/data-w-gray-only-2 data/data-with-grayscale-4000
 
 
 def train_generator(optimizer, fake_data, real_data, mse_loss_fn):
@@ -116,20 +113,17 @@ def train(g_model, g_optimizer, mse_loss_fn, dataloader, params, epoch, fig):
         # # Save Losses for plotting later
         # D_losses.append(g_error.item())
 
-        # Display Progress
-        # Display Images
-
         if i % params.save_summary_steps == 0:
             proportions_batch = real_label.shape[0] / params.batch_size
             prop.append(proportions_batch)
             summ.append(stats)
 
-        if ((i + 1) % round(0.1*num_of_batches) == 0) and (epoch==0):
-            # if (i + 1) % round(0.1*params.save_summary_steps) == 0:
+        if ((i + 1) % round(0.1*num_of_batches) == 0) and (epoch == 0):
+            # Display data Images
             real_samples_reshaped = gan_net.vectors_to_samples(real_data)  # ?
             real_titles = gan_net.labels_to_titles(real_label)
 
-            display_results.fill_figure(real_samples_reshaped, fig, i + 1, args.model_dir, labels=real_titles,
+            display_results.fill_figure(real_samples_reshaped, fig, i + 1, args.model_dir, -1, 1, labels=real_titles,
                                         dtype='real')
 
     stats_mean = {metric: np.sum([x[metric] for x in summ] / np.sum(prop)) for metric in summ[0]}
@@ -138,22 +132,17 @@ def train(g_model, g_optimizer, mse_loss_fn, dataloader, params, epoch, fig):
 
     stats_string = " ; ".join("{}: {:05.3f}".format(k, v) for k, v in stats_mean.items())
     logging.info("train metrics: " + stats_string)
-    if ((epoch + 1) % (0.01 * params.num_epochs) == 0) or ((epoch + 1) < min(10, (0.001 * params.num_epochs))):
-    # if (epoch + 1) % (0.01 * params.num_epochs) == 0:
+    if ((epoch + 1) % (0.01 * params.num_epochs) == 0) or ((epoch + 1) <= min(10, (0.001 * params.num_epochs))):
+        # Display Progress
         print("Epoch {}/{}".format(epoch + 1, params.num_epochs))
         print(stats_string)
 
+        # Display test Images
         test_samples = g_model(test_noise, test_one_hot_v).data.cpu()
         test_samples_reshaped = gan_net.vectors_to_samples(test_samples)  # ?
         test_titles = gan_net.labels_to_titles(test_labels)
 
-        display_results.fill_figure(test_samples_reshaped, fig, epoch + 1, args.model_dir, labels=test_titles)
-
-        # real_samples_reshaped = gan_net.vectors_to_samples(real_data)  # ?
-        # real_titles = gan_net.labels_to_titles(real_label)
-        #
-        # display_results.fill_figure(real_samples_reshaped, fig, epoch + 1, args.model_dir, labels=real_titles,
-        #                             dtype='real')
+        display_results.fill_figure(test_samples_reshaped, fig, epoch + 1, args.model_dir, -1, 1, labels=test_titles)
 
     return test_samples, real_data, stats_mean['g_error']
 
@@ -161,6 +150,10 @@ def train(g_model, g_optimizer, mse_loss_fn, dataloader, params, epoch, fig):
 def train_g(g_model, train_dataloader, g_optimizer, mse_loss_fn, params, model_dir):
 
     best_loss = np.inf
+    dest_min = 0
+    dest_max = 255
+    curr_min = -1
+    curr_max = 1
 
     fig = display_results.create_figure()
 
@@ -192,8 +185,11 @@ def train_g(g_model, train_dataloader, g_optimizer, mse_loss_fn, params, model_d
             display_results.plot_graph(best_g_grads_graph, [], "Grads_Best", args.model_dir, epoch=epoch+1)
 
             if test_samples is not None:
+
                 np_test_samples = np.array(test_samples)
-                np_test_samples = np.around(np_test_samples * 127.5 + 127.5).astype(int)
+                np_test_samples = \
+                    dest_min + (dest_max - dest_min) * (np_test_samples - curr_min) / (curr_max - curr_min)
+                np_test_samples = np.around(np_test_samples).astype(int)
                 np_test_out = (test_noise.cpu().numpy())
                 np_test_labels = (test_labels.view(test_labels.shape[0], -1).cpu().numpy())
 
@@ -213,7 +209,9 @@ def train_g(g_model, train_dataloader, g_optimizer, mse_loss_fn, params, model_d
                                   ntype='g')
 
             np_test_samples = np.array(test_samples)
-            np_test_samples = np.around(np_test_samples * 127.5 + 127.5).astype(int)
+            np_test_samples = \
+                dest_min + (dest_max - dest_min) * (np_test_samples - curr_min) / (curr_max - curr_min)
+            np_test_samples = np.around(np_test_samples).astype(int)
             np_test_out = (test_noise.cpu().numpy())
             np_test_labels = (test_labels.view(test_labels.shape[0], -1).cpu().numpy())
 
