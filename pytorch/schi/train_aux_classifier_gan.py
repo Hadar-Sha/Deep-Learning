@@ -231,9 +231,9 @@ def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, r_f_
             print("mean loss is {:05.3f}".format(loss_mean_sum))
             loss_metric_dict = {'loss': loss_mean_sum}
 
-            utils.save_checkpoint({'epoch': epoch + 1,
-                                   'state_dict': g_model.state_dict(),
-                                   'optim_dict': g_optimizer.state_dict()}, is_best=is_best, checkpoint=model_dir)
+            # utils.save_checkpoint({'epoch': epoch + 1,
+            #                        'state_dict': g_model.state_dict(),
+            #                        'optim_dict': g_optimizer.state_dict()}, is_best=is_best, checkpoint=model_dir)
 
             # Save best val metrics in a json file in the model directory
             best_json_path = os.path.join(model_dir, "metrics_min_avg_loss_best_weights.json")
@@ -262,12 +262,12 @@ def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, r_f_
         if test_samples is not None:
             utils.save_checkpoint({'epoch': epoch + 1,
                                    'state_dict': d_model.state_dict(),
-                                   'optim_dict': d_optimizer.state_dict()}, is_best=False, checkpoint=model_dir,
+                                   'optim_dict': d_optimizer.state_dict()}, is_best=is_best, checkpoint=model_dir,
                                   ntype='d')
 
             utils.save_checkpoint({'epoch': epoch + 1,
                                    'state_dict': g_model.state_dict(),
-                                   'optim_dict': g_optimizer.state_dict()}, is_best=False, checkpoint=model_dir,
+                                   'optim_dict': g_optimizer.state_dict()}, is_best=is_best, checkpoint=model_dir,
                                   ntype='g')
 
             np_test_samples = np.array(test_samples)

@@ -5,6 +5,8 @@ from torch.nn import functional as F
 
 import numpy as np
 import shap
+import os
+import shutil
 
 batch_size = 128
 num_epochs = 2
@@ -72,38 +74,102 @@ def test(model, device, test_loader):
         100. * correct / len(test_loader.dataset)))
 
 
-train_loader = torch.utils.data.DataLoader(
-    datasets.MNIST('mnist_data', train=True, download=False,
-                   transform=transforms.Compose([
-                       transforms.ToTensor()
-                   ])),
-    batch_size=batch_size, shuffle=True)
+def save_checkpoint(state, is_best, checkpoint, ntype=None):
+    """Saves model and training parameters at checkpoint + 'last.pth.tar'. If is_best==True, also saves
+    checkpoint + 'best.pth.tar'
 
-test_loader = torch.utils.data.DataLoader(
-    datasets.MNIST('mnist_data', train=False, transform=transforms.Compose([
-        transforms.ToTensor()
-    ])),
-    batch_size=batch_size, shuffle=True)
+    Args:
+        state: (dict) contains model's state_dict, may contain other keys such as epoch, optimizer state_dict
+        is_best: (bool) True if it is the best model seen till now
+        checkpoint: (string) folder where parameters are to be saved
+        ntype:
+    """
+    if ntype:
 
-model = Net().to(device)
-optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.5)
+        filepath = os.path.join(checkpoint, ntype + '_' + 'last.pth.tar')
+    else:
+        filepath = os.path.join(checkpoint, 'last.pth.tar')
+    if not os.path.exists(checkpoint):
+        print("Checkpoint Directory does not exist! Making directory {}".format(checkpoint))
+        os.mkdir(checkpoint)
+    # else:
+    # print("Checkpoint Directory exists! ")
+    torch.save(state, filepath)
+    if is_best:
+        shutil.copyfile(filepath, os.path.join(checkpoint, 'best.pth.tar'))
 
-for epoch in range(1, num_epochs + 1):
-    train(model, device, train_loader, optimizer, epoch)
-    test(model, device, test_loader)
 
-# since shuffle=True, this is a random sample of test data
-batch = next(iter(test_loader))
-images, _ = batch
+def load_checkpoint(checkpoint, model, optimizer=None):
+    """Loads model parameters (state_dict) from file_path. If optimizer is provided, loads state_dict of
+    optimizer assuming it is present in checkpoint.
 
-background = images[:100]
-test_images = images[100:110]
+    Args:
+        checkpoint: (string) filename which needs to be loaded
+        model: (torch.nn.Module) model for which the parameters are loaded
+        optimizer: (torch.optim) optional: resume optimizer from checkpoint
+    """
+    if not os.path.exists(checkpoint):
+        raise ("File doesn't exist {}".format(checkpoint))
+    checkpoint = torch.load(checkpoint)
+    model.load_state_dict(checkpoint['state_dict'])
 
-e = shap.DeepExplainer(model, background)
-shap_values = e.shap_values(test_images)
+    if optimizer:
+        optimizer.load_state_dict(checkpoint['optim_dict'])
 
-shap_numpy = [np.swapaxes(np.swapaxes(s, 1, -1), 1, 2) for s in shap_values]
-test_numpy = np.swapaxes(np.swapaxes(test_images.numpy(), 1, -1), 1, 2)
+    return checkpoint
 
-# plot the feature attributions
-shap.image_plot(shap_numpy, -test_numpy)
+
+def load_model(model_dir, restore_file):
+    # reload weights from restore_file if specified
+    if restore_file is not None and model_dir is not None:
+        restore_path = os.path.join(model_dir, restore_file + '.pth.tar')
+        print("Restoring parameters from {}".format(restore_path))
+        load_checkpoint(restore_path, model, None)  # optimizer)
+    return
+
+
+if __name__ == '__main__':
+
+    train_loader = torch.utils.data.DataLoader(
+        datasets.MNIST('mnist_data', train=True, download=False,
+                       transform=transforms.Compose([
+                           transforms.ToTensor()
+                       ])),
+        batch_size=batch_size, shuffle=True)
+
+    test_loader = torch.utils.data.DataLoader(
+        datasets.MNIST('mnist_data', train=False, transform=transforms.Compose([
+            transforms.ToTensor()
+        ])),
+        batch_size=batch_size, shuffle=True)
+
+    model = Net().to(device)
+    optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.5)
+
+    # for epoch in range(1, num_epochs + 1):
+    #     train(model, device, train_loader, optimizer, epoch)
+    #     test(model, device, test_loader)
+    #
+    # save_checkpoint({'epoch': num_epochs,
+    #                       'state_dict': model.state_dict(),
+    #                       'optim_dict': model.state_dict()}, is_best=False, checkpoint='./')
+
+    load_model('./', 'last')
+    # since shuffle=True, this is a random sample of test data
+    batch = next(iter(test_loader))
+    images, _ = batch
+
+    size_of_batch = images.shape[0]
+    bg_len = round(0.9 * size_of_batch)
+    background = images[:bg_len]
+    test_images = images[bg_len: min(bg_len+10, size_of_batch)]
+
+    e = shap.DeepExplainer(model, background)
+    shap_values = e.shap_values(test_images)
+
+    shap_numpy = [np.swapaxes(np.swapaxes(s, 1, -1), 1, 2) for s in shap_values]
+    temp = np.array(shap_numpy)
+    test_numpy = np.swapaxes(np.swapaxes(test_images.numpy(), 1, -1), 1, 2)
+
+    # plot the feature attributions
+    shap.image_plot(shap_numpy, -test_numpy)

@@ -8,6 +8,7 @@ import argparse
 import os
 from matplotlib import animation
 from torchvision.transforms import functional as F
+import torch
 
 width = 1
 height = 0.2
@@ -72,7 +73,6 @@ def create_segment(segment_center, vertical_or_horizontal, color):
 
 
 def convert_to_after_filer_grayscale(np_colors, scale_green=0.02):
-    # scale_green = 0.02
     max_gray = 1 + scale_green
     np_grays = (np_colors[:, 0]+np_colors[:, 1] * scale_green)/max_gray
     np_grays = np.reshape(np_grays, (np_grays.shape[0], 1))
@@ -80,7 +80,7 @@ def convert_to_after_filer_grayscale(np_colors, scale_green=0.02):
     return grayscale_np_colors
 
 
-def display_digit(colors, myaxis, curr_min_val, curr_max_val, withgrayscale=False):
+def display_digit(colors, myaxis, curr_min_val=0, curr_max_val=1, withgrayscale=False):
 
     vertical_horizon = [0, 0, 0, 1, 1, 1, 1]
 
@@ -155,13 +155,6 @@ def display_digit(colors, myaxis, curr_min_val, curr_max_val, withgrayscale=Fals
 
 def create_digit_image(colors, curr_min_val=0, curr_max_val=1):
 
-    # fig_temp, myaxis = plt.subplots(figsize=(2, 3), dpi=100)  # figsize=(17, 27), dpi=10
-    fig_temp, myaxis = plt.subplots(figsize=(20, 30), dpi=10)  # figsize=(17, 27), dpi=10
-    fig_temp.subplots_adjust(0, 0, 1, 1)
-    # plt.subplots_adjust(wspace=0, hspace=0)
-    # myaxis.patch.set_facecolor('w')
-    # myaxis.patch.set_alpha(1)
-
     numpy_colors = np.array(colors)
 
     # convert to [0,1] to draw
@@ -170,52 +163,58 @@ def create_digit_image(colors, curr_min_val=0, curr_max_val=1):
             print('wrong min and max input values')
             return
         else:
-            numpy_colors = (numpy_colors - curr_min_val) / (curr_max_val - curr_min_val)
-
-    # if numpy_colors.min() < 0 or numpy_colors.max() > 1:
-    #     numpy_colors = (numpy_colors - numpy_colors.min()) / (numpy_colors.max() - numpy_colors.min())
+            numpy_colors = round(((numpy_colors - curr_min_val) / (curr_max_val - curr_min_val)), 3)
 
     colors = numpy_colors.tolist()
+    if len(numpy_colors.shape) < 2 or len(numpy_colors.shape) > 3:
+        print('wrong input dimention. should be [_,8,3]')
+    elif len(numpy_colors.shape) == 2:
+        colors = [colors]
+    # elif len(numpy_colors.shape)==3:
+    #   do noting
+    data_tensor = torch.empty(numpy_colors.shape[0], 3, 300, 200, dtype=torch.float)
 
-    patches = []
-    myaxis.set_xlim([0, 2 * width])
-    myaxis.set_ylim([0, 3 * width])
-    myaxis.set_aspect('equal', 'box')
-    myaxis.axis('off')
+    for j in range(numpy_colors.shape[0]):
 
-    segments_centers = []
-    center = [width, 1.5*width]
-    bg_patch = create_background(colors[7])
-    patches.append(bg_patch)
-    myaxis.add_patch(bg_patch)
+        fig_temp, myaxis = plt.subplots(figsize=(200, 300), dpi=1)
+        fig_temp.subplots_adjust(0, 0, 1, 1)
+        myaxis.axis('off')
+        myaxis.set_xlim([0, 2 * width])
+        myaxis.set_ylim([0, 3 * width])
+        myaxis.set_aspect('equal', 'box')
 
-    segments_centers.append([center[0], center[1] + width + height])
-    segments_centers.append([center[0], center[1]])
-    segments_centers.append([center[0], center[1] - width - height])
-    segments_centers.append([center[0] - width / 2 - height / 2, center[1] + width / 2 + height / 2])
-    segments_centers.append([center[0] + width / 2 + height / 2, center[1] + width / 2 + height / 2])
-    segments_centers.append([center[0] - width / 2 - height / 2, center[1] - width / 2 - height / 2])
-    segments_centers.append([center[0] + width / 2 + height / 2, center[1] - width / 2 - height / 2])
+        patches = []
 
-    vertical_horizon = [0, 0, 0, 1, 1, 1, 1]
-    for i in range(len(segments_centers)):
-        polygon = create_segment(segments_centers[i], vertical_horizon[i], colors[i])
-        patches.append(polygon)
-        myaxis.add_patch(polygon)
+        segments_centers = []
+        center = [width, 1.5*width]
+        bg_patch = create_background(colors[j][7])
+        patches.append(bg_patch)
+        myaxis.add_patch(bg_patch)
 
-    fig_temp.canvas.draw()
+        segments_centers.append([center[0], center[1] + width + height])
+        segments_centers.append([center[0], center[1]])
+        segments_centers.append([center[0], center[1] - width - height])
+        segments_centers.append([center[0] - width / 2 - height / 2, center[1] + width / 2 + height / 2])
+        segments_centers.append([center[0] + width / 2 + height / 2, center[1] + width / 2 + height / 2])
+        segments_centers.append([center[0] - width / 2 - height / 2, center[1] - width / 2 - height / 2])
+        segments_centers.append([center[0] + width / 2 + height / 2, center[1] - width / 2 - height / 2])
 
-    plt.tight_layout()
-    plt.show(block=False)
-    plt.pause(5)
-    # plt.savefig('./temp.png', bbox_inches='tight')
+        vertical_horizon = [0, 0, 0, 1, 1, 1, 1]
+        for i in range(len(segments_centers)):
+            polygon = create_segment(segments_centers[i], vertical_horizon[i], colors[j][i])
+            patches.append(polygon)
+            myaxis.add_patch(polygon)
 
-    data = np.fromstring(fig_temp.canvas.tostring_rgb(), dtype=np.uint8, sep='')
-    data = data.reshape(fig_temp.canvas.get_width_height()[::-1] + (3,))
-    rel_data = data[6:291, 5:195, :]  # crop out background
+        fig_temp.canvas.draw()
+        # plt.show()
 
-    plt.close('all')
-    data_tensor = F.to_tensor(rel_data)
+        data = np.fromstring(fig_temp.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+        data = data.reshape(fig_temp.canvas.get_width_height()[::-1] + (3,))
+
+        # fig_temp.savefig('test_{}.png'.format(j), dpi=1)
+        data_tensor[j] = F.to_tensor(data)
+
+        plt.close(fig_temp)
 
     return data_tensor
 
@@ -239,11 +238,9 @@ def feed_digits_to_figure(_, samples, fig, epoch, image_path, curr_min_val, curr
 
     num_of_samples = len(samples)
     num_of_rows = max(1, math.floor(math.sqrt(num_of_samples)))
-    # num_of_rows = max(1, math.floor(0.2*num_of_samples))
+
     axes = np.zeros((num_of_rows, math.ceil(num_of_samples / num_of_rows))).tolist()
     plt.subplots_adjust(wspace=0.1, hspace=0.1)
-    # plt.subplots_adjust(wspace=0.01, hspace=0.01)
-    # plt.subplots_adjust(left=0.01, bottom=0.01, right=0.01, top=0.01, wspace=0.01, hspace=0.01)
 
     for i in range(num_of_samples):
         row, col = np.unravel_index(i, (num_of_rows, math.ceil(num_of_samples / num_of_rows)))
@@ -366,24 +363,47 @@ if __name__ == '__main__':
     #
     # colors = colors.tolist()
 
-    colors = []
-    colors.append([0.5, 0, 0])
-    colors.append([0, 0, 0.5])
-    colors.append([0.5, 0, 0])
-    colors.append([0.5, 0, 0])
-    colors.append([0.5, 0, 0])
-    colors.append([0, 0, 0])
-    colors.append([0.5, 0, 0])
-    # background
-    colors.append([0, 0, 0])
+    color_one = [
+        [0.5, 0.2, 0],
+        [0, 0, 0.5],
+        [0.5, 0.2, 0],
+        [0.5, 0.2, 0],
+        [0.5, 0.2, 0],
+        [0, 0, 0],
+        [0.5, 0.2, 0],
+        # background
+        [0, 0, 0]]
+
+    color_two = [
+        [0.5, 0.2, 0],
+        [0, 0, 0.5],
+        [0.5, 0.2, 0],
+        [0.5, 0.2, 0],
+        [0.5, 0.2, 0],
+        [1, 1, 1],
+        [0.5, 0.2, 0],
+        # background
+        [1, 1, 1]]
+
+    colors = [color_one, color_two]
+    # colors = []
+    # colors.append([0.5, 0.2, 0])
+    # colors.append([0, 0, 0.5])
+    # colors.append([0.5, 0.2, 0])
+    # colors.append([0.5, 0.2, 0])
+    # colors.append([0.5, 0.2, 0])
+    # colors.append([0, 0, 0])
+    # colors.append([0.5, 0.2, 0])
+    # # background
+    # colors.append([0, 0, 0])
 
     print(colors)
     # fig, ax = plt.subplots()
 
-    data_tensor = create_digit_image(colors)
+    data_t = create_digit_image(colors)
 
-    print(data_tensor.min())
-    print(data_tensor.max())
+    print(data_t.min())
+    print(data_t.max())
     # display_digit(colors, ax, True)
 #     #
 #     plt.show()
