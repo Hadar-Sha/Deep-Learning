@@ -41,17 +41,34 @@ class SchiDigitDataset(Dataset):
     def __getitem__(self, idx):
         image = self.images[idx, :]
         label = self.digit_labels[idx]
+
+        if self.transform:
+            image = self.transform(image)
+
         return image, label
 
 
 class Normalize(object):
+
+    def __init__(self, min_v, max_v):
+        self.min = min_v
+        self.max = max_v
+        self.curr_min = 0
+        self.curr_max = 255
+
     def __call__(self, sample):
-        # normalize to [0,1]
-        sample = sample / 255.
+        # normalize to [min,max]
+        sample = self.min + (self.max - self.min)*(sample - self.curr_min)/float(self.curr_max - self.curr_min)
+        # sample = (sample - 127.5)/127.5
         return sample
-        # image, label = sample['image'], sample['label']
-        # image_normalized = np.divide(image, 255.)
-        # return image_normalized, label
+    #
+    # def __call__(self, sample):
+    #     # normalize to [0,1]
+    #     sample = sample / 255.
+    #     return sample
+    #     # image, label = sample['image'], sample['label']
+    #     # image_normalized = np.divide(image, 255.)
+    #     # return image_normalized, label
 
 
 class ToTensor(object):
@@ -90,11 +107,11 @@ def fetch_dataloader(types, data_dir, params):
 
             # prevent shuffling in dev or test
             if split == 'train':
-                dl = DataLoader(dataset=SchiDigitDataset(csv_file=path, transform=transforms.Compose([ToTensor()])),
+                dl = DataLoader(dataset=SchiDigitDataset(csv_file=path, transform=transforms.Compose([Normalize(0, 1), ToTensor()])),
                                 batch_size=params.batch_size, shuffle=True)
 
             else:
-                dl = DataLoader(dataset=SchiDigitDataset(csv_file=path, transform=transforms.Compose([ToTensor()])),
+                dl = DataLoader(dataset=SchiDigitDataset(csv_file=path, transform=transforms.Compose([Normalize(0, 1), ToTensor()])),
                                 batch_size=params.batch_size, shuffle=False)
 
             dataloaders[split] = dl

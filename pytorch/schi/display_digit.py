@@ -303,6 +303,7 @@ def plot_graph(losses_one, losses_two, gtype, image_path, epoch=None):
         plt.ylabel("Grads")
 
     if (not losses_one) is False and (not losses_two) is False:
+    # if (not losses_one) is False or not losses_one.any() is False and (not losses_two) is False or not losses_two.any() is False:
     # if losses_one is not None and (not losses_one) is False and losses_two is not None and (not losses_two) is False:
         if gtype == "VAE Loss":
             bce_h, = plt.plot(losses_one, label="BCE")
@@ -319,24 +320,24 @@ def plot_graph(losses_one, losses_two, gtype, image_path, epoch=None):
     elif (not losses_one) is False:
     # elif losses_one is not None and (not losses_one) is False:
         if gtype == "VAE Loss":
-            bce_h, = plt.plot(losses_one, label="BCE")
+            bce_h = plt.plot(losses_one, label="BCE")
             plt.legend(handles=[bce_h])
         elif gtype == "Grads_Best" or gtype == "Grads":
             plt.plot(losses_one)
         else:
-            g_h, = plt.plot(losses_one, label="G")
-            plt.legend(handles=[g_h])
+            g_h = plt.plot(losses_one, label="G")
+            # plt.legend([g_h], ['G'], fontsize="small")
         # plt.plot(losses_one)
     elif (not losses_two) is False:
     # elif losses_two is not None and (not losses_two) is False:
         if gtype == "VAE Loss":
-            kl_h, = plt.plot(losses_two, label="KL")
+            kl_h = plt.plot(losses_two, label="KL")
             plt.legend(handles=[kl_h])
         elif gtype == "Grads_Best" or gtype == "Grads":
             plt.plot(losses_two)
         else:
-            d_h, = plt.plot(losses_two, label="D")
-            plt.legend(handles=[d_h])
+            d_h = plt.plot(losses_two, label="D")
+            # plt.legend(handles=[d_h])
         # plt.plot(losses_two)
     else:
         print('no data was provided')
@@ -399,11 +400,12 @@ if __name__ == '__main__':
 
     print(colors)
     # fig, ax = plt.subplots()
+    plot_graph(color_one, color_two, "Grads", './')
 
-    data_t = create_digit_image(colors)
+    # data_t = create_digit_image(colors)
 
-    print(data_t.min())
-    print(data_t.max())
+    # print(data_t.min())
+    # print(data_t.max())
     # display_digit(colors, ax, True)
 #     #
 #     plt.show()

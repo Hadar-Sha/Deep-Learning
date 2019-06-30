@@ -14,17 +14,17 @@ from pytorchtools import EarlyStopping
 # from tqdm import tqdm
 
 import utils
-import model_weighted_schi_distance.net as net
-import model_weighted_schi_distance.one_label_data_loader as data_loader
-# import model.net as net
-# import model.one_label_data_loader as data_loader
+# import model_weighted_schi_distance.net as net
+# import model_weighted_schi_distance.one_label_data_loader as data_loader
+import model.net as net
+import model.one_label_data_loader as data_loader
 from evaluate import evaluate
 import display_digit as display_results
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--parent_dir', default="C:/Users/H/Documents/Haifa Univ/Thesis/DL-Pytorch-data", help='path to experiments and data folder. not for Server')
 parser.add_argument('--data_dir', default='data/data', help="Directory containing the dataset")
-parser.add_argument('--model_dir', default='experiments/base_model_weighted_schi_dist', help="Directory containing params.json")
+parser.add_argument('--model_dir', default='experiments/base_model/debug', help="Directory containing params.json")
 parser.add_argument('--early_stop', type=bool, default=False, help="Optional, do early stop")  # action='store_true'
 parser.add_argument('--restore_file', default=None,
                     help="Optional, name of the file in --model_dir containing weights to reload before \
@@ -293,6 +293,7 @@ if __name__ == '__main__':
     loss_fn = net.loss_fn
 
     # comment to self - print to file the name of loss function !!!!!!
+    # print(loss_fn)
 
     metrics = net.metrics
     incorrect = net.incorrect
@@ -311,5 +312,6 @@ if __name__ == '__main__':
 
     grads_np = np.array(grads_per_epoch)
     for i in range(grads_np.shape[1]):
-        display_results.plot_graph(grads_np[:, i], None, "Grads_layer_{}".format(i+1), args.model_dir)
+        val = grads_np[:, i].tolist()
+        display_results.plot_graph(val, None, "Grads_layer_{}".format(i+1), args.model_dir)
 

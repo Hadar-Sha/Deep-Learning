@@ -170,6 +170,7 @@ if __name__ == '__main__':
     shap_numpy = [np.swapaxes(np.swapaxes(s, 1, -1), 1, 2) for s in shap_values]
     temp = np.array(shap_numpy)
     test_numpy = np.swapaxes(np.swapaxes(test_images.numpy(), 1, -1), 1, 2)
+    temp1 = np.array(test_numpy)
 
     # plot the feature attributions
     shap.image_plot(shap_numpy, -test_numpy)
