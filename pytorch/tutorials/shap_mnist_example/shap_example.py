@@ -157,12 +157,30 @@ if __name__ == '__main__':
     load_model('./', 'last')
     # since shuffle=True, this is a random sample of test data
     batch = next(iter(test_loader))
-    images, _ = batch
+    images, labels = batch
 
     size_of_batch = images.shape[0]
     bg_len = round(0.9 * size_of_batch)
-    background = images[:bg_len]
-    test_images = images[bg_len: min(bg_len+10, size_of_batch)]
+    test_len = min(round(0.1 * size_of_batch), 10)
+    test_idx = []
+    # test_idx = [[] for _ in range(test_len)]
+    chosen = [False for _ in range(test_len)]
+
+    i = 0
+    while i < test_len:
+        for j in range(size_of_batch):
+            if i >= test_len:
+                break
+
+            if labels[j].item() <= test_len and chosen[labels[j].item()] is False:
+                test_idx.append(j)
+                # test_idx[labels[j].item()].append(j)
+                chosen[labels[j].item()] = True
+                i += 1
+
+    background_idx = list(set([v for v in range(size_of_batch)]) - set(test_idx))
+    background = images[background_idx]
+    test_images = images[test_idx]
 
     e = shap.DeepExplainer(model, background)
     shap_values = e.shap_values(test_images)
@@ -173,4 +191,5 @@ if __name__ == '__main__':
     temp1 = np.array(test_numpy)
 
     # plot the feature attributions
-    shap.image_plot(shap_numpy, -test_numpy)
+    shap.image_plot(shap_numpy, test_numpy)
+    # shap.image_plot(shap_numpy, -test_numpy)

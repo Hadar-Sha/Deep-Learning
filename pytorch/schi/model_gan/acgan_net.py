@@ -34,7 +34,7 @@ class DiscriminatorNet(nn.Module):
         self.out_layer_class = nn.Sequential(
             nn.Linear(params.hidden_size, params.num_classes),
             # nn.ReLU(),
-            nn.Softmax(dim=1)
+            # nn.Softmax(dim=1)    # remove !!!!!!!!!!!!!
         )
 
     def forward(self, x):
@@ -72,6 +72,8 @@ def linear_transformation(x):
 class GeneratorNet(nn.Module):
     def __init__(self, params):
         super(GeneratorNet, self).__init__()
+
+        # print('in init of Generator of ACGAN')
 
         self.hidden_with_label = nn.Sequential(
             nn.Linear(params.noise_dim + params.num_classes, params.hidden_size),
@@ -211,6 +213,7 @@ def weights_init(m):
     if classname.find('Linear') != -1:
         nn.init.normal_(m.weight.data, 0.0, 0.02)
         nn.init.constant_(m.bias.data, 0)
+        # nn.init.uniform_(m.bias.data, -1, 1)
 
     if torch.cuda.is_available():
         for pa in m.parameters():

@@ -35,10 +35,14 @@ class SchiDigitDataset(Dataset):
         # self.mat = self.mat[0:50000:250, :]
 
         if num_samples == 0:
-            self.mat = self.mat[round(0.8*self.mat.shape[0]):round(0.9*self.mat.shape[0]), :]  # temp get only samples with label = 8
+            self.mat = self.mat
+            # self.mat = self.mat[round(0.8*self.mat.shape[0]):round(0.9*self.mat.shape[0]), :]  # temp get only samples with label = 8
             # self.mat = self.mat[round(0.9*self.mat.shape[0]):, :]  # temp get only samples with label = 9
 
-        elif num_samples > 0:
+        elif num_samples == 1:
+            self.mat = self.mat[0, :]
+
+        elif num_samples > 1:
             interval = 1/self.num_classes
             # interval = 1/num_samples
             rand_ind = np.zeros(num_samples, dtype=int)
@@ -54,24 +58,34 @@ class SchiDigitDataset(Dataset):
 
             self.mat = self.mat[rand_ind, :]
 
-        temp_images = self.mat[:, :24]
-        self.images = temp_images.astype(float)
+        if num_samples == 1:
+            temp_images = self.mat[:24]
+            digit_labels = self.mat[24]
+            self.digit_labels = digit_labels
+        else:
+            temp_images = self.mat[:, :24]
+            digit_labels = self.mat[:, 24]
+            self.digit_labels = digit_labels.reshape(len(digit_labels), 1)
 
-        digit_labels = self.mat[:, 24]
-        self.digit_labels = digit_labels.reshape(len(digit_labels), 1)
-        # self.digit_labels = digit_labels
+        self.images = temp_images.astype(float)
 
         self.transform = transform
 
     def __len__(self):
         # return 1
-        return len(self.digit_labels)
+        if isinstance(self.digit_labels, (np.ndarray,)):
+            return len(self.digit_labels)
+        else:
+            return 1
 
     def __getitem__(self, idx):
-        # image = self.images
-        # label = self.digit_labels
-        image = self.images[idx, :]
-        label = self.digit_labels[idx]
+
+        if isinstance(self.digit_labels, (np.ndarray,)):
+            image = self.images[idx, :]
+            label = self.digit_labels[idx]
+        else:
+            image = self.images
+            label = self.digit_labels
 
         if self.transform:
             image = self.transform(image)
@@ -122,13 +136,15 @@ def fetch_dataloader(types, data_dir, params):
             path = os.path.join(newpath, file)
 
             # added to sample limited samples only
+            # num_samples = 10
+            # num_samples = 1
             num_samples = params.num_samples
 
             # Normalize() was added, wasn't in discriminator net
             # prevent shuffling in dev or test
             if split == 'train':
                 dl = DataLoader(dataset=SchiDigitDataset(csv_file=path, num_samples=num_samples, transform=transforms.Compose(
-                    [Normalize(), ToTensor()])), batch_size=params.batch_size, shuffle=True)
+                    [Normalize(), ToTensor()])), batch_size=params.batch_size, shuffle=False)
 
             else:
                 dl = DataLoader(dataset=SchiDigitDataset(csv_file=path, num_samples=num_samples, transform=transforms.Compose(

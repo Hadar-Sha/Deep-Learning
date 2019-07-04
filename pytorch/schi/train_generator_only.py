@@ -13,8 +13,8 @@ import display_digit as display_results
 import utils
 import model_gan.generator_only_net as gan_net
 # import model_gan.two_labels_data_loader as data_loader
-import model_gan.one_label_data_loader as data_loader
-# import model_gan.single_sample_data_loader as data_loader
+# import model_gan.one_label_data_loader as data_loader
+import model_gan.single_sample_data_loader as data_loader
 
 
 parser = argparse.ArgumentParser()
@@ -72,7 +72,7 @@ def train(g_model, g_optimizer, mse_loss_fn, dataloader, params, epoch, fig):
     test_samples = None
     prop = []
     summ = []
-    num_of_batches = len(dataloader.dataset)//dataloader.batch_size
+    num_of_batches = max(1, len(dataloader.dataset)//dataloader.batch_size)
 
     for i, (real_batch, real_label) in enumerate(dataloader):
 
@@ -118,7 +118,8 @@ def train(g_model, g_optimizer, mse_loss_fn, dataloader, params, epoch, fig):
             prop.append(proportions_batch)
             summ.append(stats)
 
-        if ((i + 1) % round(0.1*num_of_batches) == 0) and (epoch == 0):
+        # if ((i + 1) % round(0.1*num_of_batches) == 0) and (epoch == 0):
+        if (epoch == 0) and (round(0.1*num_of_batches) > 0) and ((i + 1) % round(0.1*num_of_batches) == 0):
             # Display data Images
             real_samples_reshaped = gan_net.vectors_to_samples(real_data)  # ?
             real_titles = gan_net.labels_to_titles(real_label)
@@ -346,9 +347,9 @@ if __name__ == '__main__':
 
     # test_labels = list(range(num_test_samples))
     # test_labels = [it % params.num_classes for it in test_labels]
-    # test_labels = [0 for _ in range(num_test_samples)]
+    test_labels = [0 for _ in range(num_test_samples)]
     # test_labels = [9 for _ in range(num_test_samples)]  # temp
-    test_labels = [8 for _ in range(num_test_samples)]  # temp
+    # test_labels = [8 for _ in range(num_test_samples)]  # temp
     test_labels = torch.Tensor(test_labels)
     test_labels = test_labels.type(torch.LongTensor)
     test_labels = test_labels.to(device)

@@ -230,6 +230,7 @@ def close_figure(figure):
 
 
 def feed_digits_to_figure(_, samples, fig, epoch, image_path, curr_min_val, curr_max_val, labels, dtype, withgrayscale):
+    # plt.clf()
     fig.clear()
     if dtype is not None:
         fig.suptitle('batch #{}'.format(epoch))
@@ -350,6 +351,7 @@ def plot_graph(losses_one, losses_two, gtype, image_path, epoch=None):
     impath = os.path.join(path, '{}_graph.png'.format(gtype))
     plt.savefig(impath)
     plt.pause(1)
+    plt.clf()
     plt.close(fig1)
 
     return
