@@ -83,7 +83,7 @@ class GeneratorNet(nn.Module):
     def __init__(self, params):
         super(GeneratorNet, self).__init__()
         self.in_layer = nn.Sequential(
-            nn.Linear(100, params.hidden_size // 2),
+            nn.Linear(params.noise_dim, params.hidden_size // 2),
             # nn.Linear(params.num_classes, params.hidden_size // 2),
             nn.ReLU(),
             # nn.LeakyReLU(params.leaky_relu_slope),
@@ -116,7 +116,7 @@ class GeneratorNet(nn.Module):
             # nn.ReLU(),
             # nn.Linear(params.hidden_size // 2, params.num_classes),
             # nn.LogSoftmax(dim=1)
-            # nn.Sigmoid()
+            nn.Sigmoid()
             # nn.Softmax(dim=1)
         )
         # self.linear_normalization = linear_transformation()
@@ -137,20 +137,55 @@ class GeneratorNet(nn.Module):
         out = self.hidden2(out)
         out = self.hidden3(out)
         out = self.out_layer(out)
-        out = linear_transformation(out)
+        # out = linear_transformation(out)
 
         return out
 
 
 # Noise
-def noise(size):
-    # n = Variable(torch.rand(size, num_of_classes))
-    # print(n)
-    n = Variable(torch.randint(256, (size, 100)))
+def noise(size, dim, noise_type='normal'):
+    if noise_type == 'normal':
+        n = Variable(torch.randn(size, dim))  # recommended to sample from normal distribution and not from uniform dist
+    elif noise_type == 'uniform':
+        n = Variable(-1 + 2 * torch.rand(size, dim))  # make sense for binary samples
+    elif noise_type == 'binary':
+        n = Variable(-1 + 2 * torch.randint(2, (size, dim), dtype=torch.float))  # make sense for binary samples
+    # # n = Variable(torch.rand(size, num_of_classes))
+    # # print(n)
+    # # n = Variable(torch.randint(256, (size, 100)))
     # n = Variable(torch.randn(size, 10))
     if torch.cuda.is_available():
         return n.cuda()
     return n
+
+
+def convert_int_to_one_hot_vector(label, num_of_classes):
+
+    if len(list(label.size())) < 3:
+        label_shaped = label.view(-1, 1)
+
+        one_hot_vector = torch.zeros([list(label.size())[0], num_of_classes], device=label.device)
+
+        one_hot_vector.scatter_(1, label_shaped, 1)
+        one_hot_vector = one_hot_vector.type(torch.FloatTensor)
+
+        if torch.cuda.is_available():
+            return one_hot_vector.cuda()
+        return one_hot_vector
+
+    else:
+        # this is for 3d tensor
+        labels_shaped = label.view(label.size(0), label.size(1), -1)
+
+        one_hot_matrix = torch.zeros([list(labels_shaped.size())[0], list(labels_shaped.size())[1], num_of_classes], device=label.device)
+        one_hot_matrix.scatter_(2, labels_shaped, 1)
+        # added to keep a 2d dimension of labels
+        one_hot_matrix = one_hot_matrix.view(-1, list(labels_shaped.size())[1]*num_of_classes)
+        one_hot_matrix = one_hot_matrix.type(torch.FloatTensor)
+
+        if torch.cuda.is_available():
+            return one_hot_matrix.cuda()
+        return one_hot_matrix
 
 
 def real_data_target(size):
@@ -179,6 +214,25 @@ def vectors_to_samples(vectors):
     vectors = vectors.tolist()
     # vectors = (vectors/255).tolist()
     return vectors
+
+
+def labels_to_titles(labels):
+    if len(labels.shape) > 1 and min(labels.shape) == 1:
+        labels = labels.view(labels.size()[0],)
+    labels = (labels.cpu().numpy()).tolist()
+    return labels
+
+
+def weights_init(m):
+    classname = m.__class__.__name__
+    if classname.find('Linear') != -1:
+        nn.init.normal_(m.weight.data, 0.0, 0.02)
+        nn.init.constant_(m.bias.data, 0)
+        # nn.init.uniform_(m.bias.data, -1, 1)
+
+    if torch.cuda.is_available():
+        for pa in m.parameters():
+            pa.cuda()
 
 
 def loss_fn(outputs, labels):  # , num_of_classes):

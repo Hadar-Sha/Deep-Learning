@@ -26,8 +26,6 @@ parser.add_argument('--restore_file', default=None,
                     help="Optional, name of the file in --model_dir containing weights to reload before \
                     training")  # 'best' or 'train'
 
-# data-two-labels-big # grayscale-logits # data/data-w-gray-only-2 data/data-with-grayscale-4000
-
 
 def train_discriminator(d, optimizer, real_data, fake_data, real_labels, fake_labels, r_f_loss_fn, c_loss_fn):
     # Reset gradients
@@ -141,39 +139,6 @@ def train(d_model, d_optimizer, g_model, g_optimizer, r_f_loss_fn, c_loss_fn, da
         # Train D
         d_error, d_pred_real, d_pred_fake, class_accuracy = \
             train_discriminator(d_model, d_optimizer, real_data, fake_data, real_label, noisy_label, r_f_loss_fn, c_loss_fn)
-        # # def train_discriminator(d, optimizer, real_data, fake_data, real_labels, fake_labels, r_f_loss_fn, c_loss_fn):
-        # d_optimizer.zero_grad()
-        #
-        # # 1.1 Train on Real Data
-        # prediction_r_f_real, prediction_class = d_model(real_data)
-        # # Calculate error and backpropagate
-        # is_real_fake_error = r_f_loss_fn(prediction_r_f_real, gan_net.real_data_target(real_data.size(0)))
-        # class_error = c_loss_fn(prediction_class, real_label)
-        #
-        # total_real_error = is_real_fake_error + class_error
-        # total_real_error.backward()
-        #
-        # # compute the current classification accuracy
-        # class_accuracy = gan_net.compute_acc(prediction_class, real_label)
-        #
-        # # 1.2 Train on Fake Data
-        # prediction_r_f_fake, prediction_class = d_model(fake_data)
-        # # Calculate error and backpropagate
-        # is_real_fake_error = r_f_loss_fn(prediction_r_f_fake, gan_net.fake_data_target(real_data.size(0)))
-        # class_error = c_loss_fn(prediction_class, noisy_label)
-        #
-        # total_fake_error = is_real_fake_error + class_error
-        # total_fake_error.backward()
-        #
-        # # 1.3 Update weights with gradients
-        # d_optimizer.step()
-        #
-        # d_error = total_real_error + total_fake_error
-        # d_pred_real = prediction_r_f_real
-        # d_pred_fake = prediction_r_f_fake
-
-        # # Return error0
-        # return total_real_error + total_fake_error, prediction_r_f_real, prediction_r_f_fake, class_accuracy
 
         # 2. Train Generator
 
@@ -181,23 +146,6 @@ def train(d_model, d_optimizer, g_model, g_optimizer, r_f_loss_fn, c_loss_fn, da
 
         # Train G
         g_error, d_pred_fake_g = train_generator(d_model, g_optimizer, fake_data, noisy_label, r_f_loss_fn, c_loss_fn)
-
-        # # 2. Train Generator
-        # # Reset gradients
-        # g_optimizer.zero_grad()
-        # # Sample noise and generate fake data
-        # d_pred_fake_g, prediction_class = d_model(fake_data)
-        # # Calculate error and backpropagate
-        # is_real_fake_error = r_f_loss_fn(d_pred_fake_g, gan_net.fake_data_target(d_pred_fake_g.size(0)))
-        # # is_real_fake_error = r_f_loss_fn(d_pred_fake_g, gan_net.real_data_target(d_pred_fake_g.size(0)))
-        # class_error = c_loss_fn(prediction_class, noisy_label)
-        #
-        # g_error = is_real_fake_error + class_error
-        # g_error.backward()
-        # # Update weights with gradients
-        # g_optimizer.step()
-        # # # Return error
-        # # return total_generator_error, d_pred_fake_g
 
         # # Log error
         stats = {}
@@ -257,13 +205,10 @@ def train(d_model, d_optimizer, g_model, g_optimizer, r_f_loss_fn, c_loss_fn, da
         display_results.fill_figure(test_samples_reshaped, fig, epoch + 1, args.model_dir, -1, 1, labels=test_titles)
 
     return test_samples, stats_mean['d_error'] + stats_mean['g_error']
-    # stats['d_pred_real'], stats['d_pred_fake']  # check !!! maybe more values needed
 
 
 def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, r_f_loss_fn, c_loss_fn, params, model_dir):
 
-    # best_pred_real = np.inf
-    # best_pred_fake = np.inf
     best_loss = np.inf
     dest_min = 0
     dest_max = 255
@@ -294,16 +239,10 @@ def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, r_f_
             print("mean loss is {:05.3f}".format(loss_mean_sum))
             loss_metric_dict = {'loss': loss_mean_sum}
 
-            # utils.save_checkpoint({'epoch': epoch + 1,
-            #                        'state_dict': g_model.state_dict(),
-            #                        'optim_dict': g_optimizer.state_dict()}, is_best=is_best, checkpoint=model_dir)
-
             # Save best val metrics in a json file in the model directory
             best_json_path = os.path.join(model_dir, "metrics_min_avg_loss_best_weights.json")
             utils.save_dict_to_json(loss_metric_dict, best_json_path)
 
-            # best_d_grads_graph = collect_network_statistics(discriminator)
-            # best_g_grads_graph = collect_network_statistics(g_model)
             display_results.plot_graph(g_grads_graph, d_grads_graph, "Grads_Best", args.model_dir, epoch=epoch+1)
 
             if test_samples is not None:
@@ -457,7 +396,6 @@ if __name__ == '__main__':
     test_labels = test_labels.type(torch.LongTensor)
     test_labels = test_labels.to(device)
 
-    # if params.is_one_hot:
     test_labels = test_labels.view(num_test_samples, -1)
     test_one_hot_v = gan_net.convert_int_to_one_hot_vector(test_labels, params.num_classes).to(device)
 
@@ -475,9 +413,6 @@ if __name__ == '__main__':
     display_results.plot_graph(G_losses, D_losses, "Loss", args.model_dir)
     display_results.plot_graph(G_preds, D_preds, "Predictions", args.model_dir)
 
-    # d_grads_graph = collect_network_statistics(discriminator)
-    # g_grads_graph = collect_network_statistics(generator)
-
     grads_np_g = np.array(grads_per_epoch_g)
     for i in range(grads_np_g.shape[1]):
         val_g = grads_np_g[:, i].tolist()
@@ -488,4 +423,3 @@ if __name__ == '__main__':
         val_d = grads_np_d[:, i].tolist()
         display_results.plot_graph(None, val_d, "D_Grads_layer_{}".format(i + 1), args.model_dir)
 
-    # display_results.plot_graph(g_grads_graph, d_grads_graph, "Grads", args.model_dir)

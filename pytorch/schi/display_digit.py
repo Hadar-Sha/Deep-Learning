@@ -206,12 +206,10 @@ def create_digit_image(colors, curr_min_val=0, curr_max_val=1):
             myaxis.add_patch(polygon)
 
         fig_temp.canvas.draw()
-        # plt.show()
 
         data = np.fromstring(fig_temp.canvas.tostring_rgb(), dtype=np.uint8, sep='')
         data = data.reshape(fig_temp.canvas.get_width_height()[::-1] + (3,))
 
-        # fig_temp.savefig('test_{}.png'.format(j), dpi=1)
         data_tensor[j] = F.to_tensor(data)
 
         plt.close(fig_temp)
@@ -230,7 +228,6 @@ def close_figure(figure):
 
 
 def feed_digits_to_figure(_, samples, fig, epoch, image_path, curr_min_val, curr_max_val, labels, dtype, withgrayscale):
-    # plt.clf()
     fig.clear()
     if dtype is not None:
         fig.suptitle('batch #{}'.format(epoch))
@@ -261,7 +258,9 @@ def feed_digits_to_figure(_, samples, fig, epoch, image_path, curr_min_val, curr
         impath = os.path.join(path, '{}_samples_batch_#{}.png'.format(dtype, epoch))
     else:
         impath = os.path.join(path, 'test_samples_epoch_#{}.png'.format(epoch))
-    plt.savefig(impath, bbox_inches='tight')
+
+    fig.savefig(impath, bbox_inches='tight')
+    # plt.savefig(impath, bbox_inches='tight')
     return
 
 
@@ -275,8 +274,9 @@ def fill_figure(samples, fig, epoch, image_path, curr_min_val, curr_max_val, wit
 
 
 def plot_graph(losses_one, losses_two, gtype, image_path, epoch=None):
-    # plt.close('all')
+
     fig1 = plt.figure()
+    # fig1.clear()
 
     if gtype == "Loss":
         plt.title("Generator and Discriminator Loss During Training")
@@ -304,8 +304,6 @@ def plot_graph(losses_one, losses_two, gtype, image_path, epoch=None):
         plt.ylabel("Grads")
 
     if (not losses_one) is False and (not losses_two) is False:
-    # if (not losses_one) is False or not losses_one.any() is False and (not losses_two) is False or not losses_two.any() is False:
-    # if losses_one is not None and (not losses_one) is False and losses_two is not None and (not losses_two) is False:
         if gtype == "VAE Loss":
             bce_h, = plt.plot(losses_one, label="BCE")
             kl_h, = plt.plot(losses_two, label="KL")
@@ -319,7 +317,6 @@ def plot_graph(losses_one, losses_two, gtype, image_path, epoch=None):
             # plt.legend(handles=[g_h, d_h])
             plt.legend([g_h, d_h], ['G', 'D'], fontsize="small")
     elif (not losses_one) is False:
-    # elif losses_one is not None and (not losses_one) is False:
         if gtype == "VAE Loss":
             bce_h = plt.plot(losses_one, label="BCE")
             plt.legend(handles=[bce_h])
@@ -327,10 +324,7 @@ def plot_graph(losses_one, losses_two, gtype, image_path, epoch=None):
             plt.plot(losses_one)
         else:
             g_h = plt.plot(losses_one, label="G")
-            # plt.legend([g_h], ['G'], fontsize="small")
-        # plt.plot(losses_one)
     elif (not losses_two) is False:
-    # elif losses_two is not None and (not losses_two) is False:
         if gtype == "VAE Loss":
             kl_h = plt.plot(losses_two, label="KL")
             plt.legend(handles=[kl_h])
@@ -338,8 +332,6 @@ def plot_graph(losses_one, losses_two, gtype, image_path, epoch=None):
             plt.plot(losses_two)
         else:
             d_h = plt.plot(losses_two, label="D")
-            # plt.legend(handles=[d_h])
-        # plt.plot(losses_two)
     else:
         print('no data was provided')
         return
@@ -351,7 +343,8 @@ def plot_graph(losses_one, losses_two, gtype, image_path, epoch=None):
     impath = os.path.join(path, '{}_graph.png'.format(gtype))
     plt.savefig(impath)
     plt.pause(1)
-    plt.clf()
+    fig1.clf()
+    # plt.clf()
     plt.close(fig1)
 
     return
