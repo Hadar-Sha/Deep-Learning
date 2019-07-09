@@ -134,11 +134,13 @@ def train(d_model, d_optimizer, g_model, g_optimizer, r_f_loss_fn, c_loss_fn, da
         # noisy_label = noisy_label.view(real_data.size(0), -1)
         noisy_one_hot_v = gan_net.convert_int_to_one_hot_vector(noisy_label, params.num_classes).to(device)
 
-        fake_data = g_model(noisy_input, noisy_one_hot_v).detach()
+        fake_data = g_model(noisy_input, noisy_one_hot_v)
+        # fake_data = g_model(noisy_input, noisy_one_hot_v).detach()
 
         # Train D
         d_error, d_pred_real, d_pred_fake, class_accuracy = \
-            train_discriminator(d_model, d_optimizer, real_data, fake_data, real_label, noisy_label, r_f_loss_fn, c_loss_fn)
+            train_discriminator(d_model, d_optimizer, real_data, fake_data.detach(), real_label, noisy_label, r_f_loss_fn, c_loss_fn)
+            # train_discriminator(d_model, d_optimizer, real_data, fake_data, real_label, noisy_label, r_f_loss_fn, c_loss_fn)
 
         # 2. Train Generator
 

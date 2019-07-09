@@ -11,38 +11,36 @@ class DiscriminatorNet(nn.Module):
     def __init__(self, params):
         super(DiscriminatorNet, self).__init__()
         self.in_layer = nn.Sequential(
-            # nn.Linear(params.input_size, params.hidden_size//4),
-            # nn.Linear(params.input_size, params.hidden_size//2),
             nn.Linear(params.input_size, params.hidden_size),
-            nn.ReLU(),
+            nn.BatchNorm1d(params.hidden_size),
+            nn.ReLU()
             # nn.LeakyReLU(params.leaky_relu_slope),
-            nn.Dropout(params.dropout_rate)
+            # nn.Dropout(params.dropout_rate)
         )
         self.hidden1 = nn.Sequential(
             nn.Linear(params.hidden_size, params.hidden_size),
-            nn.ReLU(),
+            nn.BatchNorm1d(params.hidden_size),
+            nn.ReLU()
             # nn.LeakyReLU(params.leaky_relu_slope),
-            nn.Dropout(params.dropout_rate)
+            # nn.Dropout(params.dropout_rate)
         )
         self.hidden2 = nn.Sequential(
-            nn.Linear(params.hidden_size, params.hidden_size//2),
-            # nn.Linear(params.hidden_size//2, params.hidden_size//4),
-            nn.ReLU(),
+            nn.Linear(params.hidden_size, params.hidden_size),
+            nn.BatchNorm1d(params.hidden_size),
+            nn.ReLU()
             # nn.LeakyReLU(params.leaky_relu_slope),
-            nn.Dropout(params.dropout_rate)
+            # nn.Dropout(params.dropout_rate)
         )
         self.hidden3 = nn.Sequential(
-            nn.Linear(params.hidden_size // 2, params.hidden_size // 2),
-            # nn.Linear(params.hidden_size // 2, params.hidden_size // 4),
-            nn.ReLU(),
+            nn.Linear(params.hidden_size, params.hidden_size),
+            nn.BatchNorm1d(params.hidden_size),
+            nn.ReLU()
             # nn.LeakyReLU(params.leaky_relu_slope),
-            nn.Dropout(params.dropout_rate)
+            # nn.Dropout(params.dropout_rate)
         )
         self.out_layer = nn.Sequential(
-            # nn.Linear(params.hidden_size // 4, 1),
-            nn.Linear(params.hidden_size // 2, 1),
+            nn.Linear(params.hidden_size, 1),
             # nn.ReLU(),
-            # nn.Linear(params.hidden_size // 2, params.num_classes),
             # nn.LogSoftmax(dim=1)
             nn.Sigmoid()
         )
@@ -83,38 +81,36 @@ class GeneratorNet(nn.Module):
     def __init__(self, params):
         super(GeneratorNet, self).__init__()
         self.in_layer = nn.Sequential(
-            nn.Linear(params.noise_dim, params.hidden_size // 2),
-            # nn.Linear(params.num_classes, params.hidden_size // 2),
-            nn.ReLU(),
+            nn.Linear(params.noise_dim, params.hidden_size),
+            nn.BatchNorm1d(params.hidden_size),
+            nn.ReLU()
             # nn.LeakyReLU(params.leaky_relu_slope),
-            # nn.Linear(params.input_size, params.hidden_size),
-            nn.Dropout(params.dropout_rate)
+            # nn.Dropout(params.dropout_rate)
         )
         self.hidden1 = nn.Sequential(
-            nn.Linear(params.hidden_size // 2, params.hidden_size// 2),
-            nn.ReLU(),
+            nn.Linear(params.hidden_size, params.hidden_size),
+            nn.BatchNorm1d(params.hidden_size),
+            nn.ReLU()
             # nn.LeakyReLU(params.leaky_relu_slope),
-            # nn.Linear(params.hidden_size, params.hidden_size),
-            nn.Dropout(params.dropout_rate)
+            # nn.Dropout(params.dropout_rate)
         )
         self.hidden2 = nn.Sequential(
-            nn.Linear(params.hidden_size// 2, params.hidden_size),
-            nn.ReLU(),
+            nn.Linear(params.hidden_size, params.hidden_size),
+            nn.BatchNorm1d(params.hidden_size),
+            nn.ReLU()
             # nn.LeakyReLU(params.leaky_relu_slope),
-            # nn.Linear(params.hidden_size, params.hidden_size//2),
-            nn.Dropout(params.dropout_rate)
+            # nn.Dropout(params.dropout_rate)
         )
         self.hidden3 = nn.Sequential(
             nn.Linear(params.hidden_size, params.hidden_size),
-            nn.ReLU(),
+            nn.BatchNorm1d(params.hidden_size),
+            nn.ReLU()
             # nn.LeakyReLU(params.leaky_relu_slope),
-            # nn.Linear(params.hidden_size, params.hidden_size//2),
-            nn.Dropout(params.dropout_rate)
+            # nn.Dropout(params.dropout_rate)
         )
         self.out_layer = nn.Sequential(
             nn.Linear(params.hidden_size, params.input_size),
             # nn.ReLU(),
-            # nn.Linear(params.hidden_size // 2, params.num_classes),
             # nn.LogSoftmax(dim=1)
             nn.Sigmoid()
             # nn.Softmax(dim=1)
@@ -210,7 +206,7 @@ def fake_data_target(size):
 
 def vectors_to_samples(vectors):
     vectors = vectors.reshape(vectors.size()[0], -1, 3)
-    vectors = vectors.numpy()
+    vectors = vectors.cpu().numpy()
     vectors = vectors.tolist()
     # vectors = (vectors/255).tolist()
     return vectors

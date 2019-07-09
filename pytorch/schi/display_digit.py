@@ -315,7 +315,8 @@ def plot_graph(losses_one, losses_two, gtype, image_path, epoch=None):
             g_h = plt.plot(losses_one, label="G")
             d_h = plt.plot(losses_two, label="D")
             # plt.legend(handles=[g_h, d_h])
-            plt.legend([g_h, d_h], ['G', 'D'], fontsize="small")
+            plt.legend()
+            # plt.legend([g_h, d_h], ['G', 'D'], fontsize="small")
     elif (not losses_one) is False:
         if gtype == "VAE Loss":
             bce_h = plt.plot(losses_one, label="BCE")
@@ -382,16 +383,6 @@ if __name__ == '__main__':
         [1, 1, 1]]
 
     colors = [color_one, color_two]
-    # colors = []
-    # colors.append([0.5, 0.2, 0])
-    # colors.append([0, 0, 0.5])
-    # colors.append([0.5, 0.2, 0])
-    # colors.append([0.5, 0.2, 0])
-    # colors.append([0.5, 0.2, 0])
-    # colors.append([0, 0, 0])
-    # colors.append([0.5, 0.2, 0])
-    # # background
-    # colors.append([0, 0, 0])
 
     print(colors)
     # fig, ax = plt.subplots()
