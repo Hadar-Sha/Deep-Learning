@@ -149,7 +149,10 @@ def save_checkpoint(state, is_best, checkpoint, ntype=None):
         # print("Checkpoint Directory exists! ")
     torch.save(state, filepath)
     if is_best:
-        shutil.copyfile(filepath, os.path.join(checkpoint, 'best.pth.tar'))
+        if ntype:
+            shutil.copyfile(filepath, os.path.join(checkpoint, ntype + '_' + 'best.pth.tar'))
+        else:
+            shutil.copyfile(filepath, os.path.join(checkpoint, 'best.pth.tar'))
 
 
 def save_weights_biases(dataname, data, checkpoint):

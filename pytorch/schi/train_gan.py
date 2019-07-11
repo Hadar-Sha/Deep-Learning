@@ -108,7 +108,7 @@ def train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, dataloader, param
             real_label = real_label.view(real_label.size(0))
 
         # Generate fake data
-        noisy_input = gan_net.noise(real_data.size(0), params.noise_dim)
+        noisy_input = gan_net.noise(real_data.size(0), params.noise_dim, params.noise_type)
         #
         # noisy_label = Variable(torch.randint(params.num_classes, (real_data.size(0),)))
         # noisy_label = noisy_label.type(torch.LongTensor).to(device)
@@ -123,8 +123,13 @@ def train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, dataloader, param
         fake_data = g_model(noisy_input)
         # fake_data = g_model(noisy_input).detach()
         # Train D
-        d_error, d_pred_real, d_pred_fake = train_discriminator(d_model, d_optimizer, real_data, fake_data.detach())
-        # d_error, d_pred_real, d_pred_fake = train_discriminator(d_model, d_optimizer, real_data, fake_data)
+        if epoch <= (0.1 * params.num_epochs):
+            d_error, d_pred_real, d_pred_fake = train_discriminator(d_model, d_optimizer, real_data, fake_data.detach())
+            # d_error, d_pred_real, d_pred_fake = train_discriminator(d_model, d_optimizer, real_data, fake_data)
+        # else:
+        #     d_error = None
+        #     d_pred_real = None
+        #     d_pred_fake = None
 
         # 2. Train Generator
         # # Generate fake data
@@ -133,13 +138,16 @@ def train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, dataloader, param
         g_error = train_generator(d_model, g_optimizer, fake_data)
         # Log error
         stats = {}
-        stats['d_error'] = get_stats(d_error, 'error')
-        stats['g_error'] = get_stats(g_error, 'error')
-        stats['d_pred_real'] = get_stats(d_pred_real, 'pred')
-        stats['d_pred_fake'] = get_stats(d_pred_fake, 'pred')
+        if epoch <= (0.1 * params.num_epochs):
+            stats['d_error'] = get_stats(d_error, 'error')
+            stats['d_pred_real'] = get_stats(d_pred_real, 'pred')
+            stats['d_pred_fake'] = get_stats(d_pred_fake, 'pred')
 
-        G_preds.append(d_pred_fake.data.mean())
-        D_preds.append(d_pred_real.data.mean())
+        stats['g_error'] = get_stats(g_error, 'error')
+
+        if epoch <= (0.1 * params.num_epochs):
+            G_preds.append(d_pred_fake.data.mean())
+            D_preds.append(d_pred_real.data.mean())
 
         if i % params.save_summary_steps == 0:
             if num_of_batches > 1:
@@ -160,7 +168,8 @@ def train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, dataloader, param
 
     stats_mean = {metric: np.sum([x[metric] for x in summ] / np.sum(prop)) for metric in summ[0]}
     # Save Losses for plotting later
-    D_losses.append(d_error.item())
+    if epoch <= (0.1 * params.num_epochs):
+        D_losses.append(d_error.item())
     G_losses.append(g_error.item())
 
     stats_string = " ; ".join("{}: {:05.3f}".format(k, v) for k, v in stats_mean.items())
@@ -176,9 +185,14 @@ def train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, dataloader, param
         test_samples_reshaped = gan_net.vectors_to_samples(test_samples)  # ?
         # test_titles = gan_net.labels_to_titles(test_labels)
 
+        # print('{}'.format(epoch+1))
         display_results.fill_figure(test_samples_reshaped, fig, epoch + 1, args.model_dir, -1, 1, labels=None)
+        # print('after displaying digits')
 
-    return test_samples, stats_mean['d_error'] + stats_mean['g_error']
+    if epoch <= (0.1 * params.num_epochs):
+        return test_samples, stats_mean['d_error'] + stats_mean['g_error']
+    else:
+        return test_samples, stats_mean['g_error']
 
 
 def train_gan(d_model, g_model, train_dataloader, dev_dataloader, d_optimizer, g_optimizer, loss_fn, params, model_dir,
@@ -216,7 +230,8 @@ def train_gan(d_model, g_model, train_dataloader, dev_dataloader, d_optimizer, g
             loss_metric_dict = {'loss': loss_mean_sum}
 
             # Save best val metrics in a json file in the model directory
-            best_json_path = os.path.join(model_dir, "metrics_min_avg_loss_best_weights.json")
+            best_json_path = os.path.join(model_dir, "metrics_dev_best_weights.json")
+            # best_json_path = os.path.join(model_dir, "metrics_min_avg_loss_best_weights.json")
             utils.save_dict_to_json(loss_metric_dict, best_json_path)
 
             display_results.plot_graph(g_grads_graph, d_grads_graph, "Grads_Best", args.model_dir, epoch=epoch + 1)
@@ -276,6 +291,13 @@ def collect_network_statistics(net):
 
     for param_tensor in net.state_dict():
 
+        # print(param_tensor)
+        # print((net.state_dict()[param_tensor]).type())
+        if (net.state_dict()[param_tensor]).dtype != torch.float:
+            # print('in continue')
+            continue
+
+        # print(param_tensor)
         status_net.append([param_tensor,
                                        (net.state_dict()[param_tensor].norm()).item(),
                                        list(net.state_dict()[param_tensor].size())])
@@ -365,7 +387,7 @@ if __name__ == '__main__':
     # Train the model
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))
     num_test_samples = 20
-    test_noise = gan_net.noise(num_test_samples, params.noise_dim)
+    test_noise = gan_net.noise(num_test_samples, params.noise_dim, params.noise_type)
 
     # test_labels = list(range(num_test_samples))
     # test_labels = [it % params.num_classes for it in test_labels]

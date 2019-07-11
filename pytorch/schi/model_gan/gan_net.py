@@ -112,7 +112,8 @@ class GeneratorNet(nn.Module):
             nn.Linear(params.hidden_size, params.input_size),
             # nn.ReLU(),
             # nn.LogSoftmax(dim=1)
-            nn.Sigmoid()
+            nn.Tanh()
+            # nn.Sigmoid()
             # nn.Softmax(dim=1)
         )
         # self.linear_normalization = linear_transformation()
