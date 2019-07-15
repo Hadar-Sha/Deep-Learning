@@ -10,53 +10,58 @@ from torch.autograd.variable import Variable
 class DiscriminatorNet(nn.Module):
     def __init__(self, params):
         super(DiscriminatorNet, self).__init__()
-        self.in_layer = nn.Sequential(
-            nn.Linear(params.input_size, params.hidden_size),
-            nn.BatchNorm1d(params.hidden_size),
-            nn.ReLU()
-            # nn.LeakyReLU(params.leaky_relu_slope),
-            # nn.Dropout(params.dropout_rate)
-        )
-        self.hidden1 = nn.Sequential(
-            nn.Linear(params.hidden_size, params.hidden_size),
-            nn.BatchNorm1d(params.hidden_size),
-            nn.ReLU()
-            # nn.LeakyReLU(params.leaky_relu_slope),
-            # nn.Dropout(params.dropout_rate)
-        )
-        self.hidden2 = nn.Sequential(
-            nn.Linear(params.hidden_size, params.hidden_size),
-            nn.BatchNorm1d(params.hidden_size),
-            nn.ReLU()
-            # nn.LeakyReLU(params.leaky_relu_slope),
-            # nn.Dropout(params.dropout_rate)
-        )
-        self.hidden3 = nn.Sequential(
-            nn.Linear(params.hidden_size, params.hidden_size),
-            nn.BatchNorm1d(params.hidden_size),
-            nn.ReLU()
-            # nn.LeakyReLU(params.leaky_relu_slope),
-            # nn.Dropout(params.dropout_rate)
-        )
-        self.out_layer = nn.Sequential(
-            nn.Linear(params.hidden_size, 1),
-            # nn.ReLU(),
-            # nn.LogSoftmax(dim=1)
+        self.single_layer = nn.Sequential(
+            nn.Linear(params.input_size, 1),
             nn.Sigmoid()
         )
+        # self.in_layer = nn.Sequential(
+        #     nn.Linear(params.input_size, params.hidden_size),
+        #     nn.BatchNorm1d(params.hidden_size),
+        #     nn.ReLU()
+        #     # nn.LeakyReLU(params.leaky_relu_slope),
+        #     # nn.Dropout(params.dropout_rate)
+        # )
+        # self.hidden1 = nn.Sequential(
+        #     nn.Linear(params.hidden_size, params.hidden_size),
+        #     nn.BatchNorm1d(params.hidden_size),
+        #     nn.ReLU()
+        #     # nn.LeakyReLU(params.leaky_relu_slope),
+        #     # nn.Dropout(params.dropout_rate)
+        # )
+        # self.hidden2 = nn.Sequential(
+        #     nn.Linear(params.hidden_size, params.hidden_size),
+        #     nn.BatchNorm1d(params.hidden_size),
+        #     nn.ReLU()
+        #     # nn.LeakyReLU(params.leaky_relu_slope),
+        #     # nn.Dropout(params.dropout_rate)
+        # )
+        # self.hidden3 = nn.Sequential(
+        #     nn.Linear(params.hidden_size, params.hidden_size),
+        #     nn.BatchNorm1d(params.hidden_size),
+        #     nn.ReLU()
+        #     # nn.LeakyReLU(params.leaky_relu_slope),
+        #     # nn.Dropout(params.dropout_rate)
+        # )
+        # self.out_layer = nn.Sequential(
+        #     nn.Linear(params.hidden_size, 1),
+        #     # nn.ReLU(),
+        #     # nn.LogSoftmax(dim=1)
+        #     nn.Sigmoid()
+        # )
 
     def forward(self, x):
 
-        out = self.in_layer(x)
-        out = self.hidden1(out)
-        out = self.hidden2(out)
-        out = self.hidden3(out)
-        out = self.out_layer(out)
+        out = self.single_layer(x)
+        # out = self.in_layer(x)
+        # out = self.hidden1(out)
+        # out = self.hidden2(out)
+        # out = self.hidden3(out)
+        # out = self.out_layer(out)
 
         return out
 
 
-def linear_transformation(x):
+def linear_transformation(x):  # should be normalized to same min & max: e.g [-1,1]
     min_v, _ = torch.min(x, 0, True)
     max_v, _ = torch.max(x, 0, True)
     range_v = max_v - min_v
@@ -80,61 +85,55 @@ def linear_transformation(x):
 class GeneratorNet(nn.Module):
     def __init__(self, params):
         super(GeneratorNet, self).__init__()
-        self.in_layer = nn.Sequential(
-            nn.Linear(params.noise_dim, params.hidden_size),
-            nn.BatchNorm1d(params.hidden_size),
-            nn.ReLU()
-            # nn.LeakyReLU(params.leaky_relu_slope),
-            # nn.Dropout(params.dropout_rate)
-        )
-        self.hidden1 = nn.Sequential(
-            nn.Linear(params.hidden_size, params.hidden_size),
-            nn.BatchNorm1d(params.hidden_size),
-            nn.ReLU()
-            # nn.LeakyReLU(params.leaky_relu_slope),
-            # nn.Dropout(params.dropout_rate)
-        )
-        self.hidden2 = nn.Sequential(
-            nn.Linear(params.hidden_size, params.hidden_size),
-            nn.BatchNorm1d(params.hidden_size),
-            nn.ReLU()
-            # nn.LeakyReLU(params.leaky_relu_slope),
-            # nn.Dropout(params.dropout_rate)
-        )
-        self.hidden3 = nn.Sequential(
-            nn.Linear(params.hidden_size, params.hidden_size),
-            nn.BatchNorm1d(params.hidden_size),
-            nn.ReLU()
-            # nn.LeakyReLU(params.leaky_relu_slope),
-            # nn.Dropout(params.dropout_rate)
-        )
-        self.out_layer = nn.Sequential(
-            nn.Linear(params.hidden_size, params.input_size),
-            # nn.ReLU(),
-            # nn.LogSoftmax(dim=1)
+        self.single_layer = nn.Sequential(
+            nn.Linear(params.noise_dim, params.input_size),
             nn.Tanh()
-            # nn.Sigmoid()
-            # nn.Softmax(dim=1)
         )
-        # self.linear_normalization = linear_transformation()
-
-    # def linear_transformation(self, x):
-    #     min_v = torch.min(x, 0, True)
-    #     range_v = torch.max(x, 0, True) - min_v
-    #     if range_v > 0:
-    #         normalised = (x - min_v) / range_v
-    #     else:
-    #         normalised = torch.zeros(x.size())
-    #     return normalised
+        # self.in_layer = nn.Sequential(
+        #     nn.Linear(params.noise_dim, params.hidden_size),
+        #     nn.BatchNorm1d(params.hidden_size),
+        #     nn.ReLU()
+        #     # nn.LeakyReLU(params.leaky_relu_slope),
+        #     # nn.Dropout(params.dropout_rate)
+        # )
+        # self.hidden1 = nn.Sequential(
+        #     nn.Linear(params.hidden_size, params.hidden_size),
+        #     nn.BatchNorm1d(params.hidden_size),
+        #     nn.ReLU()
+        #     # nn.LeakyReLU(params.leaky_relu_slope),
+        #     # nn.Dropout(params.dropout_rate)
+        # )
+        # self.hidden2 = nn.Sequential(
+        #     nn.Linear(params.hidden_size, params.hidden_size),
+        #     nn.BatchNorm1d(params.hidden_size),
+        #     nn.ReLU()
+        #     # nn.LeakyReLU(params.leaky_relu_slope),
+        #     # nn.Dropout(params.dropout_rate)
+        # )
+        # self.hidden3 = nn.Sequential(
+        #     nn.Linear(params.hidden_size, params.hidden_size),
+        #     nn.BatchNorm1d(params.hidden_size),
+        #     nn.ReLU()
+        #     # nn.LeakyReLU(params.leaky_relu_slope),
+        #     # nn.Dropout(params.dropout_rate)
+        # )
+        # self.out_layer = nn.Sequential(
+        #     nn.Linear(params.hidden_size, params.input_size),
+        #     # nn.ReLU(),
+        #     # nn.LogSoftmax(dim=1)
+        #     nn.Tanh()
+        #     # nn.Sigmoid()
+        #     # nn.Softmax(dim=1)
+        # )
 
     def forward(self, x):
 
-        out = self.in_layer(x)
-        out = self.hidden1(out)
-        out = self.hidden2(out)
-        out = self.hidden3(out)
-        out = self.out_layer(out)
-        # out = linear_transformation(out)
+        out = self.single_layer(x)
+        # out = self.in_layer(x)
+        # out = self.hidden1(out)
+        # out = self.hidden2(out)
+        # out = self.hidden3(out)
+        # out = self.out_layer(out)
 
         return out
 
@@ -147,10 +146,7 @@ def noise(size, dim, noise_type='normal'):
         n = Variable(-1 + 2 * torch.rand(size, dim))  # make sense for binary samples
     elif noise_type == 'binary':
         n = Variable(-1 + 2 * torch.randint(2, (size, dim), dtype=torch.float))  # make sense for binary samples
-    # # n = Variable(torch.rand(size, num_of_classes))
-    # # print(n)
-    # # n = Variable(torch.randint(256, (size, 100)))
-    # n = Variable(torch.randn(size, 10))
+
     if torch.cuda.is_available():
         return n.cuda()
     return n
@@ -209,7 +205,6 @@ def vectors_to_samples(vectors):
     vectors = vectors.reshape(vectors.size()[0], -1, 3)
     vectors = vectors.cpu().numpy()
     vectors = vectors.tolist()
-    # vectors = (vectors/255).tolist()
     return vectors
 
 
