@@ -5,12 +5,18 @@ import os
 
 def get(batch_size, data_root='/tmp/public_dataset/pytorch', train=True, val=True, **kwargs):
     data_root = os.path.expanduser(os.path.join(data_root, 'svhn-data'))
-    num_workers = kwargs.setdefault('num_workers', 1)
+    num_workers = kwargs.setdefault('num_workers', 0)
+    # num_workers = kwargs.setdefault('num_workers', 1)
     kwargs.pop('input_size', None)
     print("Building SVHN data loader with {} workers".format(num_workers))
 
     def target_transform(target):
-        return int(target[0]) - 1
+        # print(type(target))
+        # print(target)
+        if isinstance(target, (list,)):
+            return int(target[0]) - 1
+        else:
+            return int(target) - 1
 
     ds = []
     if train:

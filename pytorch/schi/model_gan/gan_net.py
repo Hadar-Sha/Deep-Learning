@@ -10,17 +10,18 @@ from torch.autograd.variable import Variable
 class DiscriminatorNet(nn.Module):
     def __init__(self, params):
         super(DiscriminatorNet, self).__init__()
-        self.single_layer = nn.Sequential(
-            nn.Linear(params.input_size, 1),
-            nn.Sigmoid()
-        )
-        # self.in_layer = nn.Sequential(
-        #     nn.Linear(params.input_size, params.hidden_size),
-        #     nn.BatchNorm1d(params.hidden_size),
-        #     nn.ReLU()
-        #     # nn.LeakyReLU(params.leaky_relu_slope),
-        #     # nn.Dropout(params.dropout_rate)
+        # self.single_layer = nn.Sequential(
+        #     nn.Linear(params.input_size, 1),
+        #     nn.Sigmoid()
         # )
+
+        self.in_layer = nn.Sequential(
+            nn.Linear(params.input_size, params.hidden_size),
+            # nn.BatchNorm1d(params.hidden_size),
+            # nn.ReLU()
+            nn.LeakyReLU(params.leaky_relu_slope),
+            # nn.Dropout(params.dropout_rate)
+        )
         # self.hidden1 = nn.Sequential(
         #     nn.Linear(params.hidden_size, params.hidden_size),
         #     nn.BatchNorm1d(params.hidden_size),
@@ -42,21 +43,21 @@ class DiscriminatorNet(nn.Module):
         #     # nn.LeakyReLU(params.leaky_relu_slope),
         #     # nn.Dropout(params.dropout_rate)
         # )
-        # self.out_layer = nn.Sequential(
-        #     nn.Linear(params.hidden_size, 1),
-        #     # nn.ReLU(),
-        #     # nn.LogSoftmax(dim=1)
-        #     nn.Sigmoid()
-        # )
+        self.out_layer = nn.Sequential(
+            nn.Linear(params.hidden_size, 1),
+            # nn.ReLU(),
+            # nn.LogSoftmax(dim=1)
+            nn.Sigmoid()
+        )
 
     def forward(self, x):
 
-        out = self.single_layer(x)
-        # out = self.in_layer(x)
+        # out = self.single_layer(x)
+        out = self.in_layer(x)
         # out = self.hidden1(out)
         # out = self.hidden2(out)
         # out = self.hidden3(out)
-        # out = self.out_layer(out)
+        out = self.out_layer(out)
 
         return out
 
@@ -85,17 +86,18 @@ def linear_transformation(x):  # should be normalized to same min & max: e.g [-1
 class GeneratorNet(nn.Module):
     def __init__(self, params):
         super(GeneratorNet, self).__init__()
-        self.single_layer = nn.Sequential(
-            nn.Linear(params.noise_dim, params.input_size),
-            nn.Tanh()
-        )
-        # self.in_layer = nn.Sequential(
-        #     nn.Linear(params.noise_dim, params.hidden_size),
-        #     nn.BatchNorm1d(params.hidden_size),
-        #     nn.ReLU()
-        #     # nn.LeakyReLU(params.leaky_relu_slope),
-        #     # nn.Dropout(params.dropout_rate)
+        # self.single_layer = nn.Sequential(
+        #     nn.Linear(params.noise_dim, params.input_size),
+        #     nn.Tanh()
         # )
+
+        self.in_layer = nn.Sequential(
+            nn.Linear(params.noise_dim, params.hidden_size),
+            # nn.BatchNorm1d(params.hidden_size),
+            # nn.ReLU()
+            nn.LeakyReLU(params.leaky_relu_slope),
+            # nn.Dropout(params.dropout_rate)
+        )
         # self.hidden1 = nn.Sequential(
         #     nn.Linear(params.hidden_size, params.hidden_size),
         #     nn.BatchNorm1d(params.hidden_size),
@@ -117,23 +119,23 @@ class GeneratorNet(nn.Module):
         #     # nn.LeakyReLU(params.leaky_relu_slope),
         #     # nn.Dropout(params.dropout_rate)
         # )
-        # self.out_layer = nn.Sequential(
-        #     nn.Linear(params.hidden_size, params.input_size),
-        #     # nn.ReLU(),
-        #     # nn.LogSoftmax(dim=1)
-        #     nn.Tanh()
-        #     # nn.Sigmoid()
-        #     # nn.Softmax(dim=1)
-        # )
+        self.out_layer = nn.Sequential(
+            nn.Linear(params.hidden_size, params.input_size),
+            # nn.ReLU(),
+            # nn.LogSoftmax(dim=1)
+            nn.Tanh()
+            # nn.Sigmoid()
+            # nn.Softmax(dim=1)
+        )
 
     def forward(self, x):
 
-        out = self.single_layer(x)
-        # out = self.in_layer(x)
+        # out = self.single_layer(x)
+        out = self.in_layer(x)
         # out = self.hidden1(out)
         # out = self.hidden2(out)
         # out = self.hidden3(out)
-        # out = self.out_layer(out)
+        out = self.out_layer(out)
 
         return out
 

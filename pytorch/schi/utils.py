@@ -125,10 +125,12 @@ def save_dict_to_json(d, json_path, epoch=None):
     with open(json_path, 'w') as f:
         # We need to convert the values to float for json (it doesn't accept np.array, np.float, )
         d = {k: float(v) for k, v in d.items()}
-        json.dump(d, f, indent=4)
         if epoch is not None:
-            e = {'epoch', epoch}
-            json.dump(e, f, indent=4)
+            d.update({'epoch': epoch})
+        json.dump(d, f, indent=4)
+        # if epoch is not None:
+        #     e = {'epoch': epoch}
+        #     json.dump(e, f, indent=4)
 
 
 def save_checkpoint(state, is_best, checkpoint, ntype=None):

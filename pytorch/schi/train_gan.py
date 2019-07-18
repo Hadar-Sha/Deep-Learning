@@ -138,9 +138,9 @@ def train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, dataloader, param
 
         stats['g_error'] = get_stats(g_error, 'error')
 
-        if not params.stop_d or epoch <= (stop_d_perc * params.num_epochs):
-            G_preds.append(d_pred_fake.data.mean())
-            D_preds.append(d_pred_real.data.mean())
+        # if not params.stop_d or epoch <= (stop_d_perc * params.num_epochs):
+        #     G_preds.append(d_pred_fake.data.mean())
+        #     D_preds.append(d_pred_real.data.mean())
 
         if i % params.save_summary_steps == 0:
             if num_of_batches > 1:
@@ -155,6 +155,7 @@ def train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, dataloader, param
             real_samples_reshaped = gan_net.vectors_to_samples(real_data)  # ?
             real_titles = gan_net.labels_to_titles(real_label)
 
+            print('plotting batch #{} of input data'.format(i+1))
             display_results.fill_figure(real_samples_reshaped, fig, i + 1, args.model_dir, -1, 1,
                                         labels=real_titles,
                                         dtype='real')
@@ -163,6 +164,9 @@ def train(d_model, g_model, d_optimizer, g_optimizer, loss_fn, dataloader, param
     # Save Losses for plotting later
     if not params.stop_d or epoch <= (stop_d_perc * params.num_epochs):
         D_losses.append(d_error.item())
+        G_preds.append(d_pred_fake.data.mean().item())
+        D_preds.append(d_pred_real.data.mean().item())
+
     G_losses.append(g_error.item())
 
     stats_string = " ; ".join("{}: {:05.3f}".format(k, v) for k, v in stats_mean.items())
@@ -227,8 +231,6 @@ def train_gan(d_model, g_model, train_dataloader, dev_dataloader, d_optimizer, g
             best_json_path = os.path.join(model_dir, "metrics_dev_best_weights.json")
             utils.save_dict_to_json(loss_metric_dict, best_json_path, epoch + 1)
 
-            # display_results.plot_graph(g_grads_graph, d_grads_graph, "Grads_Best", args.model_dir, epoch=epoch + 1)
-
             if test_samples is not None:
                 np_test_samples = np.array(test_samples)
                 np_test_samples = \
@@ -279,8 +281,6 @@ def get_network_grads(net):
     output_gradients = []
     output_names = []
 
-    # tmp_grad = {}
-
     parameters_names = list(net.state_dict().keys())
     j = 0
     for i in range(len(parameters_names)):
@@ -294,8 +294,6 @@ def get_network_grads(net):
 
     for name, param in net.named_parameters():
         if name in parameters_names:
-            # tmp_grad[name] = param.grad.norm()
-            # output_gradients.append(param.grad.norm().item())
             all_net_grads = param.grad.data.cpu().numpy().tolist()
             flat_net_grads = []
             if isinstance(all_net_grads, (list,)):
@@ -312,10 +310,8 @@ def get_network_grads(net):
                 flat_net_grads = all_net_grads
 
             output_gradients.append([min(flat_net_grads), np.median(flat_net_grads), max(flat_net_grads)])
-            # output_gradients.append(param.grad.data.cpu().numpy().tolist())
             output_names.append(name)
 
-    # output_gradients.append(tmp_grad)
     return output_gradients, output_names
 
 
@@ -456,38 +452,7 @@ if __name__ == '__main__':
     display_results.plot_graph(G_preds, D_preds, "Predictions", args.model_dir)
 
     plot_summary_graphs_layers(grads_per_epoch_g, 'G', 'Grads', args.model_dir)
-    # grads_np_g = np.array(grads_per_epoch_g)
-    # for i in range(grads_np_g.shape[1]):
-    #     val_g = grads_np_g[:, i].tolist()
-    #     if i % 2:
-    #         display_results.plot_graph(val_g, None, "G_Grads_layer_bias_{}".format(i + 1), args.model_dir)
-    #     else:
-    #         display_results.plot_graph(val_g, None, "G_Grads_layer_weight_{}".format(i + 1), args.model_dir)
-
     plot_summary_graphs_layers(grads_per_epoch_d, 'D', 'Grads', args.model_dir)
-    # grads_np_d = np.array(grads_per_epoch_d)
-    # for i in range(grads_np_d.shape[1]):
-    #     val_d = grads_np_d[:, i].tolist()
-    #     if i % 2:
-    #         display_results.plot_graph(None, val_d, "D_Grads_layer_bias_{}".format(i + 1), args.model_dir)
-    #     else:
-    #         display_results.plot_graph(None, val_d, "D_Grads_layer_weight_{}".format(i + 1), args.model_dir)
-
     plot_summary_graphs_layers(vals_per_epoch_g, 'G', 'Vals', args.model_dir)
-    # vals_np_g = np.array(vals_per_epoch_g)
-    # for i in range(vals_np_g.shape[1]):
-    #     val_g = vals_np_g[:, i].tolist()
-    #     if i % 2:
-    #         display_results.plot_graph(val_g, None, "G_Vals_layer_bias_{}".format(i + 1), args.model_dir)
-    #     else:
-    #         display_results.plot_graph(val_g, None, "G_Vals_layer_weight_{}".format(i + 1), args.model_dir)
-
     plot_summary_graphs_layers(vals_per_epoch_d, 'D', 'Vals', args.model_dir)
-    # grads_np_d = np.array(grads_per_epoch_d)
-    # for i in range(grads_np_d.shape[1]):
-    #     val_d = grads_np_d[:, i].tolist()
-    #     if i % 2:
-    #         display_results.plot_graph(None, val_d, "D_Vals_layer_bias_{}".format(i + 1), args.model_dir)
-    #     else:
-    #         display_results.plot_graph(None, val_d, "D_Vals_layer_weight_{}".format(i + 1), args.model_dir)
 
