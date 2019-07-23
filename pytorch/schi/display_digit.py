@@ -302,6 +302,10 @@ def plot_graph(losses_one, losses_two, gtype, image_path, epoch=None):
         plt.title("min and max gradients During Training")
         plt.xlabel("layers")
         plt.ylabel("Grads")
+    elif gtype == "Accuracy":
+        plt.title("Generator and Discriminator Accuracy During Training")
+        plt.xlabel("iterations")
+        plt.ylabel("Accuracy")
 
     if (not losses_one) is False and (not losses_two) is False:
         if gtype == "VAE Loss":

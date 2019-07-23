@@ -7,6 +7,7 @@ import numpy as np
 import torch
 import torch.optim as optim
 from torch.autograd import Variable
+import re
 # from tqdm import tqdm
 
 # from utils_gan import Logger
@@ -14,8 +15,8 @@ import display_digit as display_results
 import utils
 import model_gan.acgan_net as gan_net
 # import model_gan.two_labels_data_loader as data_loader
-# import model_gan.one_label_data_loader as data_loader
-import model_gan.single_sample_data_loader as data_loader
+import model_gan.one_label_data_loader as data_loader
+#import model_gan.single_sample_data_loader as data_loader
 
 
 parser = argparse.ArgumentParser()
@@ -41,7 +42,7 @@ def train_discriminator(d, optimizer, real_data, fake_data, real_labels, fake_la
     total_real_error.backward()
 
     # compute the current classification accuracy
-    class_accuracy = gan_net.compute_acc(prediction_class, real_labels)
+    class_accuracy_real = gan_net.compute_acc(prediction_class, real_labels)
 
     # 1.2 Train on Fake Data
     prediction_r_f_fake, prediction_class = d(fake_data)
@@ -52,11 +53,13 @@ def train_discriminator(d, optimizer, real_data, fake_data, real_labels, fake_la
     total_fake_error = is_real_fake_error + class_error
     total_fake_error.backward()
 
+    # compute the current classification accuracy
+    class_accuracy_fake = gan_net.compute_acc(prediction_class, fake_labels)
     # 1.3 Update weights with gradients
     optimizer.step()
 
     # Return error0
-    return total_real_error + total_fake_error, prediction_r_f_real, prediction_r_f_fake, class_accuracy
+    return total_real_error + total_fake_error, prediction_r_f_real, prediction_r_f_fake, class_accuracy_real, class_accuracy_fake
 
 
 def train_generator(d, optimizer, fake_data, fake_labels, r_f_loss_fn, c_loss_fn):
@@ -122,10 +125,25 @@ def train(d_model, d_optimizer, g_model, g_optimizer, r_f_loss_fn, c_loss_fn, da
             real_label = real_label.cuda()
 
         # Generate fake data
-        noisy_input = gan_net.noise(real_data.size(0), params.noise_dim)
-
+        noisy_input = gan_net.noise(real_data.size(0), params.noise_dim, params.noise_type)
         # noisy_label = Variable(torch.randint(params.num_classes//2, (real_data.size(0),)))
-        noisy_label = Variable(torch.randint(params.num_classes, (real_data.size(0),)))
+
+        temp_labels = []
+        for j in range(len(possible_classes) - 1):
+            temp_labels.extend([possible_classes[j] for _ in range(real_data.size(0) // len(possible_classes))])
+        # last class will have amount of samples to complete to num_test_samples
+        temp_labels.extend([possible_classes[len(possible_classes) - 1]
+                            for _ in range(
+                real_data.size(0) - (len(possible_classes) - 1) * (real_data.size(0) // len(possible_classes)))])
+
+        # temp_labels = [0 for _ in range(real_data.size(0) // 4)]
+        # temp_labels.extend([3 for _ in range(real_data.size(0) // 4)])
+        # temp_labels.extend([5 for _ in range(real_data.size(0) // 4)])
+        # temp_labels.extend([7 for _ in range(real_data.size(0) - 3 * (real_data.size(0) // 4))])
+        noisy_label = torch.Tensor(temp_labels)
+        noisy_label = Variable(noisy_label)
+
+        # noisy_label = Variable(torch.randint(params.num_classes, (real_data.size(0),)))
         noisy_label = noisy_label.type(torch.LongTensor).to(device)
 
         real_one_hot_v = gan_net.convert_int_to_one_hot_vector(real_label, params.num_classes).to(device)
@@ -138,8 +156,8 @@ def train(d_model, d_optimizer, g_model, g_optimizer, r_f_loss_fn, c_loss_fn, da
         # fake_data = g_model(noisy_input, noisy_one_hot_v).detach()
 
         # Train D
-        d_error, d_pred_real, d_pred_fake, class_accuracy = \
-            train_discriminator(d_model, d_optimizer, real_data, fake_data.detach(), real_label, noisy_label, r_f_loss_fn, c_loss_fn)
+        d_error, d_pred_real, d_pred_fake, class_accuracy_real, class_accuracy_fake = \
+            train_discriminator(d_model, d_optimizer, real_data, fake_data.detach(), real_label, noisy_label, r_f_loss_fn, c_loss_fn)  # do not remove .detach() here !!!!!
             # train_discriminator(d_model, d_optimizer, real_data, fake_data, real_label, noisy_label, r_f_loss_fn, c_loss_fn)
 
         # 2. Train Generator
@@ -153,7 +171,8 @@ def train(d_model, d_optimizer, g_model, g_optimizer, r_f_loss_fn, c_loss_fn, da
         stats = {}
         stats['d_error'] = get_stats(d_error, 'error')
         stats['g_error'] = get_stats(g_error, 'error')
-        stats['class_accuracy'] = torch.tensor(class_accuracy).numpy()
+        stats['class_accuracy_real'] = torch.tensor(class_accuracy_real).numpy()
+        stats['class_accuracy_fake'] = torch.tensor(class_accuracy_fake).numpy()
         stats['d_pred_real'] = get_stats(d_pred_real, 'pred')
         stats['d_pred_fake'] = get_stats(d_pred_fake, 'pred')
         stats['d_pred_fake_g'] = get_stats(d_pred_fake_g, 'pred')
@@ -163,8 +182,8 @@ def train(d_model, d_optimizer, g_model, g_optimizer, r_f_loss_fn, c_loss_fn, da
         # G_losses.append(g_error.item())
         # accuracy_vals.append(class_accuracy)
 
-        G_preds.append(d_pred_fake.data.mean())
-        D_preds.append(d_pred_real.data.mean())
+        #G_preds.append(d_pred_fake.data.mean())
+        #D_preds.append(d_pred_real.data.mean())
 
         # Display Progress
         # Display Images
@@ -183,14 +202,18 @@ def train(d_model, d_optimizer, g_model, g_optimizer, r_f_loss_fn, c_loss_fn, da
             real_samples_reshaped = gan_net.vectors_to_samples(real_data)  # ?
             real_titles = gan_net.labels_to_titles(real_label)
 
+            print('plotting batch #{} of input data'.format(i+1))
             display_results.fill_figure(real_samples_reshaped, fig, i + 1, args.model_dir, -1, 1, labels=real_titles,
                                         dtype='real')
 
     stats_mean = {metric: np.sum([x[metric] for x in summ] / np.sum(prop)) for metric in summ[0]}
     # Save Losses for plotting later
     D_losses.append(d_error.item())
+    G_preds.append(d_pred_fake.data.mean().item())
+    D_preds.append(d_pred_real.data.mean().item())
     G_losses.append(g_error.item())
-    accuracy_vals.append(class_accuracy)
+    real_accuracy_vals.append(class_accuracy_real)
+    fake_accuracy_vals.append(class_accuracy_fake)
 
     stats_string = " ; ".join("{}: {:05.3f}".format(k, v) for k, v in stats_mean.items())
     logging.info("train metrics: " + stats_string)
@@ -227,11 +250,15 @@ def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, r_f_
                                             train_dataloader, params, epoch, fig)
         is_best = loss_mean_sum <= best_loss
 
-        g_grads_graph = collect_network_statistics(g_model)
-        d_grads_graph = collect_network_statistics(d_model)
+        g_grads_graph, _ = get_network_grads(g_model)
+        d_grads_graph, _ = get_network_grads(d_model)
+        g_vals_graph = collect_network_statistics(g_model)
+        d_vals_graph = collect_network_statistics(d_model)
 
         grads_per_epoch_g.append(g_grads_graph)
         grads_per_epoch_d.append(d_grads_graph)
+        vals_per_epoch_g.append(g_vals_graph)
+        vals_per_epoch_d.append(d_vals_graph)
 
         if is_best:
             logging.info("- Found new best loss")
@@ -242,10 +269,10 @@ def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, r_f_
             loss_metric_dict = {'loss': loss_mean_sum}
 
             # Save best val metrics in a json file in the model directory
-            best_json_path = os.path.join(model_dir, "metrics_min_avg_loss_best_weights.json")
-            utils.save_dict_to_json(loss_metric_dict, best_json_path)
+            best_json_path = os.path.join(model_dir, "metrics_dev_best_weights.json")
+            utils.save_dict_to_json(loss_metric_dict, best_json_path, epoch + 1)
 
-            display_results.plot_graph(g_grads_graph, d_grads_graph, "Grads_Best", args.model_dir, epoch=epoch+1)
+            # display_results.plot_graph(g_grads_graph, d_grads_graph, "Grads_Best", args.model_dir, epoch=epoch+1)
 
             if test_samples is not None:
                 np_test_samples = np.array(test_samples)
@@ -293,24 +320,66 @@ def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, r_f_
     return
 
 
+def get_network_grads(net):
+    weight_string = "weight"
+    bias_string = "bias"
+    output_gradients = []
+    output_names = []
+
+    parameters_names = list(net.state_dict().keys())
+    j = 0
+    for i in range(len(parameters_names)):
+        par = parameters_names[i - j]
+        is_rel_w = re.search(weight_string, par)
+        is_rel_b = re.search(bias_string, par)
+        if is_rel_w is None and is_rel_b is None:
+            parameters_names.remove(par)
+            j += 1
+    # grads = torch.autograd.grad(loss_fn, parameters_names, retain_graph=True)
+
+    for name, param in net.named_parameters():
+        if name in parameters_names:
+            all_net_grads = param.grad.data.cpu().numpy().tolist()
+            flat_net_grads = []
+            if isinstance(all_net_grads, (list,)):
+
+                for elem in all_net_grads:
+                    if isinstance(elem, (list,)) and isinstance(elem[0], (list,)):
+                        for item in elem:
+                            flat_net_grads.extend(item)
+                    elif isinstance(elem, (list,)):
+                        flat_net_grads.extend(elem)
+                    else:
+                        flat_net_grads.extend([elem])
+            else:
+                flat_net_grads = all_net_grads
+
+            output_gradients.append([min(flat_net_grads), np.median(flat_net_grads), max(flat_net_grads)])
+            output_names.append(name)
+
+    return output_gradients, output_names
+
+
 def collect_network_statistics(net):
 
-    status_net = []
+    #status_net = []
     net_grads_graph = []
 
     for param_tensor in net.state_dict():
 
-        status_net.append([param_tensor,
-                                       (net.state_dict()[param_tensor].norm()).item(),
-                                       list(net.state_dict()[param_tensor].size())])
+        if (net.state_dict()[param_tensor]).dtype != torch.float:
+            continue
+        # status_net.append([param_tensor,
+        #                              (net.state_dict()[param_tensor].norm()).item(),
+        #                             list(net.state_dict()[param_tensor].size())])
 
-        all_net_grads = ((net.state_dict()[param_tensor]).cpu().numpy()).tolist()
+        all_net_vals = ((net.state_dict()[param_tensor]).cpu().numpy()).tolist()
 
         # if needed, flatten the list to get one nim and one max
         flat_net_grads = []
-        if isinstance(all_net_grads, (list,)):
+        if isinstance(all_net_vals, (list,)):
 
-            for elem in all_net_grads:
+            for elem in all_net_vals:
                 if isinstance(elem, (list,)) and isinstance(elem[0], (list,)):
                     for item in elem:
                         flat_net_grads.extend(item)
@@ -319,11 +388,23 @@ def collect_network_statistics(net):
                 else:
                     flat_net_grads.extend([elem])
         else:
-            flat_net_grads = all_net_grads
+            flat_net_grads = all_net_vals
 
         net_grads_graph.append([min(flat_net_grads), np.median(flat_net_grads), max(flat_net_grads)])
 
     return net_grads_graph
+
+
+def plot_summary_graphs_layers(vals_per_epoch, n_type, v_type, im_path):
+    vals_np = np.array(vals_per_epoch)
+    for it in range(vals_np.shape[1]):
+        val = vals_np[:, it].tolist()
+        if it % 2:
+            display_results.plot_graph(val, None, "{}_{}_layer_bias_{}".format(n_type, v_type, it), im_path)
+        else:
+            display_results.plot_graph(val, None, "{}_{}_layer_weight_{}".format(n_type, v_type, it), im_path)
+
+    return
 
 
 if __name__ == '__main__':
@@ -365,8 +446,9 @@ if __name__ == '__main__':
     discriminator = gan_net.DiscriminatorNet(params)
     generator = gan_net.GeneratorNet(params)
 
-    discriminator.apply(gan_net.weights_init)
-    generator.apply(gan_net.weights_init)
+    if params.init_weights:
+        discriminator.apply(gan_net.weights_init)
+        generator.apply(gan_net.weights_init)
 
     if torch.cuda.is_available():
         discriminator.cuda()
@@ -389,11 +471,21 @@ if __name__ == '__main__':
     # Train the model
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))
     num_test_samples = 20
-    test_noise = gan_net.noise(num_test_samples, params.noise_dim)
+    test_noise = gan_net.noise(num_test_samples, params.noise_dim, params.noise_type)
 
-    test_labels = list(range(num_test_samples))
-    test_labels = [it % params.num_classes for it in test_labels]
-    # test_labels = [0 for _ in range(num_test_samples)]
+    # test_labels = list(range(num_test_samples))
+    # test_labels = [it % params.num_classes for it in test_labels]
+    possible_classes = [0, 3, 5, 7, 9]
+    test_labels = []
+    for i in range(len(possible_classes)-1):
+        test_labels.extend([possible_classes[i] for _ in range(num_test_samples // len(possible_classes))])
+    # last class will have amount of samples to complete to num_test_samples
+    test_labels.extend([possible_classes[len(possible_classes)-1]
+          for _ in range(num_test_samples - (len(possible_classes)-1) * (num_test_samples // len(possible_classes)))])
+    # test_labels = [0 for _ in range(num_test_samples//4)]
+    # test_labels.extend([3 for _ in range(num_test_samples//4)])
+    # test_labels.extend([5 for _ in range(num_test_samples//4)])
+    # test_labels.extend([7 for _ in range(num_test_samples - 3*(num_test_samples//4))])
     test_labels = torch.Tensor(test_labels)
     test_labels = test_labels.type(torch.LongTensor)
     test_labels = test_labels.to(device)
@@ -405,23 +497,31 @@ if __name__ == '__main__':
     G_losses = []
     D_preds = []
     G_preds = []
-    accuracy_vals = []
+    real_accuracy_vals = []
+    fake_accuracy_vals = []
     grads_per_epoch_g = []
     grads_per_epoch_d = []
+    vals_per_epoch_g = []
+    vals_per_epoch_d = []
 
     train_gan(discriminator, generator, train_dl, d_optimizer, g_optimizer, real_fake_loss_fn, class_selection_loss_fn, params, args.model_dir)
 
     # track results
     display_results.plot_graph(G_losses, D_losses, "Loss", args.model_dir)
     display_results.plot_graph(G_preds, D_preds, "Predictions", args.model_dir)
+    display_results.plot_graph(real_accuracy_vals, fake_accuracy_vals, "Accuracy", args.model_dir)
 
-    grads_np_g = np.array(grads_per_epoch_g)
-    for i in range(grads_np_g.shape[1]):
-        val_g = grads_np_g[:, i].tolist()
-        display_results.plot_graph(val_g, None, "G_Grads_layer_{}".format(i + 1), args.model_dir)
-
-    grads_np_d = np.array(grads_per_epoch_d)
-    for i in range(grads_np_d.shape[1]):
-        val_d = grads_np_d[:, i].tolist()
-        display_results.plot_graph(None, val_d, "D_Grads_layer_{}".format(i + 1), args.model_dir)
+    plot_summary_graphs_layers(grads_per_epoch_g, 'G', 'Grads', args.model_dir)
+    plot_summary_graphs_layers(grads_per_epoch_d, 'D', 'Grads', args.model_dir)
+    plot_summary_graphs_layers(vals_per_epoch_g, 'G', 'Vals', args.model_dir)
+    plot_summary_graphs_layers(vals_per_epoch_d, 'D', 'Vals', args.model_dir)
+    # grads_np_g = np.array(grads_per_epoch_g)
+    # for i in range(grads_np_g.shape[1]):
+    #   val_g = grads_np_g[:, i].tolist()
+    #  display_results.plot_graph(val_g, None, "G_Grads_layer_{}".format(i + 1), args.model_dir)
+    #
+    # grads_np_d = np.array(grads_per_epoch_d)
+    # for i in range(grads_np_d.shape[1]):
+    #   val_d = grads_np_d[:, i].tolist()
+    #  display_results.plot_graph(None, val_d, "D_Grads_layer_{}".format(i + 1), args.model_dir)
 

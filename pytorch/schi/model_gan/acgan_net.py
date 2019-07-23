@@ -12,18 +12,18 @@ class DiscriminatorNet(nn.Module):
         super(DiscriminatorNet, self).__init__()
 
         self.in_layer = nn.Sequential(
-            nn.Linear(params.input_size, params.hidden_size),  # *2),
+            nn.Linear(params.input_size, params.hidden_size),
             # nn.ReLU(),
             nn.LeakyReLU(params.leaky_relu_slope),
-            nn.Dropout(params.dropout_rate)
+            # nn.Dropout(params.dropout_rate)
         )
-        self.hidden1 = nn.Sequential(
-            nn.Linear(params.hidden_size, params.hidden_size),
-            # nn.Linear(params.hidden_size*2, params.hidden_size),
-            # nn.ReLU(),
-            nn.LeakyReLU(params.leaky_relu_slope),
-            nn.Dropout(params.dropout_rate)
-        )
+        # self.hidden1 = nn.Sequential(
+        #     nn.Linear(params.hidden_size, params.hidden_size),
+        #     # nn.Linear(params.hidden_size*2, params.hidden_size),
+        #     # nn.ReLU(),
+        #     nn.LeakyReLU(params.leaky_relu_slope),
+        #     nn.Dropout(params.dropout_rate)
+        # )
 
         self.out_layer_real_fake = nn.Sequential(
             nn.Linear(params.hidden_size, 1),
@@ -40,7 +40,7 @@ class DiscriminatorNet(nn.Module):
     def forward(self, x):
 
         x_ = self.in_layer(x)
-        x_ = self.hidden1(x_)
+        # x_ = self.hidden1(x_)
 
         out_real_fake = self.out_layer_real_fake(x_)
         out_class = self.out_layer_class(x_)
@@ -48,7 +48,7 @@ class DiscriminatorNet(nn.Module):
         return out_real_fake, out_class
 
 
-def linear_transformation(x):
+def linear_transformation(x):  # should be normalized to same min & max: e.g [-1,1]
     min_v, _ = torch.min(x, 0, True)
     max_v, _ = torch.max(x, 0, True)
     range_v = max_v - min_v
@@ -78,18 +78,18 @@ class GeneratorNet(nn.Module):
         self.hidden_with_label = nn.Sequential(
             nn.Linear(params.noise_dim + params.num_classes, params.hidden_size),
             # nn.ReLU(),
-            # nn.LeakyReLU(params.leaky_relu_slope),
+            nn.LeakyReLU(params.leaky_relu_slope)
             # nn.Dropout(params.dropout_rate)
-            nn.Tanh()
+            # nn.Tanh()
         )
-
-        self.hidden1 = nn.Sequential(
-            nn.Linear(params.hidden_size, params.hidden_size),  # *2),
-            # nn.ReLU(),
-            # nn.LeakyReLU(params.leaky_relu_slope),
-            # nn.Dropout(params.dropout_rate)
-            nn.Tanh()
-        )
+        #
+        # self.hidden1 = nn.Sequential(
+        #     nn.Linear(params.hidden_size, params.hidden_size),  # *2),
+        #     # nn.ReLU(),
+        #     # nn.LeakyReLU(params.leaky_relu_slope),
+        #     # nn.Dropout(params.dropout_rate)
+        #     nn.Tanh()
+        # )
 
         self.out_layer = nn.Sequential(
             nn.Linear(params.hidden_size, params.input_size),
@@ -98,10 +98,11 @@ class GeneratorNet(nn.Module):
 
     def forward(self, x, labels):
 
-        out = torch.cat([x, labels], 1)
+        out = torch.cat([labels, x], 1)
+        # out = torch.cat([x, labels], 1)
 
         out = self.hidden_with_label(out)
-        out = self.hidden1(out)
+        # out = self.hidden1(out)
         out = self.out_layer(out)
 
         return out

@@ -255,7 +255,8 @@ class _netD_CIFAR10(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, input):
-        if isinstance(input.data, torch.cuda.FloatTensor) and self.ngpu > 1:
+
+        if torch.cuda.is_available() and isinstance(input.data, torch.cuda.FloatTensor) and self.ngpu > 1:
             conv1 = nn.parallel.data_parallel(self.conv1, input, range(self.ngpu))
             conv2 = nn.parallel.data_parallel(self.conv2, conv1, range(self.ngpu))
             conv3 = nn.parallel.data_parallel(self.conv3, conv2, range(self.ngpu))
