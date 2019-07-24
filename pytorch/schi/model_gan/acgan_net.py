@@ -17,13 +17,13 @@ class DiscriminatorNet(nn.Module):
             nn.LeakyReLU(params.leaky_relu_slope),
             # nn.Dropout(params.dropout_rate)
         )
-        # self.hidden1 = nn.Sequential(
-        #     nn.Linear(params.hidden_size, params.hidden_size),
-        #     # nn.Linear(params.hidden_size*2, params.hidden_size),
-        #     # nn.ReLU(),
-        #     nn.LeakyReLU(params.leaky_relu_slope),
-        #     nn.Dropout(params.dropout_rate)
-        # )
+        self.hidden1 = nn.Sequential(
+            nn.Linear(params.hidden_size, params.hidden_size),
+            # nn.Linear(params.hidden_size*2, params.hidden_size),
+            # nn.ReLU(),
+            nn.LeakyReLU(params.leaky_relu_slope),
+            # nn.Dropout(params.dropout_rate)
+        )
 
         self.out_layer_real_fake = nn.Sequential(
             nn.Linear(params.hidden_size, 1),
@@ -40,7 +40,7 @@ class DiscriminatorNet(nn.Module):
     def forward(self, x):
 
         x_ = self.in_layer(x)
-        # x_ = self.hidden1(x_)
+        x_ = self.hidden1(x_)
 
         out_real_fake = self.out_layer_real_fake(x_)
         out_class = self.out_layer_class(x_)
@@ -83,13 +83,13 @@ class GeneratorNet(nn.Module):
             # nn.Tanh()
         )
         #
-        # self.hidden1 = nn.Sequential(
-        #     nn.Linear(params.hidden_size, params.hidden_size),  # *2),
-        #     # nn.ReLU(),
-        #     # nn.LeakyReLU(params.leaky_relu_slope),
-        #     # nn.Dropout(params.dropout_rate)
-        #     nn.Tanh()
-        # )
+        self.hidden1 = nn.Sequential(
+            nn.Linear(params.hidden_size, params.hidden_size),  # *2),
+            # nn.ReLU(),
+            nn.LeakyReLU(params.leaky_relu_slope),
+            # nn.Dropout(params.dropout_rate)
+            # nn.Tanh()
+        )
 
         self.out_layer = nn.Sequential(
             nn.Linear(params.hidden_size, params.input_size),
@@ -102,7 +102,7 @@ class GeneratorNet(nn.Module):
         # out = torch.cat([x, labels], 1)
 
         out = self.hidden_with_label(out)
-        # out = self.hidden1(out)
+        out = self.hidden1(out)
         out = self.out_layer(out)
 
         return out

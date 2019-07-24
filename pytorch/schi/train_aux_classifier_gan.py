@@ -21,7 +21,7 @@ import model_gan.one_label_data_loader as data_loader
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--parent_dir', default="C:/Users/H/Documents/Haifa Univ/Thesis/DL-Pytorch-data", help='path to experiments and data folder. not for Server')
-parser.add_argument('--data_dir', default='data/black-white-small', help="Directory containing the dataset")
+parser.add_argument('--data_dir', default='data/black-white-all/black-white-small', help="Directory containing the dataset")
 parser.add_argument('--model_dir', default='experiments/acgan_model/debug', help="Directory containing params.json")
 parser.add_argument('--restore_file', default=None,
                     help="Optional, name of the file in --model_dir containing weights to reload before \
@@ -69,6 +69,7 @@ def train_generator(d, optimizer, fake_data, fake_labels, r_f_loss_fn, c_loss_fn
     # Sample noise and generate fake data
     prediction_r_f, prediction_class = d(fake_data)
     # Calculate error and backpropagate
+
     # real_data_target: not a mistake - a tip from ganHacks
     is_real_fake_error = r_f_loss_fn(prediction_r_f, gan_net.real_data_target(prediction_r_f.size(0)))
     class_error = c_loss_fn(prediction_class, fake_labels)
@@ -128,6 +129,9 @@ def train(d_model, d_optimizer, g_model, g_optimizer, r_f_loss_fn, c_loss_fn, da
         noisy_input = gan_net.noise(real_data.size(0), params.noise_dim, params.noise_type)
         # noisy_label = Variable(torch.randint(params.num_classes//2, (real_data.size(0),)))
 
+        # temp_labels = list(range(real_data.size(0)))
+        # temp_labels = [it % params.num_classes for it in temp_labels]
+
         temp_labels = []
         for j in range(len(possible_classes) - 1):
             temp_labels.extend([possible_classes[j] for _ in range(real_data.size(0) // len(possible_classes))])
@@ -136,10 +140,9 @@ def train(d_model, d_optimizer, g_model, g_optimizer, r_f_loss_fn, c_loss_fn, da
                             for _ in range(
                 real_data.size(0) - (len(possible_classes) - 1) * (real_data.size(0) // len(possible_classes)))])
 
-        # temp_labels = [0 for _ in range(real_data.size(0) // 4)]
-        # temp_labels.extend([3 for _ in range(real_data.size(0) // 4)])
         # temp_labels.extend([5 for _ in range(real_data.size(0) // 4)])
         # temp_labels.extend([7 for _ in range(real_data.size(0) - 3 * (real_data.size(0) // 4))])
+
         noisy_label = torch.Tensor(temp_labels)
         noisy_label = Variable(noisy_label)
 
@@ -153,19 +156,15 @@ def train(d_model, d_optimizer, g_model, g_optimizer, r_f_loss_fn, c_loss_fn, da
         noisy_one_hot_v = gan_net.convert_int_to_one_hot_vector(noisy_label, params.num_classes).to(device)
 
         fake_data = g_model(noisy_input, noisy_one_hot_v)
-        # fake_data = g_model(noisy_input, noisy_one_hot_v).detach()
 
         # Train D
         d_error, d_pred_real, d_pred_fake, class_accuracy_real, class_accuracy_fake = \
             train_discriminator(d_model, d_optimizer, real_data, fake_data.detach(), real_label, noisy_label, r_f_loss_fn, c_loss_fn)  # do not remove .detach() here !!!!!
-            # train_discriminator(d_model, d_optimizer, real_data, fake_data, real_label, noisy_label, r_f_loss_fn, c_loss_fn)
 
         # 2. Train Generator
 
-        # fake_data = g_model(noisy_input, noisy_one_hot_v)   # not sure
-
         # Train G
-        g_error, d_pred_fake_g = train_generator(d_model, g_optimizer, fake_data, noisy_label, r_f_loss_fn, c_loss_fn)
+        g_error, d_pred_fake_g = train_generator(d_model, g_optimizer, fake_data, noisy_label, r_f_loss_fn, c_loss_fn)  # do not change. without .detach() here !!!!!
 
         # # Log error
         stats = {}
@@ -177,17 +176,6 @@ def train(d_model, d_optimizer, g_model, g_optimizer, r_f_loss_fn, c_loss_fn, da
         stats['d_pred_fake'] = get_stats(d_pred_fake, 'pred')
         stats['d_pred_fake_g'] = get_stats(d_pred_fake_g, 'pred')
 
-        # # Save Losses for plotting later
-        # D_losses.append(d_error.item())
-        # G_losses.append(g_error.item())
-        # accuracy_vals.append(class_accuracy)
-
-        #G_preds.append(d_pred_fake.data.mean())
-        #D_preds.append(d_pred_real.data.mean())
-
-        # Display Progress
-        # Display Images
-
         if i % params.save_summary_steps == 0:
             if num_of_batches > 1:
                 proportions_batch = real_label.shape[0] / params.batch_size
@@ -196,7 +184,6 @@ def train(d_model, d_optimizer, g_model, g_optimizer, r_f_loss_fn, c_loss_fn, da
             prop.append(proportions_batch)
             summ.append(stats)
 
-        # if (epoch == 0) and (round(0.1 * num_of_batches) > 0) and ((i + 1) % round(0.1 * num_of_batches) == 0):
         if ((i + 1) % max(1, round(0.1*num_of_batches)) == 0) and (epoch == 0):
             # Display data Images
             real_samples_reshaped = gan_net.vectors_to_samples(real_data)  # ?
@@ -272,8 +259,6 @@ def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, r_f_
             best_json_path = os.path.join(model_dir, "metrics_dev_best_weights.json")
             utils.save_dict_to_json(loss_metric_dict, best_json_path, epoch + 1)
 
-            # display_results.plot_graph(g_grads_graph, d_grads_graph, "Grads_Best", args.model_dir, epoch=epoch+1)
-
             if test_samples is not None:
                 np_test_samples = np.array(test_samples)
                 np_test_samples = \
@@ -335,7 +320,6 @@ def get_network_grads(net):
         if is_rel_w is None and is_rel_b is None:
             parameters_names.remove(par)
             j += 1
-    # grads = torch.autograd.grad(loss_fn, parameters_names, retain_graph=True)
 
     for name, param in net.named_parameters():
         if name in parameters_names:
@@ -362,16 +346,12 @@ def get_network_grads(net):
 
 def collect_network_statistics(net):
 
-    #status_net = []
     net_grads_graph = []
 
     for param_tensor in net.state_dict():
 
         if (net.state_dict()[param_tensor]).dtype != torch.float:
             continue
-        # status_net.append([param_tensor,
-        #                              (net.state_dict()[param_tensor].norm()).item(),
-        #                             list(net.state_dict()[param_tensor].size())])
 
         all_net_vals = ((net.state_dict()[param_tensor]).cpu().numpy()).tolist()
 
@@ -401,8 +381,10 @@ def plot_summary_graphs_layers(vals_per_epoch, n_type, v_type, im_path):
         val = vals_np[:, it].tolist()
         if it % 2:
             display_results.plot_graph(val, None, "{}_{}_layer_bias_{}".format(n_type, v_type, it), im_path)
+            print('{}_{}_layer_bias_{} graph plotted'.format(n_type, v_type, it))
         else:
             display_results.plot_graph(val, None, "{}_{}_layer_weight_{}".format(n_type, v_type, it), im_path)
+            print('{}_{}_layer_weight_{} graph plotted'.format(n_type, v_type, it))
 
     return
 
@@ -475,17 +457,17 @@ if __name__ == '__main__':
 
     # test_labels = list(range(num_test_samples))
     # test_labels = [it % params.num_classes for it in test_labels]
-    possible_classes = [0, 3, 5, 7, 9]
+    possible_classes = [0, 2, 3, 4, 5, 6, 7, 9]
     test_labels = []
     for i in range(len(possible_classes)-1):
         test_labels.extend([possible_classes[i] for _ in range(num_test_samples // len(possible_classes))])
     # last class will have amount of samples to complete to num_test_samples
     test_labels.extend([possible_classes[len(possible_classes)-1]
           for _ in range(num_test_samples - (len(possible_classes)-1) * (num_test_samples // len(possible_classes)))])
-    # test_labels = [0 for _ in range(num_test_samples//4)]
-    # test_labels.extend([3 for _ in range(num_test_samples//4)])
+
     # test_labels.extend([5 for _ in range(num_test_samples//4)])
     # test_labels.extend([7 for _ in range(num_test_samples - 3*(num_test_samples//4))])
+
     test_labels = torch.Tensor(test_labels)
     test_labels = test_labels.type(torch.LongTensor)
     test_labels = test_labels.to(device)
@@ -507,21 +489,15 @@ if __name__ == '__main__':
     train_gan(discriminator, generator, train_dl, d_optimizer, g_optimizer, real_fake_loss_fn, class_selection_loss_fn, params, args.model_dir)
 
     # track results
+    print('plotting graphs')
     display_results.plot_graph(G_losses, D_losses, "Loss", args.model_dir)
+    print('loss graph plotted')
     display_results.plot_graph(G_preds, D_preds, "Predictions", args.model_dir)
+    print('predictions graph plotted')
     display_results.plot_graph(real_accuracy_vals, fake_accuracy_vals, "Accuracy", args.model_dir)
+    print('accuracy graph plotted')
 
     plot_summary_graphs_layers(grads_per_epoch_g, 'G', 'Grads', args.model_dir)
     plot_summary_graphs_layers(grads_per_epoch_d, 'D', 'Grads', args.model_dir)
     plot_summary_graphs_layers(vals_per_epoch_g, 'G', 'Vals', args.model_dir)
     plot_summary_graphs_layers(vals_per_epoch_d, 'D', 'Vals', args.model_dir)
-    # grads_np_g = np.array(grads_per_epoch_g)
-    # for i in range(grads_np_g.shape[1]):
-    #   val_g = grads_np_g[:, i].tolist()
-    #  display_results.plot_graph(val_g, None, "G_Grads_layer_{}".format(i + 1), args.model_dir)
-    #
-    # grads_np_d = np.array(grads_per_epoch_d)
-    # for i in range(grads_np_d.shape[1]):
-    #   val_d = grads_np_d[:, i].tolist()
-    #  display_results.plot_graph(None, val_d, "D_Grads_layer_{}".format(i + 1), args.model_dir)
-
