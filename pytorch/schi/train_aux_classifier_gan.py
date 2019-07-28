@@ -129,16 +129,16 @@ def train(d_model, d_optimizer, g_model, g_optimizer, r_f_loss_fn, c_loss_fn, da
         noisy_input = gan_net.noise(real_data.size(0), params.noise_dim, params.noise_type)
         # noisy_label = Variable(torch.randint(params.num_classes//2, (real_data.size(0),)))
 
-        # temp_labels = list(range(real_data.size(0)))
-        # temp_labels = [it % params.num_classes for it in temp_labels]
+        temp_labels = list(range(real_data.size(0)))
+        temp_labels = [it % params.num_classes for it in temp_labels]
 
-        temp_labels = []
-        for j in range(len(possible_classes) - 1):
-            temp_labels.extend([possible_classes[j] for _ in range(real_data.size(0) // len(possible_classes))])
-        # last class will have amount of samples to complete to num_test_samples
-        temp_labels.extend([possible_classes[len(possible_classes) - 1]
-                            for _ in range(
-                real_data.size(0) - (len(possible_classes) - 1) * (real_data.size(0) // len(possible_classes)))])
+        # temp_labels = []
+        # for j in range(len(possible_classes) - 1):
+        #     temp_labels.extend([possible_classes[j] for _ in range(real_data.size(0) // len(possible_classes))])
+        # # last class will have amount of samples to complete to num_test_samples
+        # temp_labels.extend([possible_classes[len(possible_classes) - 1]
+        #                     for _ in range(
+        #         real_data.size(0) - (len(possible_classes) - 1) * (real_data.size(0) // len(possible_classes)))])
 
         # temp_labels.extend([5 for _ in range(real_data.size(0) // 4)])
         # temp_labels.extend([7 for _ in range(real_data.size(0) - 3 * (real_data.size(0) // 4))])
@@ -455,15 +455,15 @@ if __name__ == '__main__':
     num_test_samples = 20
     test_noise = gan_net.noise(num_test_samples, params.noise_dim, params.noise_type)
 
-    # test_labels = list(range(num_test_samples))
-    # test_labels = [it % params.num_classes for it in test_labels]
-    possible_classes = [0, 2, 3, 4, 5, 6, 7, 9]
-    test_labels = []
-    for i in range(len(possible_classes)-1):
-        test_labels.extend([possible_classes[i] for _ in range(num_test_samples // len(possible_classes))])
-    # last class will have amount of samples to complete to num_test_samples
-    test_labels.extend([possible_classes[len(possible_classes)-1]
-          for _ in range(num_test_samples - (len(possible_classes)-1) * (num_test_samples // len(possible_classes)))])
+    test_labels = list(range(num_test_samples))
+    test_labels = [it % params.num_classes for it in test_labels]
+    # possible_classes = [0, 2, 3, 4, 5, 6, 7, 9]
+    # test_labels = []
+    # for i in range(len(possible_classes)-1):
+    #     test_labels.extend([possible_classes[i] for _ in range(num_test_samples // len(possible_classes))])
+    # # last class will have amount of samples to complete to num_test_samples
+    # test_labels.extend([possible_classes[len(possible_classes)-1]
+    #       for _ in range(num_test_samples - (len(possible_classes)-1) * (num_test_samples // len(possible_classes)))])
 
     # test_labels.extend([5 for _ in range(num_test_samples//4)])
     # test_labels.extend([7 for _ in range(num_test_samples - 3*(num_test_samples//4))])

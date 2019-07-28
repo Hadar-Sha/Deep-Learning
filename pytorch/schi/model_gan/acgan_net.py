@@ -14,17 +14,24 @@ class DiscriminatorNet(nn.Module):
         self.in_layer = nn.Sequential(
             nn.Linear(params.input_size, params.hidden_size),
             # nn.ReLU(),
-            nn.LeakyReLU(params.leaky_relu_slope),
+            nn.LeakyReLU(params.leaky_relu_slope)
             # nn.Dropout(params.dropout_rate)
         )
         self.hidden1 = nn.Sequential(
             nn.Linear(params.hidden_size, params.hidden_size),
             # nn.Linear(params.hidden_size*2, params.hidden_size),
             # nn.ReLU(),
-            nn.LeakyReLU(params.leaky_relu_slope),
+            nn.LeakyReLU(params.leaky_relu_slope)
             # nn.Dropout(params.dropout_rate)
         )
-
+        # self.hidden2 = nn.Sequential(
+        #     nn.Linear(params.hidden_size, params.hidden_size),
+        #     nn.LeakyReLU(params.leaky_relu_slope)
+        # )
+        # self.hidden3 = nn.Sequential(
+        #     nn.Linear(params.hidden_size, params.hidden_size),
+        #     nn.LeakyReLU(params.leaky_relu_slope)
+        # )
         self.out_layer_real_fake = nn.Sequential(
             nn.Linear(params.hidden_size, 1),
             # nn.ReLU(),
@@ -41,6 +48,8 @@ class DiscriminatorNet(nn.Module):
 
         x_ = self.in_layer(x)
         x_ = self.hidden1(x_)
+        # x_ = self.hidden2(x_)
+        # x_ = self.hidden3(x_)
 
         out_real_fake = self.out_layer_real_fake(x_)
         out_class = self.out_layer_class(x_)
@@ -86,11 +95,18 @@ class GeneratorNet(nn.Module):
         self.hidden1 = nn.Sequential(
             nn.Linear(params.hidden_size, params.hidden_size),  # *2),
             # nn.ReLU(),
-            nn.LeakyReLU(params.leaky_relu_slope),
+            nn.LeakyReLU(params.leaky_relu_slope)
             # nn.Dropout(params.dropout_rate)
             # nn.Tanh()
         )
-
+        # self.hidden2 = nn.Sequential(
+        #     nn.Linear(params.hidden_size, params.hidden_size),
+        #     nn.LeakyReLU(params.leaky_relu_slope)
+        # )
+        # self.hidden3 = nn.Sequential(
+        #     nn.Linear(params.hidden_size, params.hidden_size),
+        #     nn.LeakyReLU(params.leaky_relu_slope)
+        # )
         self.out_layer = nn.Sequential(
             nn.Linear(params.hidden_size, params.input_size),
             nn.Tanh()
@@ -103,6 +119,8 @@ class GeneratorNet(nn.Module):
 
         out = self.hidden_with_label(out)
         out = self.hidden1(out)
+        # out = self.hidden2(out)
+        # out = self.hidden3(out)
         out = self.out_layer(out)
 
         return out
