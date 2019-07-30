@@ -21,42 +21,75 @@ DISTANCE_MAT = np.array([
             [1, 5, 2, 2, 3, 2, 1, 4, 0, 1],
             [2, 4, 3, 1, 2, 1, 2, 3, 1, 0]])
 # dtype=torch.float)
-
+distances_sum = np.sum(DISTANCE_MAT, 0)
+distances_sum = np.reshape(distances_sum, (10, 1))
+normalized_d_mat = DISTANCE_MAT / distances_sum
+normalized_d_mat = normalized_d_mat * 10
 
 class NeuralNet(nn.Module):
     def __init__(self, params):
         super(NeuralNet, self).__init__()
-        self.fcIn = nn.Linear(params.input_size, params.hidden_size)
-        self.fc2 = nn.Linear(params.hidden_size, params.hidden_size)
-        self.fc3 = nn.Linear(params.hidden_size, params.hidden_size)  # //2)
-        # self.fc4 = nn.Linear(params.hidden_size, params.hidden_size)  # params.num_classes)  # , bias=False)
-        self.fcOut = nn.Linear(params.hidden_size, params.num_classes)  # , bias=False)
+        self.in_layer = nn.Sequential(
+            nn.Linear(params.input_size, params.hidden_size),
+            nn.LeakyReLU(params.leaky_relu_slope)
+            # nn.ReLU(),
+            # nn.Dropout(params.dropout_rate)
+        )
+        # self.hidden1 = nn.Sequential(
+        #     nn.Linear(params.hidden_size, params.hidden_size),
+        #     nn.LeakyReLU(params.leaky_relu_slope)
+        #     # nn.ReLU(),
+        #     # nn.Dropout(params.dropout_rate)
+        # )
+        # self.hidden2 = nn.Sequential(
+        #     nn.Linear(params.hidden_size, params.hidden_size),
+        #     nn.LeakyReLU(params.leaky_relu_slope)
+        #     # nn.ReLU(),
+        #     # nn.Dropout(params.dropout_rate)
+        # )
+        self.out_layer = nn.Sequential(
+            nn.Linear(params.hidden_size, params.num_classes),
+            nn.Softmax(dim=1)
+            # nn.ReLU(),
+            # nn.Dropout(params.dropout_rate)
+        )
 
-        self.dropout_rate = params.dropout_rate
+        # self.fcIn = nn.Linear(params.input_size, params.hidden_size)
+        # self.fc2 = nn.Linear(params.hidden_size, params.hidden_size)
+        # self.fc3 = nn.Linear(params.hidden_size, params.hidden_size)  # //2)
+        # # self.fc4 = nn.Linear(params.hidden_size, params.hidden_size)  # params.num_classes)  # , bias=False)
+        # self.fcOut = nn.Linear(params.hidden_size, params.num_classes)  # , bias=False)
+        #
+        # self.dropout_rate = params.dropout_rate
 
     def forward(self, x):
 
-        # first layer
-        out = F.relu(self.fcIn(x))
-        out = F.dropout(out, self.dropout_rate, training=self.training)
+        out = self.in_layer(x)
+        # out = self.hidden1(out)
+        # out = self.hidden2(out)
+        out = self.out_layer(out)
 
-        # second layer
-        out = F.relu(self.fc2(out))
-        out = F.dropout(out, self.dropout_rate, training=self.training)
-
-        # third layer
-        out = F.relu(self.fc3(out))
-        out = F.dropout(out, self.dropout_rate, training=self.training)
-
-        # # forth layer
-        # out = F.relu(self.fc4(out))
+        # # first layer
+        # out = F.relu(self.fcIn(x))
         # out = F.dropout(out, self.dropout_rate, training=self.training)
-
-        # last layer
-        out = self.fcOut(out)  # fc4(out)
-        out = F.softmax(out, dim=1)
-        # out = F.relu(self.fc4(out))
-        # out = F.log_softmax(out, dim=1)
+        #
+        # # second layer
+        # out = F.relu(self.fc2(out))
+        # out = F.dropout(out, self.dropout_rate, training=self.training)
+        #
+        # # third layer
+        # out = F.relu(self.fc3(out))
+        # out = F.dropout(out, self.dropout_rate, training=self.training)
+        #
+        # # # forth layer
+        # # out = F.relu(self.fc4(out))
+        # # out = F.dropout(out, self.dropout_rate, training=self.training)
+        #
+        # # last layer
+        # out = self.fcOut(out)  # fc4(out)
+        # out = F.softmax(out, dim=1)
+        # # out = F.relu(self.fc4(out))
+        # # out = F.log_softmax(out, dim=1)
 
         return out
 
@@ -75,7 +108,7 @@ def convert_int_to_one_hot_vector(label, num_of_classes):
         return one_hot_vector
 
     else:
-        # this is for 3d tensor . continue here!!!!!!
+        # this is for 3d tensor
         labels_shaped = label.view(label.size(0), label.size(1), -1)
 
         one_hot_matrix = torch.zeros([list(labels_shaped.size())[0], list(labels_shaped.size())[1], num_of_classes], device=label.device)
@@ -148,7 +181,8 @@ class SCHILoss(nn.Module):
     def __init__(self):
         super(SCHILoss, self).__init__()
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.distance_mat = torch.from_numpy(DISTANCE_MAT).float().to(self.device)
+        self.distance_mat = torch.from_numpy(normalized_d_mat).float().to(self.device)
+        # self.distance_mat = torch.from_numpy(DISTANCE_MAT).float().to(self.device)
 
     def forward(self, out, label):
         val = self.distance_mat[label] * out
@@ -160,7 +194,8 @@ class SCHITwoLabelsLoss(nn.Module):
     def __init__(self):
         super(SCHITwoLabelsLoss, self).__init__()
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.distance_mat = torch.from_numpy(DISTANCE_MAT).float().to(self.device)
+        self.distance_mat = torch.from_numpy(normalized_d_mat).float().to(self.device)
+        # self.distance_mat = torch.from_numpy(DISTANCE_MAT).float().to(self.device)
 
     def forward(self, out_bef, out_aft, label_bef, label_aft):
         val_bef = self.distance_mat[label_bef] * out_bef
@@ -179,7 +214,8 @@ class HLoss(nn.Module):
         super(HLoss, self).__init__()
 
     def forward(self, x):
-        val = -x*torch.exp(x)
+        val = -x*torch.log(x)
+        # val = -x*torch.exp(x)
         val = torch.sum(val, dim=1)
         return torch.mean(val)
 
@@ -253,6 +289,20 @@ def loss_fn_two_labels_low_entropy(outputs, labels, num_of_classes):
 
     return schi_two_labels_criterion(out_before_filter, out_after_filter, label_before_filter, label_after_filter) \
            + min_entropy_criterion(out_before_filter) + min_entropy_criterion(out_after_filter)
+
+
+def vectors_to_samples(vectors):
+    vectors = vectors.reshape(vectors.size()[0], -1, 3)
+    vectors = vectors.cpu().numpy()
+    vectors = vectors.tolist()
+    return vectors
+
+
+def labels_to_titles(labels):
+    if len(labels.shape) > 1 and min(labels.shape) == 1:
+        labels = labels.view(labels.size()[0],)
+    labels = (labels.cpu().numpy()).tolist()
+    return labels
 
 
 def accuracy(outputs, labels):

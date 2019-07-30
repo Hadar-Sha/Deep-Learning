@@ -3,6 +3,7 @@
 import argparse
 import logging
 import os
+import re
 import sys
 
 import numpy as np
@@ -14,24 +15,24 @@ from pytorchtools import EarlyStopping
 # from tqdm import tqdm
 
 import utils
-# import model_weighted_schi_distance.net as net
-# import model_weighted_schi_distance.one_label_data_loader as data_loader
-import model.net as net
-import model.one_label_data_loader as data_loader
+import model_weighted_schi_distance.net as net
+import model_weighted_schi_distance.one_label_data_loader as data_loader
+# import model.net as net
+# import model.one_label_data_loader as data_loader
 from evaluate import evaluate
 import display_digit as display_results
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--parent_dir', default="C:/Users/H/Documents/Haifa Univ/Thesis/DL-Pytorch-data", help='path to experiments and data folder. not for Server')
-parser.add_argument('--data_dir', default='data/data', help="Directory containing the dataset")
-parser.add_argument('--model_dir', default='experiments/base_model/debug', help="Directory containing params.json")
+parser.add_argument('--data_dir', default='data/color-syn-two-colors-big', help="Directory containing the dataset")
+parser.add_argument('--model_dir', default='experiments/base_model_weighted_schi_dist/debug', help="Directory containing params.json")
 parser.add_argument('--early_stop', type=bool, default=False, help="Optional, do early stop")  # action='store_true'
 parser.add_argument('--restore_file', default=None,
                     help="Optional, name of the file in --model_dir containing weights to reload before \
                     training")  # 'best' or 'train'
 
 
-def train(model, optimizer, loss_fn, dataloader, metrics, params, epoch):
+def train(model, optimizer, loss_fn, dataloader, metrics, params, epoch, fig):
     """Train the model on `num_steps` batches
 
     Args:
@@ -50,6 +51,7 @@ def train(model, optimizer, loss_fn, dataloader, metrics, params, epoch):
     # summary for current training loop and a running average object for loss
     summ = []
     prop = []
+    num_of_batches = max(1, len(dataloader.dataset) // dataloader.batch_size)
 
     loss_avg = utils.WeightedAverage()
 
@@ -99,7 +101,10 @@ def train(model, optimizer, loss_fn, dataloader, metrics, params, epoch):
             output_batch = output_batch.data.cpu().numpy()
             labels_batch = labels_batch.data.cpu().numpy()
 
-            proportions_batch = labels_batch.shape[0] / params.batch_size
+            if num_of_batches > 1:
+                proportions_batch = labels_batch.shape[0] / params.batch_size
+            else:
+                proportions_batch = 1
             prop.append(proportions_batch)
 
             # compute all metrics on this batch
@@ -108,6 +113,15 @@ def train(model, optimizer, loss_fn, dataloader, metrics, params, epoch):
             summary_batch['loss'] = loss.item()
             summ.append(summary_batch)
             # print(summ)
+
+        if ((i + 1) % max(1, round(0.1*num_of_batches)) == 0) and (epoch == 0):
+            # Display data Images
+            real_samples_reshaped = net.vectors_to_samples(train_batch)  # ?
+            real_titles = net.labels_to_titles(labels_batch)
+
+            print('plotting batch #{} of input data'.format(i+1))
+            display_results.fill_figure(real_samples_reshaped, fig, i + 1, args.model_dir, -1, 1, labels=real_titles,
+                                        dtype='real')
 
     # compute mean of all metrics in summary
     # print(summ)
@@ -150,20 +164,24 @@ def train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_
 
     best_dev_acc = 0.0
 
-    early_stopping = EarlyStopping(patience=round(0.01 * params.num_epochs), verbose=False)
+    if args.early_stop:
+        early_stopping = EarlyStopping(patience=round(0.01 * params.num_epochs), verbose=False)
+
+    fig = display_results.create_figure()
 
     for epoch in range(params.num_epochs):
         # Run one epoch
         logging.info("Epoch {}/{}".format(epoch + 1, params.num_epochs))
 
         # compute number of batches in one epoch (one full pass over the training set)
-        train(model, optimizer, loss_fn, train_dataloader, metrics, params, epoch)
+        train(model, optimizer, loss_fn, train_dataloader, metrics, params, epoch, fig)
 
         # Evaluate for one epoch on validation set
         dev_metrics, incorrect_samples = evaluate(model, loss_fn, dev_dataloader, metrics, incorrect, params, epoch)
 
         dev_loss = dev_metrics['loss']
-        early_stopping(dev_loss, model)
+        if args.early_stop:
+            early_stopping(dev_loss, model)
 
         if args.early_stop and early_stopping.early_stop:
             # need_to_stop = True
@@ -171,11 +189,17 @@ def train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_
             logging.info("Early stopping")
             break
 
-        grads_graph = collect_network_statistics(model)
-        grads_per_epoch.append(grads_graph)
+        # grads_graph = collect_network_statistics(model)
+        # grads_per_epoch.append(grads_graph)
 
         dev_acc = dev_metrics['accuracy']
         is_best = dev_acc > best_dev_acc
+
+        grads_graph, _ = get_network_grads(model)
+        vals_graph = collect_network_statistics(model)
+
+        grads_per_epoch.append(grads_graph)
+        vals_per_epoch.append(vals_graph)
 
         # Save weights
         utils.save_checkpoint({'epoch': epoch + 1,
@@ -208,6 +232,47 @@ def train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_
         accuracy.append(dev_acc)
         # if isinstance(loss, torch.autograd.Variable):
         #     loss_v = loss.data.cpu().numpy()
+    display_results.close_figure(fig)
+    return
+
+
+def get_network_grads(net):
+    weight_string = "weight"
+    bias_string = "bias"
+    output_gradients = []
+    output_names = []
+
+    parameters_names = list(net.state_dict().keys())
+    j = 0
+    for i in range(len(parameters_names)):
+        par = parameters_names[i - j]
+        is_rel_w = re.search(weight_string, par)
+        is_rel_b = re.search(bias_string, par)
+        if is_rel_w is None and is_rel_b is None:
+            parameters_names.remove(par)
+            j += 1
+
+    for name, param in net.named_parameters():
+        if name in parameters_names:
+            all_net_grads = param.grad.data.cpu().numpy().tolist()
+            flat_net_grads = []
+            if isinstance(all_net_grads, (list,)):
+
+                for elem in all_net_grads:
+                    if isinstance(elem, (list,)) and isinstance(elem[0], (list,)):
+                        for item in elem:
+                            flat_net_grads.extend(item)
+                    elif isinstance(elem, (list,)):
+                        flat_net_grads.extend(elem)
+                    else:
+                        flat_net_grads.extend([elem])
+            else:
+                flat_net_grads = all_net_grads
+
+            output_gradients.append([min(flat_net_grads), np.median(flat_net_grads), max(flat_net_grads)])
+            output_names.append(name)
+
+    return output_gradients, output_names
 
 
 def collect_network_statistics(net):
@@ -241,6 +306,21 @@ def collect_network_statistics(net):
         net_grads_graph.append([min(flat_net_grads), max(flat_net_grads)])
 
     return net_grads_graph
+
+
+def plot_summary_graphs_layers(vals_to_plot, v_type, im_path):
+    vals_np = np.array(vals_to_plot)
+    for it in range(vals_np.shape[1]):
+        val = vals_np[:, it].tolist()
+        layer_indx = it // 2
+        if it % 2:  # odd row numbers store bias vals
+            display_results.plot_graph(val, None, "{}_layer_bias_{}".format(v_type, layer_indx), im_path)
+            print('{}_layer_bias_{} graph plotted'.format(v_type, layer_indx))
+        else:  # even row numbers store weight vals
+            display_results.plot_graph(val, None, "{}_layer_weight_{}".format(v_type, layer_indx), im_path)
+            print('{}_layer_weight_{} graph plotted'.format(v_type, layer_indx))
+
+    return
 
 
 if __name__ == '__main__':
@@ -290,7 +370,8 @@ if __name__ == '__main__':
 
     # fetch loss function and metrics
     # loss_fn = net.loss_fn_two_labels
-    loss_fn = net.loss_fn
+    # loss_fn = net.loss_fn
+    loss_fn = net.loss_fn_low_entropy
 
     # comment to self - print to file the name of loss function !!!!!!
     # print(loss_fn)
@@ -301,17 +382,22 @@ if __name__ == '__main__':
     losses = []
     accuracy = []
     grads_per_epoch = []
+    vals_per_epoch = []
 
     # Train the model
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))
     train_and_evaluate(model, train_dl, dev_dl, optimizer, loss_fn, metrics, incorrect, params, args.model_dir,
                        args.restore_file)
 
+    print('plotting graphs')
     display_results.plot_graph(losses, None, "General Loss", args.model_dir)
+    print('loss graph plotted')
     display_results.plot_graph(accuracy, None, "General dev accuracy", args.model_dir)
+    print('accuracy graph plotted')
 
-    grads_np = np.array(grads_per_epoch)
-    for i in range(grads_np.shape[1]):
-        val = grads_np[:, i].tolist()
-        display_results.plot_graph(val, None, "Grads_layer_{}".format(i+1), args.model_dir)
+    plot_summary_graphs_layers(grads_per_epoch, 'Grads', args.model_dir)
+    # grads_np = np.array(grads_per_epoch)
+    # for i in range(grads_np.shape[1]):
+    #     val = grads_np[:, i].tolist()
+    #     display_results.plot_graph(val, None, "Grads_layer_{}".format(i+1), args.model_dir)
 

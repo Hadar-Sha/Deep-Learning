@@ -57,8 +57,8 @@ if __name__ == "__main__":
     num_epochs = 1000
     # learning_rate = 1e-2
 
-    for noise_dim in z_noise_dims:
-        for hidden_size in hidden_sizes:
+    for hidden_size in hidden_sizes:
+        for noise_dim in z_noise_dims:
             # Modify the relevant parameter in params
             # params.learning_rate = learning_rate
             params.hidden_size = hidden_size
