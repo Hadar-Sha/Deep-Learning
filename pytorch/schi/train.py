@@ -24,9 +24,9 @@ import display_digit as display_results
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--parent_dir', default="C:/Users/H/Documents/Haifa Univ/Thesis/DL-Pytorch-data", help='path to experiments and data folder. not for Server')
-parser.add_argument('--data_dir', default='data/color-syn-two-colors-big', help="Directory containing the dataset")
-parser.add_argument('--model_dir', default='experiments/base_model_weighted_schi_dist/debug', help="Directory containing params.json")
-parser.add_argument('--early_stop', type=bool, default=False, help="Optional, do early stop")  # action='store_true'
+parser.add_argument('--data_dir', default='data/color-syn-one-color-big', help="Directory containing the dataset")
+parser.add_argument('--model_dir', default='experiments/base_model_weighted_schi_dist/syn-color/three_layers/debug', help="Directory containing params.json")
+parser.add_argument('--early_stop', type=int, default=0, help="Optional, do early stop")  # action='store_true'
 parser.add_argument('--restore_file', default=None,
                     help="Optional, name of the file in --model_dir containing weights to reload before \
                     training")  # 'best' or 'train'
@@ -114,7 +114,8 @@ def train(model, optimizer, loss_fn, dataloader, metrics, params, epoch, fig):
             summ.append(summary_batch)
             # print(summ)
 
-        if ((i + 1) % max(1, round(0.1*num_of_batches)) == 0) and (epoch == 0):
+        if ((i + 1) % max(1, round(0.5*num_of_batches)) == 0) and (epoch == 0):
+        # if ((i + 1) % max(1, round(0.1*num_of_batches)) == 0) and (epoch == 0):
             # Display data Images
             real_samples_reshaped = net.vectors_to_samples(train_batch)  # ?
             real_titles = net.labels_to_titles(labels_batch)
@@ -164,8 +165,9 @@ def train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_
 
     best_dev_acc = 0.0
 
-    if args.early_stop:
-        early_stopping = EarlyStopping(patience=round(0.01 * params.num_epochs), verbose=False)
+    if params.early_stop:
+        early_stopping = EarlyStopping(patience=round(0.1 * params.num_epochs), verbose=False)
+        # early_stopping = EarlyStopping(patience=round(0.01 * params.num_epochs), verbose=False)
 
     fig = display_results.create_figure()
 
@@ -180,10 +182,10 @@ def train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_
         dev_metrics, incorrect_samples = evaluate(model, loss_fn, dev_dataloader, metrics, incorrect, params, epoch)
 
         dev_loss = dev_metrics['loss']
-        if args.early_stop:
+        if params.early_stop:
             early_stopping(dev_loss, model)
 
-        if args.early_stop and early_stopping.early_stop:
+        if params.early_stop and early_stopping.early_stop:
             # need_to_stop = True
             print("Early stopping")
             logging.info("Early stopping")

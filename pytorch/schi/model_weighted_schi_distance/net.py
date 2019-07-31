@@ -21,10 +21,14 @@ DISTANCE_MAT = np.array([
             [1, 5, 2, 2, 3, 2, 1, 4, 0, 1],
             [2, 4, 3, 1, 2, 1, 2, 3, 1, 0]])
 # dtype=torch.float)
-distances_sum = np.sum(DISTANCE_MAT, 0)
-distances_sum = np.reshape(distances_sum, (10, 1))
-normalized_d_mat = DISTANCE_MAT / distances_sum
-normalized_d_mat = normalized_d_mat * 10
+
+# distances_sum = np.sum(DISTANCE_MAT, 0)
+# distances_sum = np.reshape(distances_sum, (10, 1))
+# normalized_d_mat = DISTANCE_MAT / distances_sum
+# normalized_d_mat = normalized_d_mat * 10
+
+normalized_d_mat = DISTANCE_MAT
+
 
 class NeuralNet(nn.Module):
     def __init__(self, params):
@@ -35,12 +39,12 @@ class NeuralNet(nn.Module):
             # nn.ReLU(),
             # nn.Dropout(params.dropout_rate)
         )
-        # self.hidden1 = nn.Sequential(
-        #     nn.Linear(params.hidden_size, params.hidden_size),
-        #     nn.LeakyReLU(params.leaky_relu_slope)
-        #     # nn.ReLU(),
-        #     # nn.Dropout(params.dropout_rate)
-        # )
+        self.hidden1 = nn.Sequential(
+            nn.Linear(params.hidden_size, params.hidden_size),
+            nn.LeakyReLU(params.leaky_relu_slope)
+            # nn.ReLU(),
+            # nn.Dropout(params.dropout_rate)
+        )
         # self.hidden2 = nn.Sequential(
         #     nn.Linear(params.hidden_size, params.hidden_size),
         #     nn.LeakyReLU(params.leaky_relu_slope)
@@ -65,7 +69,7 @@ class NeuralNet(nn.Module):
     def forward(self, x):
 
         out = self.in_layer(x)
-        # out = self.hidden1(out)
+        out = self.hidden1(out)
         # out = self.hidden2(out)
         out = self.out_layer(out)
 
@@ -361,6 +365,10 @@ def incorrect(images, outputs, labels):
 
         Returns: (list) of images for which the classification is wrong, the classification and the correct label
         """
+    dest_min = 0
+    dest_max = 255
+    curr_min = 0
+    curr_max = 1
     mat_out = []
     outputs = np.argmax(outputs, axis=1)
     # find incorrect indexes
@@ -369,9 +377,13 @@ def incorrect(images, outputs, labels):
 
     # find compatible incorrect samples and save them in a list
     samples_numpy = images.cpu().numpy()
+    # normalizing samples to [0,255]
+    samples_numpy = \
+        dest_min + (dest_max - dest_min) * (samples_numpy - curr_min) / (curr_max - curr_min)
+    samples_numpy = np.around(samples_numpy).astype(int)
 
     # find samples
-    incorrect_samples = (samples_numpy[current_incorrect_indexes]).astype(int)
+    incorrect_samples = (samples_numpy[current_incorrect_indexes])  # .astype(int)
 
     # find classifier result
     labels_pred_numpy = outputs
