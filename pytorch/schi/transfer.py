@@ -15,16 +15,18 @@ import model.net as net
 import model.two_labels_data_loader as two_labels_data_loader
 from evaluate import evaluate
 from train import train
+import display_digit as display_results
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--data_dir', default='data/data-two-labels', help="Directory containing the destination dataset")
-parser.add_argument('--model_dir', default='experiments/transfer_training_model/in-grayscale',
+parser.add_argument('--parent_dir', default="C:/Users/H/Documents/Haifa Univ/Thesis/DL-Pytorch-data", help='path to experiments and data folder. not for Server')
+parser.add_argument('--data_dir', default='data/two-labels/data-two-labels-big', help="Directory containing the destination dataset")
+parser.add_argument('--model_dir', default='experiments/transfer_training_model/in-debug',
                     help="Directory containing params.json")
 parser.add_argument('--restore_file', default='best',
                     help="Optional, name of the file in --model_dir containing weights to reload before \
                     training")  # 'best' or 'train'
 # added by me
-parser.add_argument('--model_out_dir', default='experiments/transfer_training_model/out-grayscale',
+parser.add_argument('--model_out_dir', default='experiments/transfer_training_model/out-debug',
                     help="Directory to write transfer results")
 
 
@@ -41,12 +43,14 @@ def after_transfer_train_and_evaluate(model, train_dataloader, dev_dataloader, o
 
     best_dev_acc = 0.0
 
+    fig = display_results.create_figure()
+
     for epoch in range(params.num_epochs):
         # Run one epoch
         logging.info("Epoch {}/{}".format(epoch + 1, params.num_epochs))
 
         # compute number of batches in one epoch (one full pass over the training set)
-        train(model, optimizer, loss_fn, train_dataloader, metrics, params, epoch)
+        train(model, optimizer, loss_fn, train_dataloader, metrics, params, epoch, fig)
 
         # Evaluate for one epoch on validation set
         dev_metrics, incorrect_samples = evaluate(model, loss_fn, dev_dataloader, metrics, incorrect, params, epoch)
@@ -83,6 +87,9 @@ def after_transfer_train_and_evaluate(model, train_dataloader, dev_dataloader, o
 
         last_csv_path = os.path.join(model_out_dir, "incorrect_last_samples.csv")
         utils.save_incorrect_to_csv(incorrect_samples, last_csv_path)
+
+    display_results.close_figure(fig)
+
     return
 
 
@@ -90,6 +97,9 @@ if __name__ == '__main__':
 
     # Load the parameters from json file
     args = parser.parse_args()
+    if args.parent_dir and not torch.cuda.is_available():
+        os.chdir(args.parent_dir)
+
     json_path = os.path.join(args.model_out_dir, 'params.json')
     assert os.path.isfile(json_path), "No json configuration file found at {}".format(json_path)
     params = utils.Params(json_path)

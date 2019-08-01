@@ -13,22 +13,23 @@ import re
 # from utils_gan import Logger
 import display_digit as display_results
 import utils
-import model_gan.acgan_net as gan_net
-# import model_gan.two_labels_data_loader as data_loader
-import model_gan.one_label_data_loader as data_loader
+# import model_gan.acgan_net as gan_net
+import model_gan.acgan_hiding_net as gan_net
+import model_gan.two_labels_data_loader as data_loader
+# import model_gan.one_label_data_loader as data_loader
 #import model_gan.single_sample_data_loader as data_loader
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--parent_dir', default="C:/Users/H/Documents/Haifa Univ/Thesis/DL-Pytorch-data", help='path to experiments and data folder. not for Server')
-parser.add_argument('--data_dir', default='data/black-white-all/black-white-small', help="Directory containing the dataset")
-parser.add_argument('--model_dir', default='experiments/acgan_model/debug', help="Directory containing params.json")
+parser.add_argument('--data_dir', default='data/two-labels/single-class/hidden-easy-big-only-9-5', help="Directory containing the dataset")
+parser.add_argument('--model_dir', default='experiments/acgan_model/hiding_scheme/debug', help="Directory containing params.json")
 parser.add_argument('--restore_file', default=None,
                     help="Optional, name of the file in --model_dir containing weights to reload before \
                     training")  # 'best' or 'train'
 
 
-def train_discriminator(d, optimizer, real_data, fake_data, real_labels, fake_labels, r_f_loss_fn, c_loss_fn):
+def train_discriminator(d, optimizer, real_data, fake_data, real_labels, fake_labels, r_f_loss_fn, c_loss_fn, num_classes):
     # Reset gradients
     optimizer.zero_grad()
 
@@ -36,7 +37,7 @@ def train_discriminator(d, optimizer, real_data, fake_data, real_labels, fake_la
     prediction_r_f_real, prediction_class = d(real_data)
     # Calculate error and backpropagate
     is_real_fake_error = r_f_loss_fn(prediction_r_f_real, gan_net.real_data_target(real_data.size(0)))
-    class_error = c_loss_fn(prediction_class, real_labels)
+    class_error = c_loss_fn(prediction_class, real_labels, num_classes)
 
     total_real_error = is_real_fake_error + class_error
     total_real_error.backward()
@@ -48,7 +49,7 @@ def train_discriminator(d, optimizer, real_data, fake_data, real_labels, fake_la
     prediction_r_f_fake, prediction_class = d(fake_data)
     # Calculate error and backpropagate
     is_real_fake_error = r_f_loss_fn(prediction_r_f_fake, gan_net.fake_data_target(real_data.size(0)))
-    class_error = c_loss_fn(prediction_class, fake_labels)
+    class_error = c_loss_fn(prediction_class, fake_labels, num_classes)
 
     total_fake_error = is_real_fake_error + class_error
     total_fake_error.backward()
@@ -62,7 +63,7 @@ def train_discriminator(d, optimizer, real_data, fake_data, real_labels, fake_la
     return total_real_error + total_fake_error, prediction_r_f_real, prediction_r_f_fake, class_accuracy_real, class_accuracy_fake
 
 
-def train_generator(d, optimizer, fake_data, fake_labels, r_f_loss_fn, c_loss_fn):
+def train_generator(d, optimizer, fake_data, fake_labels, r_f_loss_fn, c_loss_fn, num_classes):
     # 2. Train Generator
     # Reset gradients
     optimizer.zero_grad()
@@ -72,7 +73,7 @@ def train_generator(d, optimizer, fake_data, fake_labels, r_f_loss_fn, c_loss_fn
 
     # real_data_target: not a mistake - a tip from ganHacks
     is_real_fake_error = r_f_loss_fn(prediction_r_f, gan_net.real_data_target(prediction_r_f.size(0)))
-    class_error = c_loss_fn(prediction_class, fake_labels)
+    class_error = c_loss_fn(prediction_class, fake_labels, num_classes)
 
     total_generator_error = is_real_fake_error + class_error
     total_generator_error.backward()
@@ -129,16 +130,16 @@ def train(d_model, d_optimizer, g_model, g_optimizer, r_f_loss_fn, c_loss_fn, da
         noisy_input = gan_net.noise(real_data.size(0), params.noise_dim, params.noise_type)
         # noisy_label = Variable(torch.randint(params.num_classes//2, (real_data.size(0),)))
 
-        temp_labels = list(range(real_data.size(0)))
-        temp_labels = [it % params.num_classes for it in temp_labels]
+        # temp_labels = list(range(real_data.size(0)))
+        # temp_labels = [it % params.num_classes for it in temp_labels]
 
-        # temp_labels = []
-        # for j in range(len(possible_classes) - 1):
-        #     temp_labels.extend([possible_classes[j] for _ in range(real_data.size(0) // len(possible_classes))])
-        # # last class will have amount of samples to complete to num_test_samples
-        # temp_labels.extend([possible_classes[len(possible_classes) - 1]
-        #                     for _ in range(
-        #         real_data.size(0) - (len(possible_classes) - 1) * (real_data.size(0) // len(possible_classes)))])
+        temp_labels = []
+        for j in range(len(possible_classes) - 1):
+            temp_labels.extend([possible_classes[j] for _ in range(real_data.size(0) // len(possible_classes))])
+        # last class will have amount of samples to complete to num_test_samples
+        temp_labels.extend([possible_classes[len(possible_classes) - 1]
+                            for _ in range(
+                real_data.size(0) - (len(possible_classes) - 1) * (real_data.size(0) // len(possible_classes)))])
 
         # temp_labels.extend([5 for _ in range(real_data.size(0) // 4)])
         # temp_labels.extend([7 for _ in range(real_data.size(0) - 3 * (real_data.size(0) // 4))])
@@ -146,25 +147,40 @@ def train(d_model, d_optimizer, g_model, g_optimizer, r_f_loss_fn, c_loss_fn, da
         noisy_label = torch.Tensor(temp_labels)
         noisy_label = Variable(noisy_label)
 
+        # if len(noisy_label.shape) == 2:
+        #     noisy_label = noisy_label.view(real_label.size(0), -1, 2)
+        # else:
+        #     noisy_label = noisy_label.view(real_label.size(0), -1)
+
+        if real_label.size(1) == 1:
+            real_label = real_label.view(real_label.size(0))
+
         # noisy_label = Variable(torch.randint(params.num_classes, (real_data.size(0),)))
         noisy_label = noisy_label.type(torch.LongTensor).to(device)
 
-        real_one_hot_v = gan_net.convert_int_to_one_hot_vector(real_label, params.num_classes).to(device)
-
-        real_label = real_label.view(real_label.size(0))
+        real_label_before = torch.index_select(real_label, 1, torch.tensor([0], device=real_label.device))
+        real_label_after = torch.index_select(real_label, 1, torch.tensor([1], device=real_label.device))
+        real_bef_one_hot_v = gan_net.convert_int_to_one_hot_vector(real_label_before, params.num_classes).to(device)
+        real_aft_one_hot_v = gan_net.convert_int_to_one_hot_vector(real_label_after, params.num_classes).to(device)
+        real_one_hot_v = torch.cat((real_bef_one_hot_v, real_aft_one_hot_v), 1)
+        # real_label = real_label.view(real_label.size(0))
         # noisy_label = noisy_label.view(real_data.size(0), -1)
-        noisy_one_hot_v = gan_net.convert_int_to_one_hot_vector(noisy_label, params.num_classes).to(device)
+        noisy_label_before = torch.index_select(noisy_label, 1, torch.tensor([0], device=noisy_label.device))
+        noisy_label_after = torch.index_select(noisy_label, 1, torch.tensor([1], device=noisy_label.device))
+        noisy_bef_one_hot_v = gan_net.convert_int_to_one_hot_vector(noisy_label_before, params.num_classes).to(device)
+        noisy_aft_one_hot_v = gan_net.convert_int_to_one_hot_vector(noisy_label_after, params.num_classes).to(device)
+        noisy_one_hot_v = torch.cat((noisy_bef_one_hot_v, noisy_aft_one_hot_v), 1)
 
         fake_data = g_model(noisy_input, noisy_one_hot_v)
 
         # Train D
         d_error, d_pred_real, d_pred_fake, class_accuracy_real, class_accuracy_fake = \
-            train_discriminator(d_model, d_optimizer, real_data, fake_data.detach(), real_label, noisy_label, r_f_loss_fn, c_loss_fn)  # do not remove .detach() here !!!!!
+            train_discriminator(d_model, d_optimizer, real_data, fake_data.detach(), real_label, noisy_label, r_f_loss_fn, c_loss_fn, params.num_classes)  # do not remove .detach() here !!!!!
 
         # 2. Train Generator
 
         # Train G
-        g_error, d_pred_fake_g = train_generator(d_model, g_optimizer, fake_data, noisy_label, r_f_loss_fn, c_loss_fn)  # do not change. without .detach() here !!!!!
+        g_error, d_pred_fake_g = train_generator(d_model, g_optimizer, fake_data, noisy_label, r_f_loss_fn, c_loss_fn, params.num_classes)  # do not change. without .detach() here !!!!!
 
         # # Log error
         stats = {}
@@ -184,14 +200,15 @@ def train(d_model, d_optimizer, g_model, g_optimizer, r_f_loss_fn, c_loss_fn, da
             prop.append(proportions_batch)
             summ.append(stats)
 
-        if ((i + 1) % max(1, round(0.1*num_of_batches)) == 0) and (epoch == 0):
+        if ((i + 1) % max(1, round(0.25*num_of_batches)) == 0) and (epoch == 0):
+        # if ((i + 1) % max(1, round(0.1*num_of_batches)) == 0) and (epoch == 0):
             # Display data Images
             real_samples_reshaped = gan_net.vectors_to_samples(real_data)  # ?
             real_titles = gan_net.labels_to_titles(real_label)
 
             print('plotting batch #{} of input data'.format(i+1))
-            display_results.fill_figure(real_samples_reshaped, fig, i + 1, args.model_dir, -1, 1, labels=real_titles,
-                                        dtype='real')
+            display_results.fill_figure(real_samples_reshaped, fig, i + 1, args.model_dir, -1, 1, withgrayscale=True,
+                                        labels=real_titles, dtype='real')
 
     stats_mean = {metric: np.sum([x[metric] for x in summ] / np.sum(prop)) for metric in summ[0]}
     # Save Losses for plotting later
@@ -214,7 +231,8 @@ def train(d_model, d_optimizer, g_model, g_optimizer, r_f_loss_fn, c_loss_fn, da
         test_samples_reshaped = gan_net.vectors_to_samples(test_samples)  # ?
         test_titles = gan_net.labels_to_titles(test_labels)
 
-        display_results.fill_figure(test_samples_reshaped, fig, epoch + 1, args.model_dir, -1, 1, labels=test_titles)
+        display_results.fill_figure(test_samples_reshaped, fig, epoch + 1, args.model_dir, -1, 1,
+                                    withgrayscale=True, labels=test_titles)
 
     return test_samples, stats_mean['d_error'] + stats_mean['g_error']
 
@@ -379,12 +397,13 @@ def plot_summary_graphs_layers(vals_per_epoch, n_type, v_type, im_path):
     vals_np = np.array(vals_per_epoch)
     for it in range(vals_np.shape[1]):
         val = vals_np[:, it].tolist()
-        if it % 2:
-            display_results.plot_graph(val, None, "{}_{}_layer_bias_{}".format(n_type, v_type, it), im_path)
-            print('{}_{}_layer_bias_{} graph plotted'.format(n_type, v_type, it))
-        else:
-            display_results.plot_graph(val, None, "{}_{}_layer_weight_{}".format(n_type, v_type, it), im_path)
-            print('{}_{}_layer_weight_{} graph plotted'.format(n_type, v_type, it))
+        layer_indx = it // 2
+        if it % 2:  # odd row numbers store bias vals
+            display_results.plot_graph(val, None, "{}_{}_layer_bias_{}".format(n_type, v_type, layer_indx), im_path)
+            print('{}_{}_layer_bias_{} graph plotted'.format(n_type, v_type, layer_indx))
+        else:  # even row numbers store weight vals
+            display_results.plot_graph(val, None, "{}_{}_layer_weight_{}".format(n_type, v_type, layer_indx), im_path)
+            print('{}_{}_layer_weight_{} graph plotted'.format(n_type, v_type, layer_indx))
 
     return
 
@@ -455,15 +474,16 @@ if __name__ == '__main__':
     num_test_samples = 20
     test_noise = gan_net.noise(num_test_samples, params.noise_dim, params.noise_type)
 
-    test_labels = list(range(num_test_samples))
-    test_labels = [it % params.num_classes for it in test_labels]
+    # test_labels = list(range(num_test_samples))
+    # test_labels = [it % params.num_classes for it in test_labels]
+    possible_classes = [[9, 5]]
     # possible_classes = [0, 2, 3, 4, 5, 6, 7, 9]
-    # test_labels = []
-    # for i in range(len(possible_classes)-1):
-    #     test_labels.extend([possible_classes[i] for _ in range(num_test_samples // len(possible_classes))])
-    # # last class will have amount of samples to complete to num_test_samples
-    # test_labels.extend([possible_classes[len(possible_classes)-1]
-    #       for _ in range(num_test_samples - (len(possible_classes)-1) * (num_test_samples // len(possible_classes)))])
+    test_labels = []
+    for i in range(len(possible_classes)-1):
+        test_labels.extend([possible_classes[i] for _ in range(num_test_samples // len(possible_classes))])
+    # last class will have amount of samples to complete to num_test_samples
+    test_labels.extend([possible_classes[len(possible_classes)-1]
+          for _ in range(num_test_samples - (len(possible_classes)-1) * (num_test_samples // len(possible_classes)))])
 
     # test_labels.extend([5 for _ in range(num_test_samples//4)])
     # test_labels.extend([7 for _ in range(num_test_samples - 3*(num_test_samples//4))])
@@ -472,8 +492,16 @@ if __name__ == '__main__':
     test_labels = test_labels.type(torch.LongTensor)
     test_labels = test_labels.to(device)
 
-    test_labels = test_labels.view(num_test_samples, -1)
-    test_one_hot_v = gan_net.convert_int_to_one_hot_vector(test_labels, params.num_classes).to(device)
+    # if len(test_labels.shape) == 2:
+    #     test_labels = test_labels.view(num_test_samples, -1, 2)
+    # else:
+    #     test_labels = test_labels.view(num_test_samples, -1)
+    test_label_before = torch.index_select(test_labels, 1, torch.tensor([0], device=test_labels.device))
+    test_label_after = torch.index_select(test_labels, 1, torch.tensor([1], device=test_labels.device))
+    test_bef_one_hot_v = gan_net.convert_int_to_one_hot_vector(test_label_before, params.num_classes).to(device)
+    test_aft_one_hot_v = gan_net.convert_int_to_one_hot_vector(test_label_after, params.num_classes).to(device)
+    test_one_hot_v = torch.cat((test_bef_one_hot_v, test_aft_one_hot_v), 1)
+    # test_one_hot_v = gan_net.convert_int_to_one_hot_vector(test_labels, params.num_classes).to(device)
 
     D_losses = []
     G_losses = []
