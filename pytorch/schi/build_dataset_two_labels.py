@@ -192,7 +192,7 @@ def complete_to_mult(all_vals):
 
 if __name__ == '__main__':
 
-    trainDevTestSizes = [0.7, 0.15, 0.15]  # [0.6, 0.2, 0.2] # [2 / 3, 1 / 6, 1 / 6]
+    trainDevTestSizes = [55 / 70, 10 / 70, 5 / 70] #[0.7, 0.15, 0.15]  # [0.6, 0.2, 0.2] # [2 / 3, 1 / 6, 1 / 6]
     totalVals = [0] * 3
     lens = [0] * 3
     neededVals = [0] * 3
