@@ -35,6 +35,9 @@ def train_discriminator(d, optimizer, real_data, fake_data, real_labels, fake_la
 
     # 1.1 Train on Real Data
     prediction_r_f_real, prediction_class_real = d(real_data)
+
+    assert ((prediction_r_f_real.detach().cpu().numpy() >= 0.).all() and (prediction_r_f_real.detach().cpu().numpy() <= 1.).all())
+
     # Calculate error and backpropagate
     is_real_fake_error = r_f_loss_fn(prediction_r_f_real, gan_net.real_data_target(real_data.size(0)))
     class_error = c_loss_fn(prediction_class_real, real_labels, num_classes)
@@ -49,6 +52,10 @@ def train_discriminator(d, optimizer, real_data, fake_data, real_labels, fake_la
 
     # 1.2 Train on Fake Data
     prediction_r_f_fake, prediction_class_fake = d(fake_data)
+
+    assert ((prediction_r_f_fake.detach().cpu().numpy() >= 0.).all() and (prediction_r_f_fake.detach().cpu().numpy() <= 1.).all())
+    # assert ((prediction_r_f_fake.detach().cpu().numpy() >= 0.) and (prediction_r_f_fake.detach().cpu().numpy() <= 1.)).all()
+
     # Calculate error and backpropagate
     is_real_fake_error = r_f_loss_fn(prediction_r_f_fake, gan_net.fake_data_target(real_data.size(0)))
     class_error = c_loss_fn(prediction_class_fake, fake_labels, num_classes)
@@ -80,6 +87,7 @@ def train_generator(d, optimizer, fake_data, fake_labels, r_f_loss_fn, c_loss_fn
     prediction_r_f, prediction_class = d(fake_data)
     # Calculate error and backpropagate
 
+    assert ((prediction_r_f.detach().cpu().numpy() >= 0.).all() and (prediction_r_f.detach().cpu().numpy() <= 1.).all())
     # real_data_target: not a mistake - a tip from ganHacks
     is_real_fake_error = r_f_loss_fn(prediction_r_f, gan_net.real_data_target(prediction_r_f.size(0)))
     class_error = c_loss_fn(prediction_class, fake_labels, num_classes)
@@ -470,6 +478,10 @@ if __name__ == '__main__':
     logging.info("data was loaded from {}".format(args.data_dir))
     logging.info("- done.")
 
+    num_of_batches = max(1, len(train_dl.dataset) // train_dl.batch_size)
+    logging.info("data-set size: {}".format(len(train_dl.dataset)))
+    logging.info("number of batches: {}".format(num_of_batches))
+
     # Define the model and optimizer
     discriminator = gan_net.DiscriminatorNet(params)
     generator = gan_net.GeneratorNet(params)
@@ -495,6 +507,7 @@ if __name__ == '__main__':
     # fetch loss functions
     real_fake_loss_fn = gan_net.real_fake_loss_fn
     class_selection_loss_fn = gan_net.class_selection_loss_fn
+    # class_selection_loss_fn = gan_net.class_selection_loss_fn_exp_kl
     # incorrect = gan_net.incorrect_two_labels
 
     # Train the model
@@ -502,7 +515,7 @@ if __name__ == '__main__':
     num_test_samples = 20
     test_noise = gan_net.noise(num_test_samples, params.noise_dim, params.noise_type)
 
-    possible_classes = [[9, 5]]  # [0, 2, 3, 4, 5, 6, 7, 9]
+    possible_classes = None  # [[0, 1]]  # [[4, 1]]  # [[3, 1]]  # [[9, 5]]  # [0, 2, 3, 4, 5, 6, 7, 9]
     if possible_classes is None:
         test_labels = list(range(num_test_samples))
         test_labels = [it % params.num_classes for it in test_labels]

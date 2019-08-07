@@ -278,6 +278,51 @@ def class_selection_loss_fn(outputs, labels, num_of_classes):
     return func
 
 
+def class_selection_loss_fn_exp_kl(outputs, labels, num_of_classes):
+    """
+        Compute the loss given outputs and labels.
+        we will achieve max KL dist between out_bef_filt and lab_aft_filt by the following:
+        we wish the output to be not equal to lab_aft_filt.
+        given lab_aft_filt in [0-9] we can create a binary vector of size [num_of_classes] with all entrances = 1 if
+        entrance != lab_aft_filt and entrance = 0 otherwise.
+        we normalize this vector v to have sum = 1 by dividing in (num_of_classes-1)
+        we then calculate KL loss between out_bef_filt and v
+
+        Args:
+            outputs: (Variable) dimension batch_size x 10 - output of the model
+            labels: (Variable) dimension batch_size, where each element is a value in [0- 9]
+            num_of_classes: (int) value describing number of different classes (10)
+
+        Returns:
+            loss (Variable): loss for all samples in the batch
+    """
+
+    # kl_criterion = nn.KLDivLoss(size_average=True, reduce=True)
+    kl_criterion = nn.KLDivLoss()
+    min_entropy_criterion = HLoss()
+
+    label_before_filter = torch.index_select(labels, 1, torch.tensor([0], device=labels.device))
+    label_after_filter = torch.index_select(labels, 1, torch.tensor([1], device=labels.device))
+
+    one_hot_vector_after_filter = convert_int_to_one_hot_vector(label_after_filter, num_of_classes)
+    one_hot_vector_before_filter = convert_int_to_one_hot_vector(label_before_filter, num_of_classes)  # unneeded
+
+    out_before_filter = torch.index_select(outputs, 1, torch.tensor(list(range(10)), device=outputs.device))
+    out_after_filter = torch.index_select(outputs, 1, torch.tensor(list(range(10, 20)), device=outputs.device))
+
+    completing_after_filter = (torch.ones(labels.shape[0], num_of_classes, device=labels.device) - one_hot_vector_after_filter)\
+                               / (num_of_classes-1)
+
+    func = kl_criterion(out_after_filter, one_hot_vector_after_filter) + \
+           (1 - torch.exp(- kl_criterion(out_before_filter, one_hot_vector_after_filter))) + \
+           min_entropy_criterion(out_after_filter)
+           # min_entropy_criterion(out_before_filter)
+
+    # kl_criterion(out_before_filter, completing_after_filter) + \
+
+    return func
+
+
 # compute the current classification accuracy
 def compute_acc(outputs, labels):
     # outputs_ = outputs.data.max(1)[1]

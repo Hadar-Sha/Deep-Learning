@@ -276,8 +276,12 @@ def fill_figure(samples, fig, epoch, image_path, curr_min_val, curr_max_val, wit
 def plot_graph(losses_one, losses_two, gtype, image_path, epoch=None):
 
     fig1 = plt.figure()
-    # fig1.clear()
 
+    # default value for title and x and y axis
+    plt.xlabel("iterations")
+    plt.ylabel("values")
+    if isinstance(gtype, str):
+        plt.title(gtype)
     if gtype == "Loss":
         plt.title("Generator and Discriminator Loss During Training")
         plt.xlabel("iterations")
@@ -294,6 +298,8 @@ def plot_graph(losses_one, losses_two, gtype, image_path, epoch=None):
         plt.title("Generator and Discriminator predictions During Training")
         plt.xlabel("iterations")
         plt.ylabel("Predictions")
+        # plt.ylim(0, 1)
+        plt.yticks(np.arange(0, 1.1, step=0.2))
     elif gtype == "Grads_Best" and epoch is not None:
         plt.title("min and max gradients with best metrics epoch {}".format(epoch))
         plt.xlabel("layers")
@@ -306,37 +312,38 @@ def plot_graph(losses_one, losses_two, gtype, image_path, epoch=None):
         plt.title("Generator and Discriminator Accuracy During Training")
         plt.xlabel("iterations")
         plt.ylabel("Accuracy")
+        plt.yticks(np.arange(0, 1.1, step=0.1))
 
     if (not losses_one) is False and (not losses_two) is False:
         if gtype == "VAE Loss":
-            bce_h, = plt.plot(losses_one, label="BCE")
-            kl_h, = plt.plot(losses_two, label="KL")
-            plt.legend(handles=[bce_h, kl_h], fontsize="small")
+            plt.plot(losses_one, label="BCE")
+            plt.plot(losses_two, label="KL")
+            plt.legend()
         elif gtype == "Grads_Best" or gtype == "Grads":
             plt.plot(losses_one)
             plt.plot(losses_two)
         else:
-            g_h = plt.plot(losses_one, label="G")
-            d_h = plt.plot(losses_two, label="D")
-            # plt.legend(handles=[g_h, d_h])
+            plt.plot(losses_one, label="G")
+            plt.plot(losses_two, label="D")
             plt.legend()
-            # plt.legend([g_h, d_h], ['G', 'D'], fontsize="small")
     elif (not losses_one) is False:
         if gtype == "VAE Loss":
-            bce_h = plt.plot(losses_one, label="BCE")
-            plt.legend(handles=[bce_h])
+            plt.plot(losses_one, label="BCE")
+            plt.legend()
         elif gtype == "Grads_Best" or gtype == "Grads":
             plt.plot(losses_one)
         else:
-            g_h = plt.plot(losses_one, label="G")
+            plt.plot(losses_one, label="G")
+            plt.legend()
     elif (not losses_two) is False:
         if gtype == "VAE Loss":
-            kl_h = plt.plot(losses_two, label="KL")
-            plt.legend(handles=[kl_h])
+            plt.plot(losses_two, label="KL")
+            plt.legend()
         elif gtype == "Grads_Best" or gtype == "Grads":
             plt.plot(losses_two)
         else:
-            d_h = plt.plot(losses_two, label="D")
+            plt.plot(losses_two, label="D")
+            plt.legend()
     else:
         print('no data was provided')
         return
