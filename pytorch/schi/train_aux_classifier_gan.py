@@ -36,7 +36,11 @@ def train_discriminator(d, optimizer, real_data, fake_data, real_labels, fake_la
     # 1.1 Train on Real Data
     prediction_r_f_real, prediction_class_real = d(real_data)
 
-    assert ((prediction_r_f_real.detach().cpu().numpy() >= 0.).all() and (prediction_r_f_real.detach().cpu().numpy() <= 1.).all())
+    # print(not np.isinf(prediction_r_f_real.detach().cpu().numpy()).all())
+    assert (not np.isnan(prediction_r_f_real.detach().cpu().numpy()).all()
+            or not np.isinf(prediction_r_f_real.detach().cpu().numpy()).all())
+    assert ((prediction_r_f_real.detach().cpu().numpy() >= 0.).all()
+            and (prediction_r_f_real.detach().cpu().numpy() <= 1.).all())
 
     # Calculate error and backpropagate
     is_real_fake_error = r_f_loss_fn(prediction_r_f_real, gan_net.real_data_target(real_data.size(0)))
@@ -53,8 +57,10 @@ def train_discriminator(d, optimizer, real_data, fake_data, real_labels, fake_la
     # 1.2 Train on Fake Data
     prediction_r_f_fake, prediction_class_fake = d(fake_data)
 
-    assert ((prediction_r_f_fake.detach().cpu().numpy() >= 0.).all() and (prediction_r_f_fake.detach().cpu().numpy() <= 1.).all())
-    # assert ((prediction_r_f_fake.detach().cpu().numpy() >= 0.) and (prediction_r_f_fake.detach().cpu().numpy() <= 1.)).all()
+    assert (not np.isnan(prediction_r_f_fake.detach().cpu().numpy()).all()
+            or not np.isinf(prediction_r_f_fake.detach().cpu().numpy()).all())
+    assert ((prediction_r_f_fake.detach().cpu().numpy() >= 0.).all()
+            and (prediction_r_f_fake.detach().cpu().numpy() <= 1.).all())
 
     # Calculate error and backpropagate
     is_real_fake_error = r_f_loss_fn(prediction_r_f_fake, gan_net.fake_data_target(real_data.size(0)))
@@ -87,7 +93,10 @@ def train_generator(d, optimizer, fake_data, fake_labels, r_f_loss_fn, c_loss_fn
     prediction_r_f, prediction_class = d(fake_data)
     # Calculate error and backpropagate
 
-    assert ((prediction_r_f.detach().cpu().numpy() >= 0.).all() and (prediction_r_f.detach().cpu().numpy() <= 1.).all())
+    assert (not np.isnan(prediction_r_f.detach().cpu().numpy()).all()
+            or not np.isinf(prediction_r_f.detach().cpu().numpy()).all())
+    assert ((prediction_r_f.detach().cpu().numpy() >= 0.).all()
+            and (prediction_r_f.detach().cpu().numpy() <= 1.).all())
     # real_data_target: not a mistake - a tip from ganHacks
     is_real_fake_error = r_f_loss_fn(prediction_r_f, gan_net.real_data_target(prediction_r_f.size(0)))
     class_error = c_loss_fn(prediction_class, fake_labels, num_classes)
@@ -106,7 +115,8 @@ def get_stats(val, val_type):
         ret_val = val.data.cpu().numpy()
 
     elif isinstance(val, torch.autograd.Variable) and val_type == 'pred':
-        ret_val = val.data.mean()
+        ret_val = val.data.mean().cpu().numpy()
+        # ret_val = val.data.mean()
 
     else:
         print('invalid input')
@@ -162,16 +172,18 @@ def train(d_model, d_optimizer, g_model, g_optimizer, r_f_loss_fn, c_loss_fn, da
         # Generate fake data
         noisy_input = gan_net.noise(real_data.size(0), params.noise_dim, params.noise_type)
 
-        # temp_labels = list(range(real_data.size(0)))
-        # temp_labels = [it % params.num_classes for it in temp_labels]
+        if possible_classes is None:  # need to be fixed. not for hiding scheme !!!!!!
+            temp_labels = list(range(real_data.size(0)))
+            temp_labels = [it % params.num_classes for it in temp_labels]
 
-        temp_labels = []
-        for j in range(len(possible_classes) - 1):
-            temp_labels.extend([possible_classes[j] for _ in range(real_data.size(0) // len(possible_classes))])
-        # last class will have amount of samples to complete to num_test_samples
-        temp_labels.extend([possible_classes[len(possible_classes) - 1]
-                            for _ in range(
-                real_data.size(0) - (len(possible_classes) - 1) * (real_data.size(0) // len(possible_classes)))])
+        else:
+            temp_labels = []
+            for j in range(len(possible_classes) - 1):
+                temp_labels.extend([possible_classes[j] for _ in range(real_data.size(0) // len(possible_classes))])
+            # last class will have amount of samples to complete to num_test_samples
+            temp_labels.extend([possible_classes[len(possible_classes) - 1]
+                                for _ in range(
+                    real_data.size(0) - (len(possible_classes) - 1) * (real_data.size(0) // len(possible_classes)))])
 
         noisy_label = torch.Tensor(temp_labels)
         noisy_label = Variable(noisy_label)
@@ -260,17 +272,23 @@ def train(d_model, d_optimizer, g_model, g_optimizer, r_f_loss_fn, c_loss_fn, da
                                     withgrayscale=True, labels=test_titles)
 
     return test_samples, stats_mean['d_error'] + stats_mean['g_error'], \
-           stats_mean['class_accuracy_real'] + stats_mean['class_accuracy_fake'], [incorrect_real, incorrect_fake]
+           stats_mean['class_accuracy_real'] + stats_mean['class_accuracy_fake'], \
+           (stats['d_pred_real']-0.5) + (0.5 - stats['d_pred_fake']), [incorrect_real, incorrect_fake]
 
 
 def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, r_f_loss_fn, c_loss_fn, params, model_dir):
 
     best_loss = np.inf
     best_accuracy = 0.0
+    best_preds = 0.0
+    # best_pred_real = 0.0
+    # best_pred_fake = 0.0
+    best_dict = {'loss': best_loss, 'accuracy': best_accuracy, 'prediction': best_preds}
     dest_min = 0
     dest_max = 255
     curr_min = -1
     curr_max = 1
+    # is_best_dict = {}
 
     fig = display_results.create_figure()
 
@@ -278,10 +296,16 @@ def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, r_f_
         # Run one epoch
         logging.info("Epoch {}/{}".format(epoch + 1, params.num_epochs))
 
-        test_samples, loss_mean_sum, accuracy_sum, incorrect_samples = train(d_model, d_optimizer, g_model, g_optimizer,
+        test_samples, loss_mean_sum, accuracy_sum, preds_sum, incorrect_samples = train(d_model, d_optimizer, g_model, g_optimizer,
                                                           r_f_loss_fn, c_loss_fn, train_dataloader, params, epoch, fig)
 
-        is_best = (loss_mean_sum <= best_loss) | (accuracy_sum >= best_accuracy)
+        is_best_loss = (loss_mean_sum <= best_loss)
+        is_best_acc = (accuracy_sum >= best_accuracy)
+        is_best_preds = (preds_sum <= best_preds)
+        is_best = is_best_loss | is_best_acc | is_best_preds
+        is_best_dict = {'loss': is_best_loss, 'accuracy': is_best_acc, 'prediction': is_best_preds}
+        curr_vals_dict = {'loss': loss_mean_sum, 'accuracy': accuracy_sum, 'prediction': preds_sum}
+        # is_best = (loss_mean_sum <= best_loss) | (accuracy_sum >= best_accuracy)
 
         g_grads_graph, _ = get_network_grads(g_model)
         d_grads_graph, _ = get_network_grads(d_model)
@@ -294,21 +318,44 @@ def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, r_f_
         vals_dict['vals_per_epoch_d'].append(d_vals_graph)
 
         if is_best:
-            logging.info("- Found new best loss")
-            print("Epoch {}/{}".format(epoch + 1, params.num_epochs))
-            print("- Found new best loss")
-            best_loss = loss_mean_sum
-            print("mean loss is {:05.3f}".format(loss_mean_sum))
-            metric_dict = {'loss': loss_mean_sum, 'accuracy': accuracy_sum}
+            # if is_best_loss:
+            #     logging.info("- Found new best loss")
+            #     print("Epoch {}/{}".format(epoch + 1, params.num_epochs))
+            #     print("- Found new best loss")
+            # elif is_best_acc:
+            #     logging.info("- Found new best loss")
+            for it in is_best_dict.keys():
+                if is_best_dict[it]:
+                    logging.info("- Found new best {}".format(it))
+                    print("Epoch {}/{}".format(epoch + 1, params.num_epochs))
+                    print("- Found new best {}".format(it))
+                    best_dict[it] = curr_vals_dict[it]
+                    # best_loss = loss_mean_sum
+                    print("mean {} is {:05.3f}".format(it, loss_mean_sum))
+                    # print("mean loss is {:05.3f}".format(loss_mean_sum))
+            metric_dict = curr_vals_dict
+            # for k in metric_dict.keys():
+            #     metric_dict[k] = round(metric_dict[k], 3)
+            # metric_dict = {'loss': loss_mean_sum, 'accuracy': accuracy_sum}
 
             # Save best val metrics in a json file in the model directory
-            best_json_path = os.path.join(model_dir, "metrics_dev_best_weights.json")
-            utils.save_dict_to_json(metric_dict, best_json_path, epoch + 1)
+            for it in is_best_dict.keys():
+                if is_best_dict[it]:
+                    best_json_path = os.path.join(model_dir, "metrics_dev_best_{}_weights.json".format(it))
+                    best_csv_real_path = os.path.join(model_dir, "incorrect_real_best_{}_samples.csv".format(it))
+                    best_csv_fake_path = os.path.join(model_dir, "incorrect_fake_best_{}_samples.csv".format(it))
 
-            best_csv_path = os.path.join(model_dir, "incorrect_real_best_samples.csv")
-            utils.save_incorrect_to_csv(incorrect_samples[0], best_csv_path)
-            best_csv_path = os.path.join(model_dir, "incorrect_fake_best_samples.csv")
-            utils.save_incorrect_to_csv(incorrect_samples[1], best_csv_path)
+                    utils.save_dict_to_json(metric_dict, best_json_path, epoch + 1)
+                    utils.save_incorrect_to_csv(incorrect_samples[0], best_csv_real_path)
+                    utils.save_incorrect_to_csv(incorrect_samples[1], best_csv_fake_path)
+
+            # best_json_path = os.path.join(model_dir, "metrics_dev_best_weights.json")
+            # best_csv_path = os.path.join(model_dir, "incorrect_real_best_samples.csv")
+            # best_csv_path = os.path.join(model_dir, "incorrect_fake_best_samples.csv")
+
+            # utils.save_dict_to_json(metric_dict, best_json_path, epoch + 1)
+            # utils.save_incorrect_to_csv(incorrect_samples[0], best_csv_real_path)
+            # utils.save_incorrect_to_csv(incorrect_samples[1], best_csv_fake_path)
 
             if test_samples is not None:
                 np_test_samples = np.array(test_samples)
@@ -328,15 +375,18 @@ def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, r_f_
                 utils.save_incorrect_to_csv(test_all_data, last_csv_path)
 
         if test_samples is not None:
+            for it in is_best_dict.keys():
+                if is_best_dict[it]:
+                    best_type = it
             utils.save_checkpoint({'epoch': epoch + 1,
                                    'state_dict': d_model.state_dict(),
                                    'optim_dict': d_optimizer.state_dict()}, is_best=is_best, checkpoint=model_dir,
-                                  ntype='d')
+                                  ntype='d', best_type=best_type)
 
             utils.save_checkpoint({'epoch': epoch + 1,
                                    'state_dict': g_model.state_dict(),
                                    'optim_dict': g_optimizer.state_dict()}, is_best=is_best, checkpoint=model_dir,
-                                  ntype='g')
+                                  ntype='g', best_type=best_type)
 
             np_test_samples = np.array(test_samples)
             # convert back to range [0, 255]
@@ -515,7 +565,7 @@ if __name__ == '__main__':
     num_test_samples = 20
     test_noise = gan_net.noise(num_test_samples, params.noise_dim, params.noise_type)
 
-    possible_classes = None  # [[0, 1]]  # [[4, 1]]  # [[3, 1]]  # [[9, 5]]  # [0, 2, 3, 4, 5, 6, 7, 9]
+    possible_classes = [[0, 1], [3, 1], [8, 1], [9, 1]]  # None  # [[0, 1]]  # [[4, 1]]  # [[3, 1]]  # [[9, 5]]  # [0, 2, 3, 4, 5, 6, 7, 9]
     if possible_classes is None:
         test_labels = list(range(num_test_samples))
         test_labels = [it % params.num_classes for it in test_labels]
@@ -527,9 +577,9 @@ if __name__ == '__main__':
         test_labels.extend([possible_classes[len(possible_classes)-1]
               for _ in range(num_test_samples - (len(possible_classes)-1) * (num_test_samples // len(possible_classes)))])
 
-        test_labels = torch.Tensor(test_labels)
-        test_labels = test_labels.type(torch.LongTensor)
-        test_labels = test_labels.to(device)
+    test_labels = torch.Tensor(test_labels)
+    test_labels = test_labels.type(torch.LongTensor)
+    test_labels = test_labels.to(device)
 
     if len(test_labels.shape) == 1:
         test_one_hot_v = gan_net.convert_int_to_one_hot_vector(test_labels, params.num_classes).to(device)

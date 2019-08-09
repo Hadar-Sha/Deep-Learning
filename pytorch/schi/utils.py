@@ -124,7 +124,8 @@ def save_dict_to_json(d, json_path, epoch=None):
     """
     with open(json_path, 'w') as f:
         # We need to convert the values to float for json (it doesn't accept np.array, np.float, )
-        d = {k: float(v) for k, v in d.items()}
+        # d = {k: "{:.3f}".format(v) for k, v in d.items()}
+        d = {k: round(float(v), 3) for k, v in d.items()}
         if epoch is not None:
             d.update({'epoch': epoch})
         json.dump(d, f, indent=4)
@@ -133,7 +134,7 @@ def save_dict_to_json(d, json_path, epoch=None):
         #     json.dump(e, f, indent=4)
 
 
-def save_checkpoint(state, is_best, checkpoint, ntype=None):
+def save_checkpoint(state, is_best, checkpoint, ntype=None, best_type=None):
     """Saves model and training parameters at checkpoint + 'last.pth.tar'. If is_best==True, also saves
     checkpoint + 'best.pth.tar'
 
@@ -142,9 +143,11 @@ def save_checkpoint(state, is_best, checkpoint, ntype=None):
         is_best: (bool) True if it is the best model seen till now
         checkpoint: (string) folder where parameters are to be saved
         ntype:
+        best_type:
     """
-    if ntype:
-
+    if ntype and best_type:
+        filepath = os.path.join(checkpoint, ntype + '_' + best_type + '_' + 'last.pth.tar')
+    elif ntype:
         filepath = os.path.join(checkpoint, ntype + '_' + 'last.pth.tar')
     else:
         filepath = os.path.join(checkpoint, 'last.pth.tar')
@@ -155,7 +158,9 @@ def save_checkpoint(state, is_best, checkpoint, ntype=None):
         # print("Checkpoint Directory exists! ")
     torch.save(state, filepath)
     if is_best:
-        if ntype:
+        if ntype and best_type:
+            shutil.copyfile(filepath, os.path.join(checkpoint, ntype + '_' + best_type + '_' + 'best.pth.tar'))
+        elif ntype:
             shutil.copyfile(filepath, os.path.join(checkpoint, ntype + '_' + 'best.pth.tar'))
         else:
             shutil.copyfile(filepath, os.path.join(checkpoint, 'best.pth.tar'))
