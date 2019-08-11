@@ -37,16 +37,37 @@ def train_discriminator(d, optimizer, real_data, fake_data, real_labels, fake_la
     prediction_r_f_real, prediction_class_real = d(real_data)
 
     # print(not np.isinf(prediction_r_f_real.detach().cpu().numpy()).all())
-    assert (not np.isnan(prediction_r_f_real.detach().cpu().numpy()).all()
-            or not np.isinf(prediction_r_f_real.detach().cpu().numpy()).all())
-    assert ((prediction_r_f_real.detach().cpu().numpy() >= 0.).all()
-            and (prediction_r_f_real.detach().cpu().numpy() <= 1.).all())
+    if np.isnan(prediction_r_f_real.detach().cpu().numpy()).all():
+        logging.info("prediction_r_f_real is nan")
+        assert False, "prediction_r_f_real is nan"
+    if np.isinf(prediction_r_f_real.detach().cpu().numpy()).all():
+        logging.info("prediction_r_f_real is inf")
+        assert False, "prediction_r_f_real is inf"
+    # assert (not np.isnan(prediction_r_f_real.detach().cpu().numpy()).all()
+    #         or not np.isinf(prediction_r_f_real.detach().cpu().numpy()).all())
+    if not ((prediction_r_f_real.detach().cpu().numpy() >= 0.).all()
+            and (prediction_r_f_real.detach().cpu().numpy() <= 1.).all()):
+        logging.info("prediction_r_f_real is <= 0 or >= 1")
+        assert False, "prediction_r_f_real is <= 0 or >= 1"
 
     # Calculate error and backpropagate
     is_real_fake_error = r_f_loss_fn(prediction_r_f_real, gan_net.real_data_target(real_data.size(0)))
     class_error = c_loss_fn(prediction_class_real, real_labels, num_classes)
 
     total_real_error = is_real_fake_error + class_error
+
+    # if (is_real_fake_error.detach().cpu().numpy() < 0.).any() or (is_real_fake_error.detach().cpu().numpy() > 1.).any()\
+    #         or np.isnan(is_real_fake_error.detach().cpu().numpy()).any() \
+    #         or np.isinf(is_real_fake_error.detach().cpu().numpy()).any():
+    #     print("is_real_fake_error is: {}".format(is_real_fake_error))
+    #     logging.info("is_real_fake_error is: {}".format(is_real_fake_error))
+    #
+    # if (class_error.detach().cpu().numpy() < 0.).any() or (class_error.detach().cpu().numpy() > 1.).any()\
+    #         or np.isnan(class_error.detach().cpu().numpy()).any() \
+    #         or np.isinf(class_error.detach().cpu().numpy()).any():
+    #     print("class_error is: {}".format(class_error))
+    #     logging.info("class_error is: {}".format(class_error))
+
     total_real_error.backward()
 
     # compute the current classification accuracy
@@ -57,16 +78,39 @@ def train_discriminator(d, optimizer, real_data, fake_data, real_labels, fake_la
     # 1.2 Train on Fake Data
     prediction_r_f_fake, prediction_class_fake = d(fake_data)
 
-    assert (not np.isnan(prediction_r_f_fake.detach().cpu().numpy()).all()
-            or not np.isinf(prediction_r_f_fake.detach().cpu().numpy()).all())
-    assert ((prediction_r_f_fake.detach().cpu().numpy() >= 0.).all()
-            and (prediction_r_f_fake.detach().cpu().numpy() <= 1.).all())
+    # assert (not np.isnan(prediction_r_f_fake.detach().cpu().numpy()).all()
+    #         or not np.isinf(prediction_r_f_fake.detach().cpu().numpy()).all())
+    # assert ((prediction_r_f_fake.detach().cpu().numpy() >= 0.).all()
+    #         and (prediction_r_f_fake.detach().cpu().numpy() <= 1.).all())
+    if np.isnan(prediction_r_f_fake.detach().cpu().numpy()).all():
+        logging.info("prediction_r_f_fake is nan")
+        assert False, "prediction_r_f_fake is nan"
+    if np.isinf(prediction_r_f_fake.detach().cpu().numpy()).all():
+        logging.info("prediction_r_f_fake is inf")
+        assert False, "prediction_r_f_fake is inf"
+    if not ((prediction_r_f_fake.detach().cpu().numpy() >= 0.).all()
+            and (prediction_r_f_fake.detach().cpu().numpy() <= 1.).all()):
+        logging.info("prediction_r_f_fake is <= 0 or >= 1")
+        assert False, "prediction_r_f_fake is <= 0 or >= 1"
 
     # Calculate error and backpropagate
     is_real_fake_error = r_f_loss_fn(prediction_r_f_fake, gan_net.fake_data_target(real_data.size(0)))
     class_error = c_loss_fn(prediction_class_fake, fake_labels, num_classes)
 
     total_fake_error = is_real_fake_error + class_error
+
+    # if (is_real_fake_error.detach().cpu().numpy() < 0.).any() or (is_real_fake_error.detach().cpu().numpy() > 1.).any() \
+    #         or np.isnan(is_real_fake_error.detach().cpu().numpy()).any() \
+    #         or np.isinf(is_real_fake_error.detach().cpu().numpy()).any():
+    #     print("is_real_fake_error is: {}".format(is_real_fake_error))
+    #     logging.info("is_real_fake_error is: {}".format(is_real_fake_error))
+    #
+    # if (class_error.detach().cpu().numpy() < 0.).any() or (class_error.detach().cpu().numpy() > 1.).any() \
+    #         or np.isnan(class_error.detach().cpu().numpy()).any() \
+    #         or np.isinf(class_error.detach().cpu().numpy()).any():
+    #     print("class_error is: {}".format(class_error))
+    #     logging.info("class_error is: {}".format(class_error))
+
     total_fake_error.backward()
 
     # compute the current classification accuracy
@@ -93,15 +137,39 @@ def train_generator(d, optimizer, fake_data, fake_labels, r_f_loss_fn, c_loss_fn
     prediction_r_f, prediction_class = d(fake_data)
     # Calculate error and backpropagate
 
-    assert (not np.isnan(prediction_r_f.detach().cpu().numpy()).all()
-            or not np.isinf(prediction_r_f.detach().cpu().numpy()).all())
-    assert ((prediction_r_f.detach().cpu().numpy() >= 0.).all()
-            and (prediction_r_f.detach().cpu().numpy() <= 1.).all())
+    # assert (not np.isnan(prediction_r_f.detach().cpu().numpy()).all()
+    #         or not np.isinf(prediction_r_f.detach().cpu().numpy()).all())
+    # assert ((prediction_r_f.detach().cpu().numpy() >= 0.).all()
+    #         and (prediction_r_f.detach().cpu().numpy() <= 1.).all())
+    if np.isnan(prediction_r_f.detach().cpu().numpy()).all():
+        logging.info("prediction_r_f is nan")
+        assert False, "prediction_r_f is nan"
+    if np.isinf(prediction_r_f.detach().cpu().numpy()).all():
+        logging.info("prediction_r_f is inf")
+        assert False, "prediction_r_f is inf"
+    if not ((prediction_r_f.detach().cpu().numpy() >= 0.).all()
+            and (prediction_r_f.detach().cpu().numpy() <= 1.).all()):
+        logging.info("prediction_r_f is <= 0 or >= 1")
+        assert False, "prediction_r_f is <= 0 or >= 1"
+
     # real_data_target: not a mistake - a tip from ganHacks
     is_real_fake_error = r_f_loss_fn(prediction_r_f, gan_net.real_data_target(prediction_r_f.size(0)))
     class_error = c_loss_fn(prediction_class, fake_labels, num_classes)
 
     total_generator_error = is_real_fake_error + class_error
+
+    # if (is_real_fake_error.detach().cpu().numpy() < 0.).any() or (is_real_fake_error.detach().cpu().numpy() > 1.).any() \
+    #         or np.isnan(is_real_fake_error.detach().cpu().numpy()).any() \
+    #         or np.isinf(is_real_fake_error.detach().cpu().numpy()).any():
+    #     print("is_real_fake_error is: {}".format(is_real_fake_error))
+    #     logging.info("is_real_fake_error is: {}".format(is_real_fake_error))
+    #
+    # if (class_error.detach().cpu().numpy() < 0.).any() or (class_error.detach().cpu().numpy() > 1.).any() \
+    #         or np.isnan(class_error.detach().cpu().numpy()).any() \
+    #         or np.isinf(class_error.detach().cpu().numpy()).any():
+    #     print("class_error is: {}".format(class_error))
+    #     logging.info("class_error is: {}".format(class_error))
+
     total_generator_error.backward()
     # Update weights with gradients
     optimizer.step()
@@ -204,7 +272,6 @@ def train(d_model, d_optimizer, g_model, g_optimizer, r_f_loss_fn, c_loss_fn, da
         fake_data = g_model(noisy_input, noisy_one_hot_v)
 
         # Train D
-        # d_error, d_pred_real, d_pred_fake, class_accuracy_real, class_accuracy_fake, incorrect_real_batch, incorrect_fake_batch = \
         d_error, prediction_class_list, accuracy_vals_list, incorrect_list = \
             train_discriminator(d_model, d_optimizer, real_data, fake_data.detach(), real_label, noisy_label, r_f_loss_fn, c_loss_fn, params.num_classes)  # do not remove .detach() here !!!!!
 
@@ -232,7 +299,6 @@ def train(d_model, d_optimizer, g_model, g_optimizer, r_f_loss_fn, c_loss_fn, da
             summ.append(stats)
 
         if ((i + 1) % max(1, round(0.25*num_of_batches)) == 0) and (epoch == 0):
-        # if ((i + 1) % max(1, round(0.1*num_of_batches)) == 0) and (epoch == 0):
             # Display data Images
             real_samples_reshaped = gan_net.vectors_to_samples(real_data)  # ?
             real_titles = gan_net.labels_to_titles(real_label)
@@ -281,8 +347,6 @@ def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, r_f_
     best_loss = np.inf
     best_accuracy = 0.0
     best_preds = 0.0
-    # best_pred_real = 0.0
-    # best_pred_fake = 0.0
     best_dict = {'loss': best_loss, 'accuracy': best_accuracy, 'prediction': best_preds}
     dest_min = 0
     dest_max = 255
@@ -378,15 +442,15 @@ def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, r_f_
             for it in is_best_dict.keys():
                 if is_best_dict[it]:
                     best_type = it
-            utils.save_checkpoint({'epoch': epoch + 1,
-                                   'state_dict': d_model.state_dict(),
-                                   'optim_dict': d_optimizer.state_dict()}, is_best=is_best, checkpoint=model_dir,
-                                  ntype='d', best_type=best_type)
+                    utils.save_checkpoint({'epoch': epoch + 1,
+                                           'state_dict': d_model.state_dict(),
+                                           'optim_dict': d_optimizer.state_dict()}, is_best=is_best, checkpoint=model_dir,
+                                          ntype='d', best_type=best_type)
 
-            utils.save_checkpoint({'epoch': epoch + 1,
-                                   'state_dict': g_model.state_dict(),
-                                   'optim_dict': g_optimizer.state_dict()}, is_best=is_best, checkpoint=model_dir,
-                                  ntype='g', best_type=best_type)
+                    utils.save_checkpoint({'epoch': epoch + 1,
+                                           'state_dict': g_model.state_dict(),
+                                           'optim_dict': g_optimizer.state_dict()}, is_best=is_best, checkpoint=model_dir,
+                                          ntype='g', best_type=best_type)
 
             np_test_samples = np.array(test_samples)
             # convert back to range [0, 255]
