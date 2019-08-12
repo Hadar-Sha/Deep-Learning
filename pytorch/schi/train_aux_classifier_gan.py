@@ -6,7 +6,7 @@ import os
 import numpy as np
 import torch
 import torch.optim as optim
-from torch.autograd import Variable
+from torch.autograd import Variable, detect_anomaly
 import re
 # from tqdm import tqdm
 
@@ -36,39 +36,25 @@ def train_discriminator(d, optimizer, real_data, fake_data, real_labels, fake_la
     # 1.1 Train on Real Data
     prediction_r_f_real, prediction_class_real = d(real_data)
 
-    # print(not np.isinf(prediction_r_f_real.detach().cpu().numpy()).all())
     if np.isnan(prediction_r_f_real.detach().cpu().numpy()).all():
         logging.info("prediction_r_f_real is nan")
         assert False, "prediction_r_f_real is nan"
     if np.isinf(prediction_r_f_real.detach().cpu().numpy()).all():
         logging.info("prediction_r_f_real is inf")
         assert False, "prediction_r_f_real is inf"
-    # assert (not np.isnan(prediction_r_f_real.detach().cpu().numpy()).all()
-    #         or not np.isinf(prediction_r_f_real.detach().cpu().numpy()).all())
     if not ((prediction_r_f_real.detach().cpu().numpy() >= 0.).all()
             and (prediction_r_f_real.detach().cpu().numpy() <= 1.).all()):
         logging.info("prediction_r_f_real is <= 0 or >= 1")
         assert False, "prediction_r_f_real is <= 0 or >= 1"
 
-    # Calculate error and backpropagate
-    is_real_fake_error = r_f_loss_fn(prediction_r_f_real, gan_net.real_data_target(real_data.size(0)))
-    class_error = c_loss_fn(prediction_class_real, real_labels, num_classes)
+    with detect_anomaly():
+        # Calculate error and backpropagate
+        is_real_fake_error = r_f_loss_fn(prediction_r_f_real, gan_net.real_data_target(real_data.size(0)))
+        class_error = c_loss_fn(prediction_class_real, real_labels, num_classes)
 
-    total_real_error = is_real_fake_error + class_error
+        total_real_error = is_real_fake_error + class_error
 
-    # if (is_real_fake_error.detach().cpu().numpy() < 0.).any() or (is_real_fake_error.detach().cpu().numpy() > 1.).any()\
-    #         or np.isnan(is_real_fake_error.detach().cpu().numpy()).any() \
-    #         or np.isinf(is_real_fake_error.detach().cpu().numpy()).any():
-    #     print("is_real_fake_error is: {}".format(is_real_fake_error))
-    #     logging.info("is_real_fake_error is: {}".format(is_real_fake_error))
-    #
-    # if (class_error.detach().cpu().numpy() < 0.).any() or (class_error.detach().cpu().numpy() > 1.).any()\
-    #         or np.isnan(class_error.detach().cpu().numpy()).any() \
-    #         or np.isinf(class_error.detach().cpu().numpy()).any():
-    #     print("class_error is: {}".format(class_error))
-    #     logging.info("class_error is: {}".format(class_error))
-
-    total_real_error.backward()
+        total_real_error.backward()
 
     # compute the current classification accuracy
     class_accuracy_real = gan_net.compute_acc(prediction_class_real, real_labels)
@@ -78,10 +64,6 @@ def train_discriminator(d, optimizer, real_data, fake_data, real_labels, fake_la
     # 1.2 Train on Fake Data
     prediction_r_f_fake, prediction_class_fake = d(fake_data)
 
-    # assert (not np.isnan(prediction_r_f_fake.detach().cpu().numpy()).all()
-    #         or not np.isinf(prediction_r_f_fake.detach().cpu().numpy()).all())
-    # assert ((prediction_r_f_fake.detach().cpu().numpy() >= 0.).all()
-    #         and (prediction_r_f_fake.detach().cpu().numpy() <= 1.).all())
     if np.isnan(prediction_r_f_fake.detach().cpu().numpy()).all():
         logging.info("prediction_r_f_fake is nan")
         assert False, "prediction_r_f_fake is nan"
@@ -93,25 +75,26 @@ def train_discriminator(d, optimizer, real_data, fake_data, real_labels, fake_la
         logging.info("prediction_r_f_fake is <= 0 or >= 1")
         assert False, "prediction_r_f_fake is <= 0 or >= 1"
 
-    # Calculate error and backpropagate
-    is_real_fake_error = r_f_loss_fn(prediction_r_f_fake, gan_net.fake_data_target(real_data.size(0)))
-    class_error = c_loss_fn(prediction_class_fake, fake_labels, num_classes)
+    with detect_anomaly():
+        # Calculate error and backpropagate
+        is_real_fake_error = r_f_loss_fn(prediction_r_f_fake, gan_net.fake_data_target(real_data.size(0)))
+        class_error = c_loss_fn(prediction_class_fake, fake_labels, num_classes)
 
-    total_fake_error = is_real_fake_error + class_error
+        total_fake_error = is_real_fake_error + class_error
 
-    # if (is_real_fake_error.detach().cpu().numpy() < 0.).any() or (is_real_fake_error.detach().cpu().numpy() > 1.).any() \
-    #         or np.isnan(is_real_fake_error.detach().cpu().numpy()).any() \
-    #         or np.isinf(is_real_fake_error.detach().cpu().numpy()).any():
-    #     print("is_real_fake_error is: {}".format(is_real_fake_error))
-    #     logging.info("is_real_fake_error is: {}".format(is_real_fake_error))
-    #
-    # if (class_error.detach().cpu().numpy() < 0.).any() or (class_error.detach().cpu().numpy() > 1.).any() \
-    #         or np.isnan(class_error.detach().cpu().numpy()).any() \
-    #         or np.isinf(class_error.detach().cpu().numpy()).any():
-    #     print("class_error is: {}".format(class_error))
-    #     logging.info("class_error is: {}".format(class_error))
+        # if (is_real_fake_error.detach().cpu().numpy() < 0.).any() or (is_real_fake_error.detach().cpu().numpy() > 1.).any() \
+        #         or np.isnan(is_real_fake_error.detach().cpu().numpy()).any() \
+        #         or np.isinf(is_real_fake_error.detach().cpu().numpy()).any():
+        #     print("is_real_fake_error is: {}".format(is_real_fake_error))
+        #     logging.info("is_real_fake_error is: {}".format(is_real_fake_error))
+        #
+        # if (class_error.detach().cpu().numpy() < 0.).any() or (class_error.detach().cpu().numpy() > 1.).any() \
+        #         or np.isnan(class_error.detach().cpu().numpy()).any() \
+        #         or np.isinf(class_error.detach().cpu().numpy()).any():
+        #     print("class_error is: {}".format(class_error))
+        #     logging.info("class_error is: {}".format(class_error))
 
-    total_fake_error.backward()
+        total_fake_error.backward()
 
     # compute the current classification accuracy
     class_accuracy_fake = gan_net.compute_acc(prediction_class_fake, fake_labels)
@@ -152,25 +135,15 @@ def train_generator(d, optimizer, fake_data, fake_labels, r_f_loss_fn, c_loss_fn
         logging.info("prediction_r_f is <= 0 or >= 1")
         assert False, "prediction_r_f is <= 0 or >= 1"
 
-    # real_data_target: not a mistake - a tip from ganHacks
-    is_real_fake_error = r_f_loss_fn(prediction_r_f, gan_net.real_data_target(prediction_r_f.size(0)))
-    class_error = c_loss_fn(prediction_class, fake_labels, num_classes)
+    with detect_anomaly():
+        # real_data_target: not a mistake - a tip from ganHacks
+        is_real_fake_error = r_f_loss_fn(prediction_r_f, gan_net.real_data_target(prediction_r_f.size(0)))
+        class_error = c_loss_fn(prediction_class, fake_labels, num_classes)
 
-    total_generator_error = is_real_fake_error + class_error
+        total_generator_error = is_real_fake_error + class_error
 
-    # if (is_real_fake_error.detach().cpu().numpy() < 0.).any() or (is_real_fake_error.detach().cpu().numpy() > 1.).any() \
-    #         or np.isnan(is_real_fake_error.detach().cpu().numpy()).any() \
-    #         or np.isinf(is_real_fake_error.detach().cpu().numpy()).any():
-    #     print("is_real_fake_error is: {}".format(is_real_fake_error))
-    #     logging.info("is_real_fake_error is: {}".format(is_real_fake_error))
-    #
-    # if (class_error.detach().cpu().numpy() < 0.).any() or (class_error.detach().cpu().numpy() > 1.).any() \
-    #         or np.isnan(class_error.detach().cpu().numpy()).any() \
-    #         or np.isinf(class_error.detach().cpu().numpy()).any():
-    #     print("class_error is: {}".format(class_error))
-    #     logging.info("class_error is: {}".format(class_error))
+        total_generator_error.backward()
 
-    total_generator_error.backward()
     # Update weights with gradients
     optimizer.step()
     # Return error
@@ -344,10 +317,11 @@ def train(d_model, d_optimizer, g_model, g_optimizer, r_f_loss_fn, c_loss_fn, da
 
 def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, r_f_loss_fn, c_loss_fn, params, model_dir):
 
-    best_loss = np.inf
-    best_accuracy = 0.0
-    best_preds = 0.0
-    best_dict = {'loss': best_loss, 'accuracy': best_accuracy, 'prediction': best_preds}
+    # best_loss = np.inf
+    # best_accuracy = 0.0
+    # best_preds = 1.0  # 0.0
+    best_dict = {'loss': np.inf, 'accuracy': 0.0, 'prediction': 1.0}
+    # best_dict = {'loss': best_loss, 'accuracy': best_accuracy, 'prediction': best_preds}
     dest_min = 0
     dest_max = 255
     curr_min = -1
@@ -356,6 +330,10 @@ def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, r_f_
 
     fig = display_results.create_figure()
 
+    stats_dir = os.path.join(model_dir, 'stats')
+    if not os.path.isdir(stats_dir):
+        os.mkdir(stats_dir)
+
     for epoch in range(params.num_epochs):
         # Run one epoch
         logging.info("Epoch {}/{}".format(epoch + 1, params.num_epochs))
@@ -363,12 +341,15 @@ def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, r_f_
         test_samples, loss_mean_sum, accuracy_sum, preds_sum, incorrect_samples = train(d_model, d_optimizer, g_model, g_optimizer,
                                                           r_f_loss_fn, c_loss_fn, train_dataloader, params, epoch, fig)
 
-        is_best_loss = (loss_mean_sum <= best_loss)
-        is_best_acc = (accuracy_sum >= best_accuracy)
-        is_best_preds = (preds_sum <= best_preds)
-        is_best = is_best_loss | is_best_acc | is_best_preds
-        is_best_dict = {'loss': is_best_loss, 'accuracy': is_best_acc, 'prediction': is_best_preds}
+        # is_best_loss = (loss_mean_sum <= best_loss)
+        # is_best_acc = (accuracy_sum >= best_accuracy)
+        # is_best_preds = (preds_sum <= best_preds)
+        # is_best = is_best_loss | is_best_acc | is_best_preds
+        # is_best_dict = {'loss': is_best_loss, 'accuracy': is_best_acc, 'prediction': is_best_preds}
         curr_vals_dict = {'loss': loss_mean_sum, 'accuracy': accuracy_sum, 'prediction': preds_sum}
+        is_best_dict = {'loss': (curr_vals_dict['loss'] <= best_dict['loss']),
+                        'accuracy': (curr_vals_dict['accuracy'] >= best_dict['accuracy']),
+                        'prediction': (curr_vals_dict['prediction'] <= best_dict['prediction'])}
         # is_best = (loss_mean_sum <= best_loss) | (accuracy_sum >= best_accuracy)
 
         g_grads_graph, _ = get_network_grads(g_model)
@@ -381,45 +362,28 @@ def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, r_f_
         vals_dict['vals_per_epoch_g'].append(g_vals_graph)
         vals_dict['vals_per_epoch_d'].append(d_vals_graph)
 
-        if is_best:
-            # if is_best_loss:
-            #     logging.info("- Found new best loss")
-            #     print("Epoch {}/{}".format(epoch + 1, params.num_epochs))
-            #     print("- Found new best loss")
-            # elif is_best_acc:
-            #     logging.info("- Found new best loss")
-            for it in is_best_dict.keys():
-                if is_best_dict[it]:
-                    logging.info("- Found new best {}".format(it))
-                    print("Epoch {}/{}".format(epoch + 1, params.num_epochs))
-                    print("- Found new best {}".format(it))
-                    best_dict[it] = curr_vals_dict[it]
-                    # best_loss = loss_mean_sum
-                    print("mean {} is {:05.3f}".format(it, loss_mean_sum))
-                    # print("mean loss is {:05.3f}".format(loss_mean_sum))
-            metric_dict = curr_vals_dict
-            # for k in metric_dict.keys():
-            #     metric_dict[k] = round(metric_dict[k], 3)
-            # metric_dict = {'loss': loss_mean_sum, 'accuracy': accuracy_sum}
+        # if is_best:
+        for it in is_best_dict.keys():
+            if is_best_dict[it]:
+                logging.info("- Found new best {}".format(it))
+                print("Epoch {}/{}".format(epoch + 1, params.num_epochs))
+                print("- Found new best {}".format(it))
+                best_dict[it] = curr_vals_dict[it]
 
-            # Save best val metrics in a json file in the model directory
-            for it in is_best_dict.keys():
-                if is_best_dict[it]:
-                    best_json_path = os.path.join(model_dir, "metrics_dev_best_{}_weights.json".format(it))
-                    best_csv_real_path = os.path.join(model_dir, "incorrect_real_best_{}_samples.csv".format(it))
-                    best_csv_fake_path = os.path.join(model_dir, "incorrect_fake_best_{}_samples.csv".format(it))
+                print("mean {} is {:05.3f}".format(it, best_dict[it]))
 
-                    utils.save_dict_to_json(metric_dict, best_json_path, epoch + 1)
-                    utils.save_incorrect_to_csv(incorrect_samples[0], best_csv_real_path)
-                    utils.save_incorrect_to_csv(incorrect_samples[1], best_csv_fake_path)
+        metric_dict = curr_vals_dict
 
-            # best_json_path = os.path.join(model_dir, "metrics_dev_best_weights.json")
-            # best_csv_path = os.path.join(model_dir, "incorrect_real_best_samples.csv")
-            # best_csv_path = os.path.join(model_dir, "incorrect_fake_best_samples.csv")
+        # Save best val metrics in a json file in the model directory
+        for it in is_best_dict.keys():
+            if is_best_dict[it]:
+                best_json_path = os.path.join(stats_dir, "metrics_dev_best_{}_weights.json".format(it))
+                best_csv_real_path = os.path.join(stats_dir, "incorrect_real_best_{}_samples.csv".format(it))
+                best_csv_fake_path = os.path.join(stats_dir, "incorrect_fake_best_{}_samples.csv".format(it))
 
-            # utils.save_dict_to_json(metric_dict, best_json_path, epoch + 1)
-            # utils.save_incorrect_to_csv(incorrect_samples[0], best_csv_real_path)
-            # utils.save_incorrect_to_csv(incorrect_samples[1], best_csv_fake_path)
+                utils.save_dict_to_json(metric_dict, best_json_path, epoch + 1)
+                utils.save_incorrect_to_csv(incorrect_samples[0], best_csv_real_path)
+                utils.save_incorrect_to_csv(incorrect_samples[1], best_csv_fake_path)
 
             if test_samples is not None:
                 np_test_samples = np.array(test_samples)
@@ -444,13 +408,13 @@ def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, r_f_
                     best_type = it
                     utils.save_checkpoint({'epoch': epoch + 1,
                                            'state_dict': d_model.state_dict(),
-                                           'optim_dict': d_optimizer.state_dict()}, is_best=is_best, checkpoint=model_dir,
-                                          ntype='d', best_type=best_type)
+                                           'optim_dict': d_optimizer.state_dict()}, is_best=is_best_dict[it],
+                                          checkpoint=stats_dir, ntype='d', best_type=best_type)
 
                     utils.save_checkpoint({'epoch': epoch + 1,
                                            'state_dict': g_model.state_dict(),
-                                           'optim_dict': g_optimizer.state_dict()}, is_best=is_best, checkpoint=model_dir,
-                                          ntype='g', best_type=best_type)
+                                           'optim_dict': g_optimizer.state_dict()}, is_best=is_best_dict[it],
+                                          checkpoint=stats_dir, ntype='g', best_type=best_type)
 
             np_test_samples = np.array(test_samples)
             # convert back to range [0, 255]

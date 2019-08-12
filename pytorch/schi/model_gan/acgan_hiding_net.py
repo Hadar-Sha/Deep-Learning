@@ -32,7 +32,9 @@ class DiscriminatorNet(nn.Module):
         # to output 2 labels we output a vector of size 2 * num classes
         self.out_layer_class = nn.Sequential(
             nn.Linear(params.hidden_size, 2*params.num_classes),
-            nn.Softmax(dim=1)    # remove !!!!!!!!!!!!!
+            nn.LogSoftmax(dim=1)    # remove !!!!!!!!!!!!!
+            # nn.Softmax(dim=1)    # remove !!!!!!!!!!!!!
+
         )
 
     def forward(self, x):
@@ -230,9 +232,11 @@ class HLoss(nn.Module):
         super(HLoss, self).__init__()
 
     def forward(self, x):
-        val = -x*torch.log(x)
-        # val = -x*torch.exp(x)
+        # val = - F.softmax(x, dim=1) * F.log_softmax(x, dim=1)
+        # val = -x*torch.log(x)
+        val = -x*torch.exp(x)
         val = torch.sum(val, dim=1)
+        # val = -1.0 * val.sum()
         return torch.mean(val)
 
 
@@ -256,7 +260,7 @@ def class_selection_loss_fn(outputs, labels, num_of_classes):
     """
 
     # kl_criterion = nn.KLDivLoss(size_average=True, reduce=True)
-    kl_criterion = nn.KLDivLoss()
+    kl_criterion = nn.KLDivLoss(reduction='batchmean')
     min_entropy_criterion = HLoss()
 
     label_before_filter = torch.index_select(labels, 1, torch.tensor([0], device=labels.device))
