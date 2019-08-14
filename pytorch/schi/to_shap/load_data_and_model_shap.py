@@ -235,10 +235,10 @@ if __name__ == '__main__':
                 i += 1
 
     background_idx = list(set([v for v in range(size_of_batch)])-set(test_idx))
-    background = images[background_idx]
-    test_images_samples = images[test_idx]
-    # background = images[:bg_len]
-    # test_images_samples = images[bg_len: min(bg_len + 10, size_of_batch)]
+    # background = images[background_idx]
+    # test_images_samples = images[test_idx]
+    background = images[:bg_len]
+    test_images_samples = images[bg_len: min(bg_len + 10, size_of_batch)]
 
     e = shap.DeepExplainer(model, background)
     shap_values_samples = e.shap_values(test_images_samples)

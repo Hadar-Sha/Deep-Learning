@@ -282,6 +282,51 @@ def class_selection_loss_fn(outputs, labels, num_of_classes):
     return func
 
 
+def class_selection_loss_fn_exact_equal(outputs, labels, num_of_classes):
+    """
+        Compute the loss given outputs and labels.
+        we will achieve max KL dist between out_bef_filt and lab_aft_filt by the following:
+        we wish the output to be not equal to lab_aft_filt.
+        given lab_aft_filt in [0-9] we can create a binary vector of size [num_of_classes] with all entrances = 1 if
+        entrance != lab_aft_filt and entrance = 0 otherwise.
+        we normalize this vector v to have sum = 1 by dividing in (num_of_classes-1)
+        we then calculate KL loss between out_bef_filt and v
+
+        Args:
+            outputs: (Variable) dimension batch_size x 10 - output of the model
+            labels: (Variable) dimension batch_size, where each element is a value in [0- 9]
+            num_of_classes: (int) value describing number of different classes (10)
+
+        Returns:
+            loss (Variable): loss for all samples in the batch
+    """
+
+    cross_entropy_criterion = nn.CrossEntropyLoss()
+    # # kl_criterion = nn.KLDivLoss(size_average=True, reduce=True)
+    # kl_criterion = nn.KLDivLoss(reduction='batchmean')
+    # min_entropy_criterion = HLoss()
+
+    label_before_filter = torch.index_select(labels, 1, torch.tensor([0], device=labels.device))
+    label_after_filter = torch.index_select(labels, 1, torch.tensor([1], device=labels.device))
+
+    # one_hot_vector_after_filter = convert_int_to_one_hot_vector(label_after_filter, num_of_classes)
+    # one_hot_vector_before_filter = convert_int_to_one_hot_vector(label_before_filter, num_of_classes)  # unneeded
+
+    out_before_filter = torch.index_select(outputs, 1, torch.tensor(list(range(10)), device=outputs.device))
+    out_after_filter = torch.index_select(outputs, 1, torch.tensor(list(range(10, 20)), device=outputs.device))
+
+    # completing_after_filter = (torch.ones(labels.shape[0], num_of_classes, device=labels.device) - one_hot_vector_after_filter)\
+    #                            / (num_of_classes-1)
+
+    func = cross_entropy_criterion(out_before_filter, label_before_filter) + \
+           cross_entropy_criterion(out_after_filter, label_after_filter)
+    # func = kl_criterion(out_after_filter, one_hot_vector_after_filter) + \
+    #        kl_criterion(out_before_filter, completing_after_filter) + \
+    #        min_entropy_criterion(out_before_filter)
+
+    return func
+
+
 def class_selection_loss_fn_exp_kl(outputs, labels, num_of_classes):
     """
         Compute the loss given outputs and labels.
@@ -358,6 +403,37 @@ def compute_acc(outputs, labels):
     return all_count / float(labels.shape[0])
 
 
+# compute the current classification accuracy
+def compute_acc_exact_equal(outputs, labels):
+    # outputs_ = outputs.data.max(1)[1]
+    # correct = outputs_.eq(labels.data).cpu().sum()
+    # acc = float(correct) / float(len(labels.data))  # * 100.0
+    # return acc
+
+    if len(list(labels.shape)) == 1:
+        return 0.0
+
+    outputs = outputs.detach().cpu().numpy()
+    labels = labels.detach().cpu().numpy()
+
+    label_before_filter = labels[:, 0]  # unneeded
+    label_after_filter = labels[:, 1]
+
+    out_before_filter = outputs[:, :10]
+    out_after_filter = outputs[:, 10:]
+
+    out_int_before = np.argmax(out_before_filter, axis=1)
+    out_int_after = np.argmax(out_after_filter, axis=1)
+
+    # the classification before filter is correct as long as it is not equal to label after filter
+    before_ind = np.nonzero(out_int_before == label_before_filter)
+    after_ind = np.nonzero(out_int_after == label_after_filter)
+    all_ind = np.intersect1d(before_ind, after_ind)
+
+    all_count = all_ind.shape[0]
+    return all_count / float(labels.shape[0])
+
+
 def incorrect(images, outputs, labels, curr_min=-1, curr_max=1, dest_min=0, dest_max=255):
     """
         Keep all images for which the classification is wrong
@@ -387,6 +463,75 @@ def incorrect(images, outputs, labels, curr_min=-1, curr_max=1, dest_min=0, dest
     # find incorrect indexes
     # the classification before filter is incorrect only if it is equal to label after filter
     correct_before_indexes = np.nonzero(out_int_before != label_after_filter)  # label_after_filter : not a typo!!!!
+    correct_after_indexes = np.nonzero(out_int_after == label_after_filter)
+    all_indexes = np.arange(out_int_before.shape[0])  # to get all indices
+    all_correct_indexes = np.intersect1d(correct_before_indexes, correct_after_indexes)
+    incorrect_indexes = np.setdiff1d(all_indexes, all_correct_indexes)
+
+    # find compatible incorrect samples and save them in a list
+    samples_numpy = images.cpu().numpy()
+    # convert back to range [0, 255]
+    samples_numpy = \
+        dest_min + (dest_max - dest_min) * (samples_numpy - curr_min) / (curr_max - curr_min)
+    samples_numpy = np.around(samples_numpy).astype(int)
+
+    # find samples
+    incorrect_samples = (samples_numpy[incorrect_indexes])  # .astype(int)
+
+    # find classifier result for before filter
+    incorrect_before_labels = out_int_before[incorrect_indexes]
+
+    # find classifier result for after filter
+    incorrect_after_labels = out_int_after[incorrect_indexes]
+
+    # find true labels for before filter
+    true_before_labels = label_before_filter[incorrect_indexes]
+
+    # find true labels for after filter
+    true_after_labels = label_after_filter[incorrect_indexes]
+
+    # organize data
+    before_labels = np.column_stack((incorrect_before_labels, true_before_labels))
+    after_labels = np.column_stack((incorrect_after_labels, true_after_labels))
+    all_labels = np.column_stack((before_labels, after_labels))
+
+    numpy_mat_out = np.concatenate((incorrect_samples, all_labels), axis=1)
+    length = len(numpy_mat_out.tolist())
+    if length > 0:
+        mat_out.extend(numpy_mat_out.tolist())
+
+    return mat_out
+
+
+def incorrect_exact_equal(images, outputs, labels, curr_min=-1, curr_max=1, dest_min=0, dest_max=255):
+    """
+        Keep all images for which the classification is wrong
+
+        Args:
+            images: (np.ndarray) dimension batch_size x 24- input to the model
+            outputs: (np.ndarray) dimension batch_size x 10 - log softmax output of the model
+            labels: (np.ndarray) dimension batch_size, where each element is a value in [0- 9]
+
+        Returns: (list) of images for which the classification is wrong, the classification and the correct label
+        """
+    mat_out = []
+
+    # images = images.detach().cpu().numpy()
+    outputs = outputs.detach().cpu().numpy()
+    labels = labels.detach().cpu().numpy()
+
+    label_before_filter = labels[:, 0]  # unneeded
+    label_after_filter = labels[:, 1]
+
+    out_before_filter = outputs[:, :10]
+    out_after_filter = outputs[:, 10:]
+
+    out_int_before = np.argmax(out_before_filter, axis=1)
+    out_int_after = np.argmax(out_after_filter, axis=1)
+
+    # find incorrect indexes
+    # the classification before filter is incorrect only if it is equal to label after filter
+    correct_before_indexes = np.nonzero(out_int_before == label_before_filter)
     correct_after_indexes = np.nonzero(out_int_after == label_after_filter)
     all_indexes = np.arange(out_int_before.shape[0])  # to get all indices
     all_correct_indexes = np.intersect1d(correct_before_indexes, correct_after_indexes)
