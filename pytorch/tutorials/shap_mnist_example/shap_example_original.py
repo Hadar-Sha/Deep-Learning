@@ -10,6 +10,9 @@ batch_size = 128
 num_epochs = 2
 device = torch.device('cpu')
 
+print(shap.__version__)
+print(torch.__version__)
+
 
 class Net(nn.Module):
     def __init__(self):

@@ -57,9 +57,9 @@ def train_discriminator(d, optimizer, real_data, fake_data, real_labels, fake_la
         total_real_error.backward()
 
     # compute the current classification accuracy
-    class_accuracy_real = gan_net.compute_acc(prediction_class_real, real_labels)
+    class_accuracy_real = accuracy_fn(prediction_class_real, real_labels)
     # return incorrect classification samples
-    incorrect_real_batch = gan_net.incorrect(real_data, prediction_class_real, real_labels)
+    incorrect_real_batch = incorrect_fn(real_data, prediction_class_real, real_labels)
 
     # 1.2 Train on Fake Data
     prediction_r_f_fake, prediction_class_fake = d(fake_data)
@@ -97,9 +97,9 @@ def train_discriminator(d, optimizer, real_data, fake_data, real_labels, fake_la
         total_fake_error.backward()
 
     # compute the current classification accuracy
-    class_accuracy_fake = gan_net.compute_acc(prediction_class_fake, fake_labels)
+    class_accuracy_fake = accuracy_fn(prediction_class_fake, fake_labels)
     # return incorrect classification samples
-    incorrect_fake_batch = gan_net.incorrect(fake_data, prediction_class_fake, fake_labels)
+    incorrect_fake_batch = incorrect_fn(fake_data, prediction_class_fake, fake_labels)
     # 1.3 Update weights with gradients
     optimizer.step()
 
@@ -584,7 +584,14 @@ if __name__ == '__main__':
 
     # fetch loss functions
     real_fake_loss_fn = gan_net.real_fake_loss_fn
-    class_selection_loss_fn = gan_net.class_selection_loss_fn
+    class_selection_loss_fn = gan_net.class_selection_loss_fn_exact_equal
+    accuracy_fn = gan_net.compute_acc_exact_equal
+    incorrect_fn = gan_net.incorrect_exact_equal
+
+    # class_selection_loss_fn = gan_net.class_selection_loss_fn
+    # accuracy_fn = gan_net.compute_acc
+    # incorrect_fn = gan_net.incorrect
+
     # class_selection_loss_fn = gan_net.class_selection_loss_fn_exp_kl
     # incorrect = gan_net.incorrect_two_labels
 
@@ -593,7 +600,7 @@ if __name__ == '__main__':
     num_test_samples = 20
     test_noise = gan_net.noise(num_test_samples, params.noise_dim, params.noise_type)
 
-    possible_classes = [[9, 3], [9, 5]]  # [[0, 1], [3, 1]]  # [[0, 1], [3, 1], [8, 1], [9, 1]]
+    possible_classes = [[0, 1], [3, 1], [8, 1], [9, 1]]  # [[0, 1], [3, 1]]  # [[9, 3], [9, 5]]  #
     # None  # [[0, 1]]  # [[4, 1]]  # [[3, 1]]  # [[9, 5]]  # [0, 2, 3, 4, 5, 6, 7, 9]
     if possible_classes is None:
         test_labels = list(range(num_test_samples))

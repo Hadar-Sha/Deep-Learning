@@ -307,7 +307,9 @@ def class_selection_loss_fn_exact_equal(outputs, labels, num_of_classes):
     # min_entropy_criterion = HLoss()
 
     label_before_filter = torch.index_select(labels, 1, torch.tensor([0], device=labels.device))
+    label_before_filter = label_before_filter.view(label_before_filter.shape[0])
     label_after_filter = torch.index_select(labels, 1, torch.tensor([1], device=labels.device))
+    label_after_filter = label_after_filter.view(label_after_filter.shape[0])
 
     # one_hot_vector_after_filter = convert_int_to_one_hot_vector(label_after_filter, num_of_classes)
     # one_hot_vector_before_filter = convert_int_to_one_hot_vector(label_before_filter, num_of_classes)  # unneeded
