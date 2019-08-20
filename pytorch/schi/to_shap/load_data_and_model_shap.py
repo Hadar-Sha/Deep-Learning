@@ -10,7 +10,7 @@ from torchvision.transforms import functional as F
 # import utils
 import net_to_shap as net
 import one_label_data_loader_to_shap as one_labels_data_loader
-from evaluate_to_shap import evaluate
+# from evaluate_to_shap import evaluate
 # from train import train
 
 width = 1
@@ -125,6 +125,8 @@ def create_digit_image(colors):  # , curr_min_val=0, curr_max_val=1):
     normalized = False
 
     numpy_colors = np.array(colors)
+    if len(numpy_colors.shape) == 1:
+        numpy_colors = numpy_colors.reshape(numpy_colors.shape[0], 1) * np.ones([1, 3])
 
     curr_min_val = numpy_colors.min()
     curr_max_val = numpy_colors.max()
@@ -171,7 +173,7 @@ def create_digit_image(colors):  # , curr_min_val=0, curr_max_val=1):
 
     fig_temp.canvas.draw()
 
-    data = np.frombuffer(fig_temp.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+    data = np.frombuffer(fig_temp.canvas.tostring_rgb(), dtype=np.uint8)
     # data = np.fromstring(fig_temp.canvas.tostring_rgb(), dtype=np.uint8, sep='')
     data = data.reshape(fig_temp.canvas.get_width_height()[::-1] + (3,))
     data_c = data/255.
@@ -218,63 +220,68 @@ if __name__ == '__main__':
 
     size_of_batch = images.shape[0]
     bg_len = round(0.9 * size_of_batch)
-    test_len = min(round(0.1 * size_of_batch), 10)
+    test_len = 20
+    # test_len = min(round(0.1 * size_of_batch), 10)
     test_idx = []
     # test_idx = [[] for _ in range(test_len)]
     chosen = [False for _ in range(test_len)]
 
-    i = 0
-    while i < test_len:
-        for j in range(size_of_batch):
-            if i >= test_len:
-                break
-
-            if labels[j].item() <= test_len and chosen[labels[j].item()] is False:
-                test_idx.append(j)
-                # test_idx[labels[j].item()].append(j)
-                chosen[labels[j].item()] = True
-                i += 1
-
-    background_idx = list(set([v for v in range(size_of_batch)])-set(test_idx))
-    background = images[background_idx]
-    test_images_samples = images[test_idx]
-    # background = images[:bg_len]
-    # test_images_samples = images[bg_len: min(bg_len + 10, size_of_batch)]
+    # i = 0
+    # while i < test_len:
+    #     for j in range(size_of_batch):
+    #         if i >= test_len:
+    #             break
+    #
+    #         if labels[j].item() <= test_len and chosen[labels[j].item()] is False:
+    #             test_idx.append(j)
+    #             # test_idx[labels[j].item()].append(j)
+    #             chosen[labels[j].item()] = True
+    #             i += 1
+    #
+    # background_idx = list(set([v for v in range(size_of_batch)])-set(test_idx))
+    # background = images[background_idx]
+    # test_images_samples = images[test_idx]
+    background = images[:bg_len]
+    test_images_samples = images[bg_len: min(bg_len + 4, size_of_batch)]
 
     e = shap.DeepExplainer(model, background)
     shap_values_samples = e.shap_values(test_images_samples)
+    # shap_values_samples_red
 
     # output is in shape [batch_size,24] changing to illustrate as an image
     shap_values = []
-    shap_values = [[] for _ in range(len(shap_values_samples))]
+    shap_values = [[[] for _ in range(len(shap_values_samples))] for _ in range(3)]
+    # shap_values = [[] for _ in range(len(shap_values_samples))]
 
     for j in range(len(shap_values_samples)):
         reshaped = vectors_to_samples(torch.tensor(shap_values_samples[j]))
-        for k in range(len(reshaped)):
-            # tensor_image = reshaped[k]
-            # image = np.array(tensor_image)
-            tensor_image = create_digit_image(reshaped[k])
-            # , curr_min_val=-10, curr_max_val=10)  # , curr_min_val=-255, curr_max_val=255)
-            image = tensor_image.numpy()  # .tolist()
-            shap_values[j].append(image)
+        reshaped_np = np.array(reshaped)
+        reshaped_splitd = [reshaped_np[:, :, i].tolist() for i in range(3)]
+        # reshaped_red = reshaped_np[:, :, 0].tolist()
+
+        for ind in range(3):
+            for k in range(len(reshaped_splitd[0])):
+                tensor_image = create_digit_image(reshaped_splitd[ind][k])
+                image = tensor_image.numpy()
+                shap_values[ind][j].append(image)
 
     # test_images = torch.empty(len(test_images_samples), 8, 3)
     test_images = torch.empty(len(test_images_samples), 3, im_h, im_w)  #, dtype=torch.int)
     reshaped = vectors_to_samples(test_images_samples.clone().detach())
-    # reshaped = vectors_to_samples(torch.tensor(test_images_samples))
 
     for k in range(len(reshaped)):
-        # test_images[k] = torch.tensor(reshaped[k])
         test_images[k] = create_digit_image(reshaped[k])
-        # , curr_min_val=-10, curr_max_val=10)  # , curr_min_val=-255, curr_max_val=255)
 
-    shap_numpy = [np.swapaxes(np.swapaxes(s, 1, -1), 1, 2) for s in shap_values]
-    temp = np.array(shap_numpy)
+    # shap_numpy_blue = [np.swapaxes(np.swapaxes(s, 1, -1), 1, 2) for s in shap_values[2]]
+    shap_numpy_splitd = [[np.swapaxes(np.swapaxes(s, 1, -1), 1, 2) for s in shap_values[i]] for i in range(3)]
+
     test_numpy = np.swapaxes(np.swapaxes(test_images.numpy(), 1, -1), 1, 2)
-    temp1 = np.array(test_numpy)
 
     # plot the feature attributions
-    shap.image_plot(shap_numpy, test_numpy)
+    for i in range(3):
+        shap.image_plot(shap_numpy_splitd[i], test_numpy)
+    # shap.image_plot(shap_numpy_red, test_numpy)
+
     # shap.image_plot(shap_numpy, -test_numpy)
 
     # # fetch loss function and metrics
