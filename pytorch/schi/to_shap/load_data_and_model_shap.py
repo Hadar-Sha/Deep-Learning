@@ -171,7 +171,8 @@ def create_digit_image(colors):  # , curr_min_val=0, curr_max_val=1):
 
     fig_temp.canvas.draw()
 
-    data = np.fromstring(fig_temp.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+    data = np.frombuffer(fig_temp.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+    # data = np.fromstring(fig_temp.canvas.tostring_rgb(), dtype=np.uint8, sep='')
     data = data.reshape(fig_temp.canvas.get_width_height()[::-1] + (3,))
     data_c = data/255.
 
@@ -235,10 +236,10 @@ if __name__ == '__main__':
                 i += 1
 
     background_idx = list(set([v for v in range(size_of_batch)])-set(test_idx))
-    # background = images[background_idx]
-    # test_images_samples = images[test_idx]
-    background = images[:bg_len]
-    test_images_samples = images[bg_len: min(bg_len + 10, size_of_batch)]
+    background = images[background_idx]
+    test_images_samples = images[test_idx]
+    # background = images[:bg_len]
+    # test_images_samples = images[bg_len: min(bg_len + 10, size_of_batch)]
 
     e = shap.DeepExplainer(model, background)
     shap_values_samples = e.shap_values(test_images_samples)
@@ -259,7 +260,8 @@ if __name__ == '__main__':
 
     # test_images = torch.empty(len(test_images_samples), 8, 3)
     test_images = torch.empty(len(test_images_samples), 3, im_h, im_w)  #, dtype=torch.int)
-    reshaped = vectors_to_samples(torch.tensor(test_images_samples))
+    reshaped = vectors_to_samples(test_images_samples.clone().detach())
+    # reshaped = vectors_to_samples(torch.tensor(test_images_samples))
 
     for k in range(len(reshaped)):
         # test_images[k] = torch.tensor(reshaped[k])

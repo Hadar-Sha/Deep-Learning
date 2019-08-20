@@ -36,25 +36,25 @@ def train_discriminator(d, optimizer, real_data, fake_data, real_labels, fake_la
     # 1.1 Train on Real Data
     prediction_r_f_real, prediction_class_real = d(real_data)
 
-    if np.isnan(prediction_r_f_real.detach().cpu().numpy()).all():
-        logging.info("prediction_r_f_real is nan")
-        assert False, "prediction_r_f_real is nan"
-    if np.isinf(prediction_r_f_real.detach().cpu().numpy()).all():
-        logging.info("prediction_r_f_real is inf")
-        assert False, "prediction_r_f_real is inf"
-    if not ((prediction_r_f_real.detach().cpu().numpy() >= 0.).all()
-            and (prediction_r_f_real.detach().cpu().numpy() <= 1.).all()):
-        logging.info("prediction_r_f_real is <= 0 or >= 1")
-        assert False, "prediction_r_f_real is <= 0 or >= 1"
+    # if np.isnan(prediction_r_f_real.detach().cpu().numpy()).all():
+    #     logging.info("prediction_r_f_real is nan")
+    #     assert False, "prediction_r_f_real is nan"
+    # if np.isinf(prediction_r_f_real.detach().cpu().numpy()).all():
+    #     logging.info("prediction_r_f_real is inf")
+    #     assert False, "prediction_r_f_real is inf"
+    # if not ((prediction_r_f_real.detach().cpu().numpy() >= 0.).all()
+    #         and (prediction_r_f_real.detach().cpu().numpy() <= 1.).all()):
+    #     logging.info("prediction_r_f_real is <= 0 or >= 1")
+    #     assert False, "prediction_r_f_real is <= 0 or >= 1"
 
-    with detect_anomaly():
-        # Calculate error and backpropagate
-        is_real_fake_error = r_f_loss_fn(prediction_r_f_real, gan_net.real_data_target(real_data.size(0)))
-        class_error = c_loss_fn(prediction_class_real, real_labels, num_classes)
+    # with detect_anomaly():
+    # Calculate error and backpropagate
+    is_real_fake_error = r_f_loss_fn(prediction_r_f_real, gan_net.real_data_target(real_data.size(0)))
+    class_error = c_loss_fn(prediction_class_real, real_labels, num_classes)
 
-        total_real_error = is_real_fake_error + class_error
+    total_real_error = is_real_fake_error + class_error
 
-        total_real_error.backward()
+    total_real_error.backward()
 
     # compute the current classification accuracy
     class_accuracy_real = accuracy_fn(prediction_class_real, real_labels)
@@ -64,37 +64,25 @@ def train_discriminator(d, optimizer, real_data, fake_data, real_labels, fake_la
     # 1.2 Train on Fake Data
     prediction_r_f_fake, prediction_class_fake = d(fake_data)
 
-    if np.isnan(prediction_r_f_fake.detach().cpu().numpy()).all():
-        logging.info("prediction_r_f_fake is nan")
-        assert False, "prediction_r_f_fake is nan"
-    if np.isinf(prediction_r_f_fake.detach().cpu().numpy()).all():
-        logging.info("prediction_r_f_fake is inf")
-        assert False, "prediction_r_f_fake is inf"
-    if not ((prediction_r_f_fake.detach().cpu().numpy() >= 0.).all()
-            and (prediction_r_f_fake.detach().cpu().numpy() <= 1.).all()):
-        logging.info("prediction_r_f_fake is <= 0 or >= 1")
-        assert False, "prediction_r_f_fake is <= 0 or >= 1"
+    # if np.isnan(prediction_r_f_fake.detach().cpu().numpy()).all():
+    #     logging.info("prediction_r_f_fake is nan")
+    #     assert False, "prediction_r_f_fake is nan"
+    # if np.isinf(prediction_r_f_fake.detach().cpu().numpy()).all():
+    #     logging.info("prediction_r_f_fake is inf")
+    #     assert False, "prediction_r_f_fake is inf"
+    # if not ((prediction_r_f_fake.detach().cpu().numpy() >= 0.).all()
+    #         and (prediction_r_f_fake.detach().cpu().numpy() <= 1.).all()):
+    #     logging.info("prediction_r_f_fake is <= 0 or >= 1")
+    #     assert False, "prediction_r_f_fake is <= 0 or >= 1"
 
-    with detect_anomaly():
-        # Calculate error and backpropagate
-        is_real_fake_error = r_f_loss_fn(prediction_r_f_fake, gan_net.fake_data_target(real_data.size(0)))
-        class_error = c_loss_fn(prediction_class_fake, fake_labels, num_classes)
+    # with detect_anomaly():
+    # Calculate error and backpropagate
+    is_real_fake_error = r_f_loss_fn(prediction_r_f_fake, gan_net.fake_data_target(real_data.size(0)))
+    class_error = c_loss_fn(prediction_class_fake, fake_labels, num_classes)
 
-        total_fake_error = is_real_fake_error + class_error
+    total_fake_error = is_real_fake_error + class_error
 
-        # if (is_real_fake_error.detach().cpu().numpy() < 0.).any() or (is_real_fake_error.detach().cpu().numpy() > 1.).any() \
-        #         or np.isnan(is_real_fake_error.detach().cpu().numpy()).any() \
-        #         or np.isinf(is_real_fake_error.detach().cpu().numpy()).any():
-        #     print("is_real_fake_error is: {}".format(is_real_fake_error))
-        #     logging.info("is_real_fake_error is: {}".format(is_real_fake_error))
-        #
-        # if (class_error.detach().cpu().numpy() < 0.).any() or (class_error.detach().cpu().numpy() > 1.).any() \
-        #         or np.isnan(class_error.detach().cpu().numpy()).any() \
-        #         or np.isinf(class_error.detach().cpu().numpy()).any():
-        #     print("class_error is: {}".format(class_error))
-        #     logging.info("class_error is: {}".format(class_error))
-
-        total_fake_error.backward()
+    total_fake_error.backward()
 
     # compute the current classification accuracy
     class_accuracy_fake = accuracy_fn(prediction_class_fake, fake_labels)
@@ -120,29 +108,25 @@ def train_generator(d, optimizer, fake_data, fake_labels, r_f_loss_fn, c_loss_fn
     prediction_r_f, prediction_class = d(fake_data)
     # Calculate error and backpropagate
 
-    # assert (not np.isnan(prediction_r_f.detach().cpu().numpy()).all()
-    #         or not np.isinf(prediction_r_f.detach().cpu().numpy()).all())
-    # assert ((prediction_r_f.detach().cpu().numpy() >= 0.).all()
-    #         and (prediction_r_f.detach().cpu().numpy() <= 1.).all())
-    if np.isnan(prediction_r_f.detach().cpu().numpy()).all():
-        logging.info("prediction_r_f is nan")
-        assert False, "prediction_r_f is nan"
-    if np.isinf(prediction_r_f.detach().cpu().numpy()).all():
-        logging.info("prediction_r_f is inf")
-        assert False, "prediction_r_f is inf"
-    if not ((prediction_r_f.detach().cpu().numpy() >= 0.).all()
-            and (prediction_r_f.detach().cpu().numpy() <= 1.).all()):
-        logging.info("prediction_r_f is <= 0 or >= 1")
-        assert False, "prediction_r_f is <= 0 or >= 1"
+    # if np.isnan(prediction_r_f.detach().cpu().numpy()).all():
+    #     logging.info("prediction_r_f is nan")
+    #     assert False, "prediction_r_f is nan"
+    # if np.isinf(prediction_r_f.detach().cpu().numpy()).all():
+    #     logging.info("prediction_r_f is inf")
+    #     assert False, "prediction_r_f is inf"
+    # if not ((prediction_r_f.detach().cpu().numpy() >= 0.).all()
+    #         and (prediction_r_f.detach().cpu().numpy() <= 1.).all()):
+    #     logging.info("prediction_r_f is <= 0 or >= 1")
+    #     assert False, "prediction_r_f is <= 0 or >= 1"
 
-    with detect_anomaly():
-        # real_data_target: not a mistake - a tip from ganHacks
-        is_real_fake_error = r_f_loss_fn(prediction_r_f, gan_net.real_data_target(prediction_r_f.size(0)))
-        class_error = c_loss_fn(prediction_class, fake_labels, num_classes)
+    # with detect_anomaly():
+    # real_data_target: not a mistake - a tip from ganHacks
+    is_real_fake_error = r_f_loss_fn(prediction_r_f, gan_net.real_data_target(prediction_r_f.size(0)))
+    class_error = c_loss_fn(prediction_class, fake_labels, num_classes)
 
-        total_generator_error = is_real_fake_error + class_error
+    total_generator_error = is_real_fake_error + class_error
 
-        total_generator_error.backward()
+    total_generator_error.backward()
 
     # Update weights with gradients
     optimizer.step()
@@ -293,7 +277,6 @@ def train(d_model, d_optimizer, g_model, g_optimizer, r_f_loss_fn, c_loss_fn, da
 
     incorrect_real.extend(incorrect_list[0])
     incorrect_fake.extend(incorrect_list[1])
-    # incorrect_fake.extend(incorrect_fake_batch)
 
     stats_string = " ; ".join("{}: {:05.3f}".format(k, v) for k, v in stats_mean.items())
     logging.info("train metrics: " + stats_string)
@@ -317,16 +300,12 @@ def train(d_model, d_optimizer, g_model, g_optimizer, r_f_loss_fn, c_loss_fn, da
 
 def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, r_f_loss_fn, c_loss_fn, params, model_dir):
 
-    # best_loss = np.inf
-    # best_accuracy = 0.0
-    # best_preds = 1.0  # 0.0
     best_dict = {'loss': np.inf, 'accuracy': 0.0, 'prediction': 1.0}
-    # best_dict = {'loss': best_loss, 'accuracy': best_accuracy, 'prediction': best_preds}
+
     dest_min = 0
     dest_max = 255
     curr_min = -1
     curr_max = 1
-    # is_best_dict = {}
 
     fig = display_results.create_figure()
 
@@ -341,16 +320,10 @@ def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, r_f_
         test_samples, loss_mean_sum, accuracy_sum, preds_sum, incorrect_samples = train(d_model, d_optimizer, g_model, g_optimizer,
                                                           r_f_loss_fn, c_loss_fn, train_dataloader, params, epoch, fig)
 
-        # is_best_loss = (loss_mean_sum <= best_loss)
-        # is_best_acc = (accuracy_sum >= best_accuracy)
-        # is_best_preds = (preds_sum <= best_preds)
-        # is_best = is_best_loss | is_best_acc | is_best_preds
-        # is_best_dict = {'loss': is_best_loss, 'accuracy': is_best_acc, 'prediction': is_best_preds}
         curr_vals_dict = {'loss': loss_mean_sum, 'accuracy': accuracy_sum, 'prediction': preds_sum}
         is_best_dict = {'loss': (curr_vals_dict['loss'] <= best_dict['loss']),
                         'accuracy': (curr_vals_dict['accuracy'] >= best_dict['accuracy']),
                         'prediction': (curr_vals_dict['prediction'] <= best_dict['prediction'])}
-        # is_best = (loss_mean_sum <= best_loss) | (accuracy_sum >= best_accuracy)
 
         g_grads_graph, _ = get_network_grads(g_model)
         d_grads_graph, _ = get_network_grads(d_model)
@@ -362,7 +335,6 @@ def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, r_f_
         vals_dict['vals_per_epoch_g'].append(g_vals_graph)
         vals_dict['vals_per_epoch_d'].append(d_vals_graph)
 
-        # if is_best:
         for it in is_best_dict.keys():
             if is_best_dict[it]:
                 logging.info("- Found new best {}".format(it))
@@ -600,7 +572,11 @@ if __name__ == '__main__':
     num_test_samples = 20
     test_noise = gan_net.noise(num_test_samples, params.noise_dim, params.noise_type)
 
-    possible_classes = [[0, 1], [3, 1], [8, 1], [9, 1]]  # [[0, 1], [3, 1]]  # [[9, 3], [9, 5]]  #
+    possible_classes = [[2, 1], [5, 1], [6, 1]]
+    #[[0, 1]]
+    # for it in range(2, 10):
+    #     possible_classes.append([it, 1])
+    # [[0, 1], [3, 1], [8, 1], [9, 1]]  # [[0, 1], [3, 1]]  # [[9, 3], [9, 5]]  #
     # None  # [[0, 1]]  # [[4, 1]]  # [[3, 1]]  # [[9, 5]]  # [0, 2, 3, 4, 5, 6, 7, 9]
     if possible_classes is None:
         test_labels = list(range(num_test_samples))
@@ -626,23 +602,11 @@ if __name__ == '__main__':
         test_aft_one_hot_v = gan_net.convert_int_to_one_hot_vector(test_label_after, params.num_classes).to(device)
         test_one_hot_v = torch.cat((test_bef_one_hot_v, test_aft_one_hot_v), 1)
 
-    # D_losses = []
-    # G_losses = []
     losses_dict = {'D_losses': [], 'G_losses': []}
-    # D_preds = []
-    # G_preds = []
     preds_dict = {'D_preds': [], 'G_preds': []}
-    # real_accuracy_vals = []
-    # fake_accuracy_vals = []
     accuracies_dict = {'real_accuracy_vals': [], 'fake_accuracy_vals': []}
-    # grads_per_epoch_g = []
-    # grads_per_epoch_d = []
     grads_dict = {'grads_per_epoch_d': [], 'grads_per_epoch_g': []}
-    # vals_per_epoch_g = []
-    # vals_per_epoch_d = []
     vals_dict = {'vals_per_epoch_d': [], 'vals_per_epoch_g': []}
-
-    # all_graphs_input = {}
 
     train_gan(discriminator, generator, train_dl, d_optimizer, g_optimizer, real_fake_loss_fn, class_selection_loss_fn, params, args.model_dir)
 
