@@ -159,39 +159,39 @@ if __name__ == '__main__':
     batch = next(iter(test_loader))
     images, labels = batch
 
-    # background = images[:100]
-    # test_images = images[100:103]
+    background = images[:100]
+    test_images = images[100:104]
 
-    size_of_batch = images.shape[0]
-    bg_len = round(0.9 * size_of_batch)
-    test_len = min(round(0.1 * size_of_batch), 10)
-    test_idx = []
-    # test_idx = [[] for _ in range(test_len)]
-    chosen = [False for _ in range(test_len)]
-
-    i = 0
-    while i < test_len:
-        for j in range(size_of_batch):
-            if i >= test_len:
-                break
-
-            if labels[j].item() <= test_len and chosen[labels[j].item()] is False:
-                test_idx.append(j)
-                # test_idx[labels[j].item()].append(j)
-                chosen[labels[j].item()] = True
-                i += 1
-
-    background_idx = list(set([v for v in range(size_of_batch)]) - set(test_idx))
-    background = images[background_idx]
-    test_images = images[test_idx]
+    # size_of_batch = images.shape[0]
+    # bg_len = round(0.9 * size_of_batch)
+    # test_len = min(round(0.1 * size_of_batch), 10)
+    # test_idx = []
+    # # test_idx = [[] for _ in range(test_len)]
+    # chosen = [False for _ in range(test_len)]
+    #
+    # i = 0
+    # while i < test_len:
+    #     for j in range(size_of_batch):
+    #         if i >= test_len:
+    #             break
+    #
+    #         if labels[j].item() <= test_len and chosen[labels[j].item()] is False:
+    #             test_idx.append(j)
+    #             # test_idx[labels[j].item()].append(j)
+    #             chosen[labels[j].item()] = True
+    #             i += 1
+    #
+    # background_idx = list(set([v for v in range(size_of_batch)]) - set(test_idx))
+    # background = images[background_idx]
+    # test_images = images[test_idx]
 
     e = shap.DeepExplainer(model, background)
     shap_values = e.shap_values(test_images)
 
     shap_numpy = [np.swapaxes(np.swapaxes(s, 1, -1), 1, 2) for s in shap_values]
-    temp = np.array(shap_numpy)
+    # temp = np.array(shap_numpy)
     test_numpy = np.swapaxes(np.swapaxes(test_images.numpy(), 1, -1), 1, 2)
-    temp1 = np.array(test_numpy)
+    # temp1 = np.array(test_numpy)
 
     # plot the feature attributions
     shap.image_plot(shap_numpy, test_numpy)

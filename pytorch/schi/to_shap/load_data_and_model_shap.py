@@ -15,8 +15,10 @@ import one_label_data_loader_to_shap as one_labels_data_loader
 
 width = 1
 height = 0.2
-im_w = 20
-im_h = 30
+im_w = 200
+im_h = 300
+
+plt.ioff()
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_dir', default='./experiment-data-with-gray-4000', help="Directory containing the destination dataset")
@@ -118,15 +120,18 @@ def create_segment(segment_center, vertical_or_horizontal, color):
     return segment
 
 
-def create_digit_image(colors):  # , curr_min_val=0, curr_max_val=1):
+def create_digit_image(colors, fig):  # , curr_min_val=0, curr_max_val=1):
 
+    fig.clear()
     width = 1
     height = 0.2
     normalized = False
+    is_grayscale = False
 
     numpy_colors = np.array(colors)
     if len(numpy_colors.shape) == 1:
         numpy_colors = numpy_colors.reshape(numpy_colors.shape[0], 1) * np.ones([1, 3])
+        is_grayscale = True
 
     curr_min_val = numpy_colors.min()
     curr_max_val = numpy_colors.max()
@@ -141,15 +146,21 @@ def create_digit_image(colors):  # , curr_min_val=0, curr_max_val=1):
             normalized = True
 
     colors = numpy_colors.tolist()
+    # data_tensor = torch.empty(3, 300, 200, dtype=torch.float)
 
-    fig_temp, myaxis = plt.subplots(figsize=(im_w, im_h), dpi=1)
-    fig_temp.subplots_adjust(0, 0, 1, 1)
+    # fig_temp, myaxis = plt.subplots(figsize=(im_w, im_h), dpi=1)
+    # fig_temp.clear()
+    # fig_temp.subplots_adjust(0, 0, 1, 1)
+    plt.subplots_adjust(0, 0, 1, 1)
+    myaxis = fig.add_subplot()
+    # myaxis = fig.axes
     patches = []
 
     myaxis.axis('off')
     myaxis.set_xlim([0, 2 * width])
     myaxis.set_ylim([0, 3 * width])
     myaxis.set_aspect('equal', 'box')
+    # fig_temp.tight_layout()
 
     segments_centers = []
     center = [width, 1.5*width]
@@ -171,12 +182,18 @@ def create_digit_image(colors):  # , curr_min_val=0, curr_max_val=1):
         patches.append(polygon)
         myaxis.add_patch(polygon)
 
-    fig_temp.canvas.draw()
+    fig.canvas.draw()
+    fig.canvas.toolbar.pack_forget()
+    # fig_temp.canvas.draw()
 
-    data = np.frombuffer(fig_temp.canvas.tostring_rgb(), dtype=np.uint8)
+    # fig_temp.canvas.
+    data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
     # data = np.fromstring(fig_temp.canvas.tostring_rgb(), dtype=np.uint8, sep='')
-    data = data.reshape(fig_temp.canvas.get_width_height()[::-1] + (3,))
+    data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
     data_c = data/255.
+
+    if is_grayscale:
+        data_c = data_c[:,:,0]
 
     if normalized:
         data_back = np.round(curr_min_val + data_c * (curr_max_val - curr_min_val), 3)  # .astype(int)
@@ -185,7 +202,12 @@ def create_digit_image(colors):  # , curr_min_val=0, curr_max_val=1):
 
     data_tensor = F.to_tensor(data_back)
 
-    plt.close(fig_temp)
+    # fig_temp.clf()
+    # plt.show()
+    # plt.pause(1)
+    # plt.close('all')
+    # plt.close(fig_temp)
+    # print(data_tensor.shape)
 
     return data_tensor
 
@@ -253,6 +275,10 @@ if __name__ == '__main__':
     shap_values = [[[] for _ in range(len(shap_values_samples))] for _ in range(3)]
     # shap_values = [[] for _ in range(len(shap_values_samples))]
 
+    # creating figure for converting data to image
+    fig = plt.figure(figsize=(im_w, im_h), dpi=1)
+
+    print(len(shap_values_samples))
     for j in range(len(shap_values_samples)):
         reshaped = vectors_to_samples(torch.tensor(shap_values_samples[j]))
         reshaped_np = np.array(reshaped)
@@ -261,25 +287,38 @@ if __name__ == '__main__':
 
         for ind in range(3):
             for k in range(len(reshaped_splitd[0])):
-                tensor_image = create_digit_image(reshaped_splitd[ind][k])
+                tensor_image = create_digit_image(reshaped_splitd[ind][k], fig)
                 image = tensor_image.numpy()
                 shap_values[ind][j].append(image)
 
     # test_images = torch.empty(len(test_images_samples), 8, 3)
-    test_images = torch.empty(len(test_images_samples), 3, im_h, im_w)  #, dtype=torch.int)
-    reshaped = vectors_to_samples(test_images_samples.clone().detach())
+    test_images = [torch.empty(len(test_images_samples), 1, im_h, im_w) for _ in range(3)]  #, dtype=torch.int)
+    # test_images = torch.empty(len(test_images_samples), 3, im_h, im_w)  #, dtype=torch.int)
+    reshaped_test = vectors_to_samples(test_images_samples.clone().detach())
+    reshaped_test_np = np.array(reshaped_test)
+    reshaped_test_splitd = [reshaped_test_np[:, :, i].tolist() for i in range(3)]
 
-    for k in range(len(reshaped)):
-        test_images[k] = create_digit_image(reshaped[k])
+    for id in range(3):
+        for k in range(len(reshaped_test_splitd[0])):
+            test_images[id][k] = create_digit_image(reshaped_test_splitd[id][k], fig)
+
+    # closing temp figure
+    plt.close(fig)
 
     # shap_numpy_blue = [np.swapaxes(np.swapaxes(s, 1, -1), 1, 2) for s in shap_values[2]]
     shap_numpy_splitd = [[np.swapaxes(np.swapaxes(s, 1, -1), 1, 2) for s in shap_values[i]] for i in range(3)]
+    shap_numpy_stackd = list(np.concatenate((shap_numpy_splitd[0], shap_numpy_splitd[1], shap_numpy_splitd[2]), axis=2))
 
-    test_numpy = np.swapaxes(np.swapaxes(test_images.numpy(), 1, -1), 1, 2)
+    test_numpy = [np.swapaxes(np.swapaxes(test_images[i].numpy(), 1, -1), 1, 2) for i in range(3)]
+    test_numpy_stackd = np.concatenate((test_numpy[0], test_numpy[1], test_numpy[2]), axis=1)
+    # test_numpy_stackd = test_numpy_stackd[0]
 
-    # plot the feature attributions
-    for i in range(3):
-        shap.image_plot(shap_numpy_splitd[i], test_numpy)
+    shap.image_plot(shap_numpy_stackd, test_numpy_stackd)
+
+    # # plot the feature attributions
+    # for i in range(3):
+    #
+    #     shap.image_plot(shap_numpy_splitd[i], test_numpy[i])
     # shap.image_plot(shap_numpy_red, test_numpy)
 
     # shap.image_plot(shap_numpy, -test_numpy)

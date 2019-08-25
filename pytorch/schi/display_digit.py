@@ -207,12 +207,15 @@ def create_digit_image(colors, curr_min_val=0, curr_max_val=1):
 
         fig_temp.canvas.draw()
 
-        data = np.fromstring(fig_temp.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+        data = np.frombuffer(fig_temp.canvas.tostring_rgb(), dtype=np.uint8)
+        # data = np.fromstring(fig_temp.canvas.tostring_rgb(), dtype=np.uint8, sep='')
         data = data.reshape(fig_temp.canvas.get_width_height()[::-1] + (3,))
 
         data_tensor[j] = F.to_tensor(data)
 
+        # plt.show()
         plt.close(fig_temp)
+        # print(data_tensor.shape)
 
     return data_tensor
 
@@ -393,13 +396,16 @@ if __name__ == '__main__':
         # background
         [1, 1, 1]]
 
-    colors = [color_one, color_two]
+    gray = [[0.5],[0],[0.5],[0.5],[0.5],[1],[0.5]]
+    colors = [color_one]
+    # colors = [color_one, color_two]
 
     print(colors)
     # fig, ax = plt.subplots()
-    plot_graph(color_one, color_two, "Grads", './')
+    # plot_graph(color_one, color_two, "Grads", './')
 
-    # data_t = create_digit_image(colors)
+    data_t = create_digit_image(colors)
+    print(data_t.shape)
 
     # print(data_t.min())
     # print(data_t.max())

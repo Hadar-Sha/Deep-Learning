@@ -572,10 +572,10 @@ if __name__ == '__main__':
     num_test_samples = 20
     test_noise = gan_net.noise(num_test_samples, params.noise_dim, params.noise_type)
 
-    possible_classes = [[0, 1], [2, 1]]  # [[2, 1], [5, 1], [6, 1]]
-    #[[0, 1]]
-    # for it in range(2, 10):
-    #     possible_classes.append([it, 1])
+    # possible_classes = [[0, 1], [2, 1]]  # [[2, 1], [5, 1], [6, 1]]
+    possible_classes = [[0, 1]]
+    for it in range(2, 10):
+        possible_classes.append([it, 1])
     # [[0, 1], [3, 1], [8, 1], [9, 1]]  # [[0, 1], [3, 1]]  # [[9, 3], [9, 5]]  #
     # None  # [[0, 1]]  # [[4, 1]]  # [[3, 1]]  # [[9, 5]]  # [0, 2, 3, 4, 5, 6, 7, 9]
     if possible_classes is None:

@@ -50,23 +50,23 @@ if __name__ == "__main__":
 
     # Perform hypersearch over one parameter
     # learning_rates = [1e-3, 1e-2]  # 1e-4
-    hidden_sizes = list(range(600, 1001, 200))
-    z_noise_dims = list(range(100, 301, 100))  # list(range(200, 401, 100))
+    # hidden_sizes = list(range(600, 1001, 200))
+    z_noise_dims = [10, 20, 50]# list(range(100, 301, 100))  # list(range(200, 401, 100))
     # dropout_rates = np.round(np.arange(0.25, 1, 0.25), 2).tolist()
     # noise_types = ['normal', 'uniform', 'binary']
     # num_epochs = 1000
     # learning_rate = 1e-2
 
-    for hidden_size in hidden_sizes:
-        for noise_dim in z_noise_dims:
-            # Modify the relevant parameter in params
-            # params.learning_rate = learning_rate
-            params.hidden_size = hidden_size + noise_dim  # + noise_dim added to make sure: hidden_size >= noise_dim
-            # params.noise_type = noise_type
-            # params.num_epochs = num_epochs
-            params.noise_dim = noise_dim
+    # for hidden_size in hidden_sizes:
+    for noise_dim in z_noise_dims:
+        # Modify the relevant parameter in params
+        # params.learning_rate = learning_rate
+        # params.hidden_size = hidden_size + noise_dim  # + noise_dim added to make sure: hidden_size >= noise_dim
+        # params.noise_type = noise_type
+        # params.num_epochs = num_epochs
+        params.noise_dim = noise_dim
 
-            # Launch job (name has to be unique)
-            job_name = "hidden_size_{}_noise_dim_{}"\
-                .format(hidden_size + noise_dim, noise_dim)
-            launch_training_job(args.parent_dir, args.data_dir, job_name, params)
+        # Launch job (name has to be unique)
+        job_name = "hidden_size_{}_noise_dim_{}"\
+            .format(params.hidden_size, noise_dim)
+        launch_training_job(args.parent_dir, args.data_dir, job_name, params)

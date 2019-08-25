@@ -1,7 +1,10 @@
 import torch, torchvision
 from torchvision import datasets, transforms
+from torch.autograd import Variable
 from torch import nn, optim
 from torch.nn import functional as F
+from utee import selector
+import svhn
 
 import numpy as np
 import shap
@@ -43,37 +46,37 @@ device = torch.device('cpu')
 #         return x
 
 
-def train(model, device, train_loader, optimizer, epoch):
-    model.train()
-    for batch_idx, (data, target) in enumerate(train_loader):
-        data, target = data.to(device), target.to(device)
-        optimizer.zero_grad()
-        output = model(data)
-        loss = F.nll_loss(output.log(), target)
-        loss.backward()
-        optimizer.step()
-        if batch_idx % 100 == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                epoch, batch_idx * len(data), len(train_loader.dataset),
-                       100. * batch_idx / len(train_loader), loss.item()))
-
-
-def test(model, device, test_loader):
-    model.eval()
-    test_loss = 0
-    correct = 0
-    with torch.no_grad():
-        for data, target in test_loader:
-            data, target = data.to(device), target.to(device)
-            output = model(data)
-            test_loss += F.nll_loss(output.log(), target).item()  # sum up batch loss
-            pred = output.max(1, keepdim=True)[1]  # get the index of the max log-probability
-            correct += pred.eq(target.view_as(pred)).sum().item()
-
-    test_loss /= len(test_loader.dataset)
-    print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
-        test_loss, correct, len(test_loader.dataset),
-        100. * correct / len(test_loader.dataset)))
+# def train(model, device, train_loader, optimizer, epoch):
+#     model.train()
+#     for batch_idx, (data, target) in enumerate(train_loader):
+#         data, target = data.to(device), target.to(device)
+#         optimizer.zero_grad()
+#         output = model(data)
+#         loss = F.nll_loss(output.log(), target)
+#         loss.backward()
+#         optimizer.step()
+#         if batch_idx % 100 == 0:
+#             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+#                 epoch, batch_idx * len(data), len(train_loader.dataset),
+#                        100. * batch_idx / len(train_loader), loss.item()))
+#
+#
+# def test(model, device, test_loader):
+#     model.eval()
+#     test_loss = 0
+#     correct = 0
+#     with torch.no_grad():
+#         for data, target in test_loader:
+#             data, target = data.to(device), target.to(device)
+#             output = model(data)
+#             test_loss += F.nll_loss(output.log(), target).item()  # sum up batch loss
+#             pred = output.max(1, keepdim=True)[1]  # get the index of the max log-probability
+#             correct += pred.eq(target.view_as(pred)).sum().item()
+#
+#     test_loss /= len(test_loader.dataset)
+#     print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
+#         test_loss, correct, len(test_loader.dataset),
+#         100. * correct / len(test_loader.dataset)))
 
 
 def save_checkpoint(state, is_best, checkpoint, ntype=None):
@@ -132,35 +135,46 @@ def load_model(model_dir, restore_file):
 
 if __name__ == '__main__':
 
-    train_loader = torch.utils.data.DataLoader(
-        datasets.SVHN('svnh_data', split='train', download=False,
-                       transform=transforms.Compose([
-                           transforms.ToTensor()
-                       ])),
-        batch_size=batch_size, shuffle=True)
+    # train_loader = torch.utils.data.DataLoader(
+    #     datasets.SVHN('svnh_data', split='train', download=False,
+    #                    transform=transforms.Compose([
+    #                        transforms.ToTensor()
+    #                    ])),
+    #     batch_size=batch_size, shuffle=True)
+    #
+    # test_loader = torch.utils.data.DataLoader(
+    #     datasets.SVHN('svnh_data', split='test', download=False,
+    #                   transform=transforms.Compose([
+    #                         transforms.ToTensor()
+    #                     ])),
+    #     batch_size=batch_size, shuffle=True)
 
-    test_loader = torch.utils.data.DataLoader(
-        datasets.SVHN('svnh_data', split='test', download=False,
-                      transform=transforms.Compose([
-                            transforms.ToTensor()
-                        ])),
-        batch_size=batch_size, shuffle=True)
-
-    model = Net().to(device)
-    optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.5)
-
-    for epoch in range(1, num_epochs + 1):
-        train(model, device, train_loader, optimizer, epoch)
-        test(model, device, test_loader)
-
-    save_checkpoint({'epoch': num_epochs,
-                          'state_dict': model.state_dict(),
-                          'optim_dict': model.state_dict()}, is_best=False, checkpoint='./')
+    # model = Net().to(device)
+    # optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.5)
+    #
+    # for epoch in range(1, num_epochs + 1):
+    #     train(model, device, train_loader, optimizer, epoch)
+    #     test(model, device, test_loader)
+    #
+    # save_checkpoint({'epoch': num_epochs,
+    #                       'state_dict': model.state_dict(),
+    #                       'optim_dict': model.state_dict()}, is_best=False, checkpoint='./')
 
     # load_model('./', 'last')
     # since shuffle=True, this is a random sample of test data
-    batch = next(iter(test_loader))
-    images, labels = batch
+    # batch = next(iter(test_loader))
+    # images, labels = batch
+    path = os.getcwd()
+    print(path)
+    model, ds_fetcher, is_imagenet = selector.select('svhn', cuda=False, model_root=path)
+    ds_val = ds_fetcher(batch_size=10, train=False, val=True, data_root=path)
+    for idx, (images, labels) in enumerate(ds_val):
+        images = Variable(torch.FloatTensor(images))
+        # data = Variable(torch.FloatTensor(data)).cuda()
+        output = model(images)
+
+    print(idx)
+    # load_model('./', 'last')
 
     size_of_batch = images.shape[0]
     bg_len = round(0.9 * size_of_batch)
@@ -187,11 +201,13 @@ if __name__ == '__main__':
 
     e = shap.DeepExplainer(model, background)
     shap_values = e.shap_values(test_images)
+    print(len(shap_values))
+    print(len(shap_values[0]))
 
     shap_numpy = [np.swapaxes(np.swapaxes(s, 1, -1), 1, 2) for s in shap_values]
-    temp = np.array(shap_numpy)
+    # temp = np.array(shap_numpy)
     test_numpy = np.swapaxes(np.swapaxes(test_images.numpy(), 1, -1), 1, 2)
-    temp1 = np.array(test_numpy)
+    # temp1 = np.array(test_numpy)
 
     # plot the feature attributions
     shap.image_plot(shap_numpy, test_numpy)
