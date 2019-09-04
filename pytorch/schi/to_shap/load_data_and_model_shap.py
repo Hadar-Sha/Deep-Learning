@@ -17,17 +17,19 @@ width = 1
 height = 0.2
 im_w = 200
 im_h = 300
+RGB = 3
 
 plt.ioff()
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--data_dir', default='./grayscale-data', help="Directory containing the destination dataset")
+parser.add_argument('--data_dir', default='./experiment-data-with-gray-4000', help="Directory containing the destination dataset")
 parser.add_argument('--model_dir', default='', help="Directory containing params.json")
 parser.add_argument('--restore_file', default='best',
                     help="Optional, name of the file in --model_dir containing weights to reload before \
                     training")  # 'best' or 'train'
-parser.add_argument('--reduce_background_shap', default=True, type=bool,
+parser.add_argument('--reduce_background_shap', default=True, action='store_false',
                     help="if showing relative shap values to background's shap values")
+
 
 # './experiment-data-with-gray-4000' # './grayscale-data'
 def load_checkpoint(checkpoint, model, optimizer=None):
@@ -120,6 +122,39 @@ def create_segment(segment_center, vertical_or_horizontal, color):
 
     segment = Polygon(points, True, facecolor=color)
     return segment
+
+
+def grayscale_to_binary(colors):
+    # np_colors = np.array(colors)
+    for i in range(RGB):
+        for j in range(len(colors[0])):
+            colors[i][j] = [1. if colors[i][j][it] == colors[i][j][7] else 0. for it in range(len(colors[0][0]))]
+
+    return colors
+
+
+def grayscale_to_white_bg(colors):
+    # np_colors = np.array(colors)
+    for i in range(RGB):
+        for j in range(len(colors[0])):
+            max_v = np.array(colors[i][j]).max()
+            min_v = np.array(colors[i][j]).min()
+            colors[i][j] = [1. if colors[i][j][it] == colors[i][j][7] else 1.-(max_v-min_v)
+                            for it in range(len(colors[0][0]))]
+
+    return colors
+
+
+def grayscale_to_bright(colors):
+    # np_colors = np.array(colors)
+    for i in range(RGB):
+        for j in range(len(colors[0])):
+            max_v = np.array(colors[i][j]).max()
+            min_v = np.array(colors[i][j]).min()
+            colors[i][j] = [1. if colors[i][j][it] == max_v else 1.-(max_v-min_v)
+                            for it in range(len(colors[0][0]))]
+
+    return colors
 
 
 def create_digit_image(colors, fig, curr_min_val=0, curr_max_val=1):
@@ -247,29 +282,28 @@ if __name__ == '__main__':
     # test_images_samples = images[test_idx]
     background = images[:bg_len]
     test_images_samples = images[bg_len: min(bg_len + 2, size_of_batch)]
+
     # test_images_samples = images[bg_len: min(bg_len + 4, size_of_batch)]
 
     e = shap.DeepExplainer(model, background)
     shap_values_samples = e.shap_values(test_images_samples)
     min_shap_val = round(np.array(shap_values_samples).min(), 3)
     max_shap_val = round(np.array(shap_values_samples).max(), 3)
-    # print(np.array(shap_values_samples).mean())
 
     # output is in shape [batch_size,24] changing to illustrate as an image
     shap_values = []
-    shap_values = [[[] for _ in range(len(shap_values_samples))] for _ in range(3)]
+    shap_values = [[[] for _ in range(len(shap_values_samples))] for _ in range(RGB)]
 
     # creating figure for converting data to image
     fig = plt.figure(figsize=(im_w, im_h), dpi=1)
 
-    # print(len(shap_values_samples))
     for j in range(len(shap_values_samples)):
         reshaped = vectors_to_samples(torch.tensor(shap_values_samples[j]))
         reshaped_np = np.array(reshaped)
-        reshaped_splitd = [reshaped_np[:, :, i].tolist() for i in range(3)]
+        reshaped_splitd = [reshaped_np[:, :, i].tolist() for i in range(RGB)]
         max_bg_val = np.array(reshaped_splitd)[:, :, 7].max()
 
-        for ind in range(3):
+        for ind in range(RGB):
             for k in range(len(reshaped_splitd[0])):
                 # change code here !!! for each reshaped_splitd[ind][k] (shape = 8) change values to be
                 # newval = val- bgval (reshaped_splitd[ind][k][7])
@@ -282,30 +316,59 @@ if __name__ == '__main__':
                 tensor_image = create_digit_image(reshaped_splitd[ind][k], fig, min_shap_val - bg_val,
                                                       max_shap_val - bg_val)
 
-                # if ind == 0:
-                #     print(tensor_image.shape)
                 image_s = tensor_image.numpy()
                 shap_values[ind][j].append(image_s)
 
-    test_images = [torch.empty(len(test_images_samples), 1, im_h, im_w) for _ in range(3)]
+    test_images = [torch.empty(len(test_images_samples), 1, im_h, im_w) for _ in range(RGB)]
     reshaped_test = vectors_to_samples(test_images_samples.clone().detach())
-    reshaped_test_np = np.array(reshaped_test)
-    reshaped_test_splitd = [reshaped_test_np[:, :, i].tolist() for i in range(3)]
 
-    for id in range(3):
+    ts_images = torch.empty(len(test_images_samples), RGB, im_h, im_w)
+    for i in range(len(reshaped_test)):
+        ts_images[i] = create_digit_image(reshaped_test[i], fig)
+
+    reshaped_test_np = np.array(reshaped_test)
+    reshaped_test_splitd = [reshaped_test_np[:, :, i].tolist() for i in range(RGB)]
+    reshaped_test_splitd = grayscale_to_bright(reshaped_test_splitd)  # added by Hadar!!!!!
+    # reshaped_test_splitd = grayscale_to_white_bg(reshaped_test_splitd)  # added by Hadar!!!!!
+    # reshaped_test_splitd = grayscale_to_binary(reshaped_test_splitd)  # added by Hadar!!!!!
+
+    for id in range(RGB):
         for k in range(len(reshaped_test_splitd[0])):
             test_images[id][k] = create_digit_image(reshaped_test_splitd[id][k], fig, min_shap_val, max_shap_val)
 
     # closing temp figure
     plt.close(fig)
 
-    shap_numpy_splitd = [[np.swapaxes(np.swapaxes(s, 1, -1), 1, 2) for s in shap_values[i]] for i in range(3)]
+    shap_numpy_splitd = [[np.swapaxes(np.swapaxes(s, 1, -1), 1, 2) for s in shap_values[i]] for i in range(RGB)]
     shap_numpy_stackd = list(np.concatenate((shap_numpy_splitd[0], shap_numpy_splitd[1], shap_numpy_splitd[2]), axis=2))
 
-    test_numpy = [np.swapaxes(np.swapaxes(test_images[i].numpy(), 1, -1), 1, 2) for i in range(3)]
+    test_numpy = [np.swapaxes(np.swapaxes(test_images[i].numpy(), 1, -1), 1, 2) for i in range(RGB)]
     test_numpy_stackd = np.concatenate((test_numpy[0], test_numpy[1], test_numpy[2]), axis=1)
 
-    shap.image_plot(shap_numpy_stackd, test_numpy_stackd)  # , np.arange(len(shap_numpy_stackd)))
+    a = 1
+    ts_images = np.swapaxes(np.swapaxes(ts_images.numpy(), 1, -1), 1, 2)
+
+    # plt.ion()
+    plt.show()
+    for i in range(len(ts_images)):
+        plt.figure(i+1)
+        plt.imshow(ts_images[i])
+        # plt.show()
+        plt.draw()
+
+    # print(np.array(shap_numpy_stackd).shape)
+
+    # labels.shape[0] == shap_values[0].shape[0]
+    # print(np.matmul(np.ones([2,1]),np.arange(len(shap_numpy_stackd)).reshape([1, len(shap_numpy_stackd)])).shape[0])
+    # print(shap_numpy_stackd[0].shape[0])
+    #
+    # # labels.shape[1] == len(shap_values)
+    # print(np.matmul(np.ones([2,1]),np.arange(len(shap_numpy_stackd)).reshape([1, len(shap_numpy_stackd)])).shape[1])
+    # print(len(shap_numpy_stackd))
+    labels_for_plot = np.matmul(np.ones([len(shap_numpy_stackd[0]), 1], dtype=int),
+                                np.arange(len(shap_numpy_stackd)).reshape([1, len(shap_numpy_stackd)]))
+
+    shap.image_plot(shap_numpy_stackd, test_numpy_stackd, labels_for_plot)
 
     # unioned_test_numpy = np.concatenate((test_numpy[0], test_numpy[1], test_numpy[2]), axis=3)
 
@@ -322,8 +385,8 @@ if __name__ == '__main__':
     #     plt.imshow(np_im, cmap=plt.get_cmap('gray'))
     #     plt.show()
 
-    # # plot the feature attributions
-    # for i in range(3):
+    # plot the feature attributions
+    # for i in range(RGB):
     #
     #     shap.image_plot(shap_numpy_splitd[i], test_numpy[i])
 

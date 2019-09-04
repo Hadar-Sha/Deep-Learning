@@ -36,18 +36,6 @@ def train_discriminator(d, optimizer, real_data, fake_data, real_labels, fake_la
     # 1.1 Train on Real Data
     prediction_r_f_real, prediction_class_real = d(real_data)
 
-    # if np.isnan(prediction_r_f_real.detach().cpu().numpy()).all():
-    #     logging.info("prediction_r_f_real is nan")
-    #     assert False, "prediction_r_f_real is nan"
-    # if np.isinf(prediction_r_f_real.detach().cpu().numpy()).all():
-    #     logging.info("prediction_r_f_real is inf")
-    #     assert False, "prediction_r_f_real is inf"
-    # if not ((prediction_r_f_real.detach().cpu().numpy() >= 0.).all()
-    #         and (prediction_r_f_real.detach().cpu().numpy() <= 1.).all()):
-    #     logging.info("prediction_r_f_real is <= 0 or >= 1")
-    #     assert False, "prediction_r_f_real is <= 0 or >= 1"
-
-    # with detect_anomaly():
     # Calculate error and backpropagate
     is_real_fake_error = r_f_loss_fn(prediction_r_f_real, gan_net.real_data_target(real_data.size(0)))
     class_error = c_loss_fn(prediction_class_real, real_labels, num_classes)
@@ -64,18 +52,6 @@ def train_discriminator(d, optimizer, real_data, fake_data, real_labels, fake_la
     # 1.2 Train on Fake Data
     prediction_r_f_fake, prediction_class_fake = d(fake_data)
 
-    # if np.isnan(prediction_r_f_fake.detach().cpu().numpy()).all():
-    #     logging.info("prediction_r_f_fake is nan")
-    #     assert False, "prediction_r_f_fake is nan"
-    # if np.isinf(prediction_r_f_fake.detach().cpu().numpy()).all():
-    #     logging.info("prediction_r_f_fake is inf")
-    #     assert False, "prediction_r_f_fake is inf"
-    # if not ((prediction_r_f_fake.detach().cpu().numpy() >= 0.).all()
-    #         and (prediction_r_f_fake.detach().cpu().numpy() <= 1.).all()):
-    #     logging.info("prediction_r_f_fake is <= 0 or >= 1")
-    #     assert False, "prediction_r_f_fake is <= 0 or >= 1"
-
-    # with detect_anomaly():
     # Calculate error and backpropagate
     is_real_fake_error = r_f_loss_fn(prediction_r_f_fake, gan_net.fake_data_target(real_data.size(0)))
     class_error = c_loss_fn(prediction_class_fake, fake_labels, num_classes)
@@ -106,21 +82,8 @@ def train_generator(d, optimizer, fake_data, fake_labels, r_f_loss_fn, c_loss_fn
     optimizer.zero_grad()
     # Sample noise and generate fake data
     prediction_r_f, prediction_class = d(fake_data)
+
     # Calculate error and backpropagate
-
-    # if np.isnan(prediction_r_f.detach().cpu().numpy()).all():
-    #     logging.info("prediction_r_f is nan")
-    #     assert False, "prediction_r_f is nan"
-    # if np.isinf(prediction_r_f.detach().cpu().numpy()).all():
-    #     logging.info("prediction_r_f is inf")
-    #     assert False, "prediction_r_f is inf"
-    # if not ((prediction_r_f.detach().cpu().numpy() >= 0.).all()
-    #         and (prediction_r_f.detach().cpu().numpy() <= 1.).all()):
-    #     logging.info("prediction_r_f is <= 0 or >= 1")
-    #     assert False, "prediction_r_f is <= 0 or >= 1"
-
-    # with detect_anomaly():
-    # real_data_target: not a mistake - a tip from ganHacks
     is_real_fake_error = r_f_loss_fn(prediction_r_f, gan_net.real_data_target(prediction_r_f.size(0)))
     class_error = c_loss_fn(prediction_class, fake_labels, num_classes)
 
@@ -141,7 +104,6 @@ def get_stats(val, val_type):
 
     elif isinstance(val, torch.autograd.Variable) and val_type == 'pred':
         ret_val = val.data.mean().cpu().numpy()
-        # ret_val = val.data.mean()
 
     else:
         print('invalid input')
@@ -357,22 +319,22 @@ def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, r_f_
                 utils.save_incorrect_to_csv(incorrect_samples[0], best_csv_real_path)
                 utils.save_incorrect_to_csv(incorrect_samples[1], best_csv_fake_path)
 
-            if test_samples is not None:
-                np_test_samples = np.array(test_samples)
-                # convert back to range [0, 255]
-                np_test_samples = \
-                    dest_min + (dest_max - dest_min) * (np_test_samples - curr_min) / (curr_max - curr_min)
-                np_test_samples = np.around(np_test_samples).astype(int)
-                np_test_out = (test_noise.cpu().numpy())
-                np_test_labels = (test_labels.view(test_labels.shape[0], -1).cpu().numpy())
-
-                data_path = os.path.join(model_dir, 'data')
-                if not os.path.isdir(data_path):
-                    os.mkdir(data_path)
-
-                test_all_data = (np.concatenate((np_test_samples, np_test_out, np_test_labels), axis=1)).tolist()
-                last_csv_path = os.path.join(data_path, "best_samples_epoch_{}.csv".format(epoch + 1))
-                utils.save_incorrect_to_csv(test_all_data, last_csv_path)
+            # if test_samples is not None:
+            #     np_test_samples = np.array(test_samples)
+            #     # convert back to range [0, 255]
+            #     np_test_samples = \
+            #         dest_min + (dest_max - dest_min) * (np_test_samples - curr_min) / (curr_max - curr_min)
+            #     np_test_samples = np.around(np_test_samples).astype(int)
+            #     np_test_out = (test_noise.cpu().numpy())
+            #     np_test_labels = (test_labels.view(test_labels.shape[0], -1).cpu().numpy())
+            #
+            #     data_path = os.path.join(model_dir, 'data')
+            #     if not os.path.isdir(data_path):
+            #         os.mkdir(data_path)
+            #
+            #     test_all_data = (np.concatenate((np_test_samples, np_test_out, np_test_labels), axis=1)).tolist()
+            #     last_csv_path = os.path.join(data_path, "best_samples_epoch_{}.csv".format(epoch + 1))
+            #     utils.save_incorrect_to_csv(test_all_data, last_csv_path)
 
         if test_samples is not None:
             for it in is_best_dict.keys():
