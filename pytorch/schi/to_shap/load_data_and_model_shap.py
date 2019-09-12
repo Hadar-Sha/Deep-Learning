@@ -10,7 +10,7 @@ from torchvision.transforms import functional as F
 # import utils
 import net_to_shap as net
 import one_label_data_loader_to_shap as one_labels_data_loader
-# from evaluate_to_shap import evaluate
+from evaluate_to_shap import evaluate
 # from train import train
 
 width = 1
@@ -22,13 +22,15 @@ RGB = 3
 plt.ioff()
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--data_dir', default='./experiment-data-with-gray-4000', help="Directory containing the destination dataset")
+parser.add_argument('--data_dir', default='./grayscale-data', help="Directory containing the destination dataset")
 parser.add_argument('--model_dir', default='', help="Directory containing params.json")
 parser.add_argument('--restore_file', default='best',
                     help="Optional, name of the file in --model_dir containing weights to reload before \
                     training")  # 'best' or 'train'
-parser.add_argument('--reduce_background_shap', default=True, action='store_false',
+parser.add_argument('--reduce_background_shap', default=0, type=int,
+                    #action='store_false',
                     help="if showing relative shap values to background's shap values")
+parser.add_argument('--change_test_shap', default=0, type=int, help='how to modify background')
 
 
 # './experiment-data-with-gray-4000' # './grayscale-data'
@@ -68,20 +70,26 @@ def vectors_to_samples(vectors):
     return vectors
 
 
-def create_background(color, center=[width, 1.5*width]):
+def create_background(color, center=[width, 1.5*width], area=1):
 
+    area = max(1, area)  # to make sure we avoid devision by 0 later
     points = np.zeros([4, 2], dtype=float)
     points[0] = [center[0]-width, center[1]-1.5*width]
     points[1] = [center[0]-width, center[1]+1.5*width]
     points[2] = [center[0]+width, center[1]+1.5*width]
     points[3] = [center[0]+width, center[1]-1.5*width]
 
+    if area > 1:
+        color = [it / area for it in color]
+    # background = Polygon(points, True, facecolor=color/area)
     background = Polygon(points, True, facecolor=color)
     return background
 
 
-def create_segment(segment_center, vertical_or_horizontal, color):
+def create_segment(segment_center, vertical_or_horizontal, color, area=1):
     points = np.zeros([6, 2], dtype=float)
+    area = max(1, area)  # to make sure we avoid devision by 0 later
+
     if not vertical_or_horizontal:  # segment is horizontal
         points[0, 0] = segment_center[0] - width / 2
         points[0, 1] = segment_center[1] - height / 2
@@ -120,12 +128,14 @@ def create_segment(segment_center, vertical_or_horizontal, color):
         points[5, 0] = segment_center[0]
         points[5, 1] = segment_center[1] - width / 2 - height / 2
 
+    if area > 1:
+        color = [it / area for it in color]
+    # segment = Polygon(points, True, facecolor=color/area)
     segment = Polygon(points, True, facecolor=color)
     return segment
 
 
 def grayscale_to_binary(colors):
-    # np_colors = np.array(colors)
     for i in range(RGB):
         for j in range(len(colors[0])):
             colors[i][j] = [1. if colors[i][j][it] == colors[i][j][7] else 0. for it in range(len(colors[0][0]))]
@@ -134,7 +144,6 @@ def grayscale_to_binary(colors):
 
 
 def grayscale_to_white_bg(colors):
-    # np_colors = np.array(colors)
     for i in range(RGB):
         for j in range(len(colors[0])):
             max_v = np.array(colors[i][j]).max()
@@ -146,7 +155,6 @@ def grayscale_to_white_bg(colors):
 
 
 def grayscale_to_bright(colors):
-    # np_colors = np.array(colors)
     for i in range(RGB):
         for j in range(len(colors[0])):
             max_v = np.array(colors[i][j]).max()
@@ -157,13 +165,24 @@ def grayscale_to_bright(colors):
     return colors
 
 
-def create_digit_image(colors, fig, curr_min_val=0, curr_max_val=1):
+def create_digit_image(colors, fig, curr_min_val=0, curr_max_val=1, normalized_color=0):
 
     fig.clear()
-    width = 1
-    height = 0.2
+    # print(curr_max_val)
+    # print(curr_min_val)
+
+    # width = 1
+    # height = 0.2
     normalized = False
     is_grayscale = False
+    segment_area = im_h*(im_w+(0.5*im_h))
+    background_area = (6*im_w*im_w) - (7 * segment_area)
+
+    # segment_area = height*(width+(0.5*height))
+    # background_area = 6*width*width
+
+    # print(segment_area)
+    # print(background_area)
 
     numpy_colors = np.array(colors)
     if len(numpy_colors.shape) == 1:
@@ -173,16 +192,29 @@ def create_digit_image(colors, fig, curr_min_val=0, curr_max_val=1):
     # curr_min_val = numpy_colors.min()
     # curr_max_val = numpy_colors.max()
 
+    # print(numpy_colors.min())
+    # print(numpy_colors.max())
+
     # convert to [0,1] to draw
     if numpy_colors.min() < 0 or numpy_colors.max() > 1:
+
         if (curr_max_val - curr_min_val) <= 0:
             print('wrong min and max input values')
             return
+        # elif numpy_colors.min() == numpy_colors.max():
+        #     print('in new cond')
+        #     numpy_colors = np.round((curr_min_val + curr_max_val)/2, 3)
         else:
             numpy_colors = np.round(((numpy_colors - curr_min_val) / (curr_max_val - curr_min_val)), 3)
             normalized = True
+            # print('normalized')
+            # print(numpy_colors.min())
+            # print(numpy_colors.max())
+            # print((numpy_colors - curr_min_val) / (curr_max_val - curr_min_val))
 
     colors = numpy_colors.tolist()
+    # print(np.array(colors[7]).min())
+    # print(np.array(colors[7]).max())
 
     plt.subplots_adjust(0, 0, 1, 1)
     myaxis = fig.add_subplot()
@@ -195,7 +227,14 @@ def create_digit_image(colors, fig, curr_min_val=0, curr_max_val=1):
 
     segments_centers = []
     center = [width, 1.5*width]
-    bg_patch = create_background(colors[7])
+    if normalized_color:
+        in_area = segment_area
+        bg_area = background_area
+    else:
+        in_area = 1
+        bg_area = 1
+
+    bg_patch = create_background(colors[7], area=bg_area)
     patches.append(bg_patch)
     myaxis.add_patch(bg_patch)
 
@@ -209,7 +248,8 @@ def create_digit_image(colors, fig, curr_min_val=0, curr_max_val=1):
 
     vertical_horizon = [0, 0, 0, 1, 1, 1, 1]
     for i in range(len(segments_centers)):
-        polygon = create_segment(segments_centers[i], vertical_horizon[i], colors[i])
+
+        polygon = create_segment(segments_centers[i], vertical_horizon[i], colors[i], area=in_area)
         patches.append(polygon)
         myaxis.add_patch(polygon)
 
@@ -254,11 +294,14 @@ if __name__ == '__main__':
 
     load_model(args.model_dir, args.restore_file)
 
-    batch = next(iter(test_dl))
+    batch = next(iter(train_dl))
     images, labels = batch
 
+    test_batch = next(iter(test_dl))
+    test_im, test_l = test_batch
+
     size_of_batch = images.shape[0]
-    bg_len = round(0.9 * size_of_batch)
+    bg_len = size_of_batch  # round(0.9 * size_of_batch)
     test_len = 20
     # test_len = min(round(0.1 * size_of_batch), 10)
     test_idx = []
@@ -281,18 +324,27 @@ if __name__ == '__main__':
     # background = images[background_idx]
     # test_images_samples = images[test_idx]
     background = images[:bg_len]
-    test_images_samples = images[bg_len: min(bg_len + 2, size_of_batch)]
+    test_images_samples = test_im[0: 2]
 
     # test_images_samples = images[bg_len: min(bg_len + 4, size_of_batch)]
 
     e = shap.DeepExplainer(model, background)
     shap_values_samples = e.shap_values(test_images_samples)
     min_shap_val = round(np.array(shap_values_samples).min(), 3)
+    # print(min_shap_val)
     max_shap_val = round(np.array(shap_values_samples).max(), 3)
+    abs_min_max_val = max(abs(min_shap_val), abs(max_shap_val))
+    # print(max_shap_val)
+    # np_shap_values_samples = np.array(shap_values_samples)
+    # np_shap_values_samples[np_shap_values_samples < 0] = -abs_min_max_val
+    # np_shap_values_samples[np_shap_values_samples > 0] = abs_min_max_val
+    # shap_values_samples = np_shap_values_samples.tolist()
 
     # output is in shape [batch_size,24] changing to illustrate as an image
     shap_values = []
     shap_values = [[[] for _ in range(len(shap_values_samples))] for _ in range(RGB)]
+
+    # print(args.reduce_background_shap)
 
     # creating figure for converting data to image
     fig = plt.figure(figsize=(im_w, im_h), dpi=1)
@@ -310,11 +362,13 @@ if __name__ == '__main__':
 
                 if args.reduce_background_shap:
                     bg_val = reshaped_splitd[ind][k][7]
-                    reshaped_splitd[ind][k] = [it - bg_val for it in reshaped_splitd[ind][k]]
                 else:
                     bg_val = 0
+                reshaped_splitd[ind][k] = [it - bg_val for it in reshaped_splitd[ind][k]]
+                # tensor_image = create_digit_image(reshaped_splitd[ind][k], fig, -abs_min_max_val - bg_val,
+                #                                   abs_min_max_val - bg_val)
                 tensor_image = create_digit_image(reshaped_splitd[ind][k], fig, min_shap_val - bg_val,
-                                                      max_shap_val - bg_val)
+                                                      max_shap_val - bg_val, normalized_color=1)
 
                 image_s = tensor_image.numpy()
                 shap_values[ind][j].append(image_s)
@@ -328,9 +382,13 @@ if __name__ == '__main__':
 
     reshaped_test_np = np.array(reshaped_test)
     reshaped_test_splitd = [reshaped_test_np[:, :, i].tolist() for i in range(RGB)]
-    reshaped_test_splitd = grayscale_to_bright(reshaped_test_splitd)  # added by Hadar!!!!!
-    # reshaped_test_splitd = grayscale_to_white_bg(reshaped_test_splitd)  # added by Hadar!!!!!
-    # reshaped_test_splitd = grayscale_to_binary(reshaped_test_splitd)  # added by Hadar!!!!!
+    if args.change_test_shap > 0:
+        if args.change_test_shap == 1:
+            reshaped_test_splitd = grayscale_to_bright(reshaped_test_splitd)  # added by Hadar!!!!!
+        elif args.change_test_shap == 2:
+            reshaped_test_splitd = grayscale_to_white_bg(reshaped_test_splitd)  # added by Hadar!!!!!
+        elif args.change_test_shap == 3:
+            reshaped_test_splitd = grayscale_to_binary(reshaped_test_splitd)  # added by Hadar!!!!!
 
     for id in range(RGB):
         for k in range(len(reshaped_test_splitd[0])):
@@ -345,8 +403,18 @@ if __name__ == '__main__':
     test_numpy = [np.swapaxes(np.swapaxes(test_images[i].numpy(), 1, -1), 1, 2) for i in range(RGB)]
     test_numpy_stackd = np.concatenate((test_numpy[0], test_numpy[1], test_numpy[2]), axis=1)
 
-    a = 1
     ts_images = np.swapaxes(np.swapaxes(ts_images.numpy(), 1, -1), 1, 2)
+
+    # fetch loss function and metrics
+    loss_fn = net.loss_fn
+
+    metrics = net.metrics
+    incorrect = net.incorrect
+    num_epochs = 10000
+
+    test_metrics, incorrect_samples = evaluate(model, loss_fn, test_dl, metrics, incorrect, num_epochs - 1)
+
+    # print(incorrect_samples)
 
     # plt.ion()
     plt.show()
@@ -368,6 +436,8 @@ if __name__ == '__main__':
     labels_for_plot = np.matmul(np.ones([len(shap_numpy_stackd[0]), 1], dtype=int),
                                 np.arange(len(shap_numpy_stackd)).reshape([1, len(shap_numpy_stackd)]))
 
+    white_temp = np.ones(test_numpy_stackd.shape)
+    # shap.image_plot(shap_numpy_stackd, white_temp, labels_for_plot)
     shap.image_plot(shap_numpy_stackd, test_numpy_stackd, labels_for_plot)
 
     # unioned_test_numpy = np.concatenate((test_numpy[0], test_numpy[1], test_numpy[2]), axis=3)
@@ -391,4 +461,5 @@ if __name__ == '__main__':
     #     shap.image_plot(shap_numpy_splitd[i], test_numpy[i])
 
     # shap.image_plot(shap_numpy, -test_numpy)
+
 

@@ -82,7 +82,7 @@ def loss_fn(outputs, labels, num_of_classes):
           demonstrates how you can easily define a custom loss function.
     """
 
-    kl_criterion = nn.KLDivLoss()
+    kl_criterion = nn.KLDivLoss(reduction='batchmean')
     one_hot_vector = convert_int_to_one_hot_vector(labels, num_of_classes)
 
     return kl_criterion(outputs, one_hot_vector)
@@ -102,7 +102,7 @@ def accuracy(outputs, labels):
     return np.sum(outputs == labels)/float(labels.size)
 
 
-def incorrect(images, outputs, labels):
+def incorrect(images, outputs, labels, curr_min=0, curr_max=1, dest_min=0, dest_max=255):
     """
         Keep all images for which the classification is wrong
 
@@ -122,6 +122,9 @@ def incorrect(images, outputs, labels):
     # find compatible incorrect samples and save them in a list
     samples_numpy = images.cpu().numpy()
 
+    # convert back to range [0, 255]
+    samples_numpy = \
+        dest_min + (dest_max - dest_min) * (samples_numpy - curr_min) / (curr_max - curr_min)
     # find samples
     incorrect_samples = (samples_numpy[current_incorrect_indexes]).astype(int)
 
