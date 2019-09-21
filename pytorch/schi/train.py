@@ -63,7 +63,7 @@ def train(model, optimizer, loss_fn, dataloader, metrics, params, epoch, fig):
 
         # move to GPU if available
         if params.cuda:
-            train_batch, labels_batch = train_batch.cuda(async=True), labels_batch.cuda(async=True)
+            train_batch, labels_batch = train_batch.cuda(), labels_batch.cuda()
         # convert to torch Variables
         train_batch, labels_batch = Variable(train_batch), Variable(labels_batch)
 
@@ -330,7 +330,8 @@ if __name__ == '__main__':
     # Load the parameters from json file
     args = parser.parse_args()
     if args.parent_dir and not torch.cuda.is_available():
-        os.chdir(args.parent_dir)
+        os.chdir(os.path.join(os.path.expanduser(os.environ['USERPROFILE']), args.parent_dir))
+        # os.chdir(args.parent_dir)
 
     # print(args.early_stop)
     # exit()
