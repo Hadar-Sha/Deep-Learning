@@ -28,7 +28,6 @@ parser.add_argument('--restore_file', default='best',
                     help="Optional, name of the file in --model_dir containing weights to reload before \
                     training")  # 'best' or 'train'
 parser.add_argument('--reduce_background_shap', default=0, type=int,
-                    #action='store_false',
                     help="if showing relative shap values to background's shap values")
 parser.add_argument('--change_test_shap', default=0, type=int, help='how to modify background')
 
@@ -72,23 +71,31 @@ def vectors_to_samples(vectors):
 
 def create_background(color, center=[width, 1.5*width], area=1):
 
-    area = max(1, area)  # to make sure we avoid devision by 0 later
+    area = max(1, area)  # to make sure we avoid division by 0 later
     points = np.zeros([4, 2], dtype=float)
     points[0] = [center[0]-width, center[1]-1.5*width]
     points[1] = [center[0]-width, center[1]+1.5*width]
     points[2] = [center[0]+width, center[1]+1.5*width]
     points[3] = [center[0]+width, center[1]-1.5*width]
 
+    # temp_flag = False
     if area > 1:
         color = [it / area for it in color]
-    # background = Polygon(points, True, facecolor=color/area)
+        # for i in range(len(color)):
+        #     color[i] = color[i] / area
+
+    # if max(color) > 0:
+    # #     temp_flag = True
+    # # if temp_flag:
+    #     print(color)
+
     background = Polygon(points, True, facecolor=color)
     return background
 
 
 def create_segment(segment_center, vertical_or_horizontal, color, area=1):
     points = np.zeros([6, 2], dtype=float)
-    area = max(1, area)  # to make sure we avoid devision by 0 later
+    area = max(1, area)  # to make sure we avoid division by 0 later
 
     if not vertical_or_horizontal:  # segment is horizontal
         points[0, 0] = segment_center[0] - width / 2
@@ -128,9 +135,17 @@ def create_segment(segment_center, vertical_or_horizontal, color, area=1):
         points[5, 0] = segment_center[0]
         points[5, 1] = segment_center[1] - width / 2 - height / 2
 
+    # temp_flag = False
     if area > 1:
         color = [it / area for it in color]
-    # segment = Polygon(points, True, facecolor=color/area)
+        # for i in range(len(color)):
+        #     color[i] = color[i] / area
+
+    # if max(color) > 0:
+    # #     temp_flag = True
+    # # if temp_flag:
+    #     print(color)
+
     segment = Polygon(points, True, facecolor=color)
     return segment
 
@@ -168,18 +183,16 @@ def grayscale_to_bright(colors):
 def create_digit_image(colors, fig, curr_min_val=0, curr_max_val=1, normalized_color=0):
 
     fig.clear()
-    # print(curr_max_val)
-    # print(curr_min_val)
 
-    # width = 1
-    # height = 0.2
     normalized = False
     is_grayscale = False
-    segment_area = im_h*(im_w+(0.5*im_h))
-    background_area = (6*im_w*im_w) - (7 * segment_area)
 
-    # segment_area = height*(width+(0.5*height))
-    # background_area = 6*width*width
+    # s_area = height*(width+(0.5*height)) and height=0.2*width
+    # and width = im_w/2 because [(im_w, im_h) -> current figure scale] == [(2*width, 3*width) -> size of axes]
+
+    # to avoid division with big number we normalize by total image area
+    segment_area = 0.22*0.25*(im_w*im_w) / (im_w*im_h)
+    background_area = ((im_w*im_h) - (7 * segment_area)) / (im_w*im_h)
 
     # print(segment_area)
     # print(background_area)
@@ -188,12 +201,6 @@ def create_digit_image(colors, fig, curr_min_val=0, curr_max_val=1, normalized_c
     if len(numpy_colors.shape) == 1:
         numpy_colors = numpy_colors.reshape(numpy_colors.shape[0], 1) * np.ones([1, 3])
         is_grayscale = True
-
-    # curr_min_val = numpy_colors.min()
-    # curr_max_val = numpy_colors.max()
-
-    # print(numpy_colors.min())
-    # print(numpy_colors.max())
 
     # convert to [0,1] to draw
     if numpy_colors.min() < 0 or numpy_colors.max() > 1:
@@ -207,14 +214,8 @@ def create_digit_image(colors, fig, curr_min_val=0, curr_max_val=1, normalized_c
         else:
             numpy_colors = np.round(((numpy_colors - curr_min_val) / (curr_max_val - curr_min_val)), 3)
             normalized = True
-            # print('normalized')
-            # print(numpy_colors.min())
-            # print(numpy_colors.max())
-            # print((numpy_colors - curr_min_val) / (curr_max_val - curr_min_val))
 
     colors = numpy_colors.tolist()
-    # print(np.array(colors[7]).min())
-    # print(np.array(colors[7]).max())
 
     plt.subplots_adjust(0, 0, 1, 1)
     myaxis = fig.add_subplot()
@@ -302,11 +303,12 @@ if __name__ == '__main__':
 
     size_of_batch = images.shape[0]
     bg_len = size_of_batch  # round(0.9 * size_of_batch)
-    test_len = 20
-    # test_len = min(round(0.1 * size_of_batch), 10)
-    test_idx = []
-    # test_idx = [[] for _ in range(test_len)]
-    chosen = [False for _ in range(test_len)]
+
+    # test_len = 20
+    # # test_len = min(round(0.1 * size_of_batch), 10)
+    # test_idx = []
+    # # test_idx = [[] for _ in range(test_len)]
+    # chosen = [False for _ in range(test_len)]
 
     # i = 0
     # while i < test_len:
@@ -331,10 +333,13 @@ if __name__ == '__main__':
     e = shap.DeepExplainer(model, background)
     shap_values_samples = e.shap_values(test_images_samples)
     min_shap_val = round(np.array(shap_values_samples).min(), 3)
-    # print(min_shap_val)
+
     max_shap_val = round(np.array(shap_values_samples).max(), 3)
     abs_min_max_val = max(abs(min_shap_val), abs(max_shap_val))
-    # print(max_shap_val)
+
+    print(min_shap_val)
+    print(max_shap_val)
+
     # np_shap_values_samples = np.array(shap_values_samples)
     # np_shap_values_samples[np_shap_values_samples < 0] = -abs_min_max_val
     # np_shap_values_samples[np_shap_values_samples > 0] = abs_min_max_val
@@ -343,8 +348,6 @@ if __name__ == '__main__':
     # output is in shape [batch_size,24] changing to illustrate as an image
     shap_values = []
     shap_values = [[[] for _ in range(len(shap_values_samples))] for _ in range(RGB)]
-
-    # print(args.reduce_background_shap)
 
     # creating figure for converting data to image
     fig = plt.figure(figsize=(im_w, im_h), dpi=1)
@@ -357,8 +360,6 @@ if __name__ == '__main__':
 
         for ind in range(RGB):
             for k in range(len(reshaped_splitd[0])):
-                # change code here !!! for each reshaped_splitd[ind][k] (shape = 8) change values to be
-                # newval = val- bgval (reshaped_splitd[ind][k][7])
 
                 if args.reduce_background_shap:
                     bg_val = reshaped_splitd[ind][k][7]
@@ -368,17 +369,22 @@ if __name__ == '__main__':
                 # tensor_image = create_digit_image(reshaped_splitd[ind][k], fig, -abs_min_max_val - bg_val,
                 #                                   abs_min_max_val - bg_val)
                 tensor_image = create_digit_image(reshaped_splitd[ind][k], fig, min_shap_val - bg_val,
-                                                      max_shap_val - bg_val, normalized_color=1)
+                                                      max_shap_val - bg_val, normalized_color=1) # normalized_color=0)  #
 
                 image_s = tensor_image.numpy()
                 shap_values[ind][j].append(image_s)
 
     test_images = [torch.empty(len(test_images_samples), 1, im_h, im_w) for _ in range(RGB)]
-    reshaped_test = vectors_to_samples(test_images_samples.clone().detach())
 
+    reshaped_test = vectors_to_samples(test_images_samples.clone().detach())
     ts_images = torch.empty(len(test_images_samples), RGB, im_h, im_w)
     for i in range(len(reshaped_test)):
         ts_images[i] = create_digit_image(reshaped_test[i], fig)
+
+    to_view_bg_images = torch.empty(len(images), RGB, im_h, im_w)
+    reshaped_bg = vectors_to_samples(images.clone().detach())
+    for i in range(len(reshaped_bg)):
+        to_view_bg_images[i] = create_digit_image(reshaped_bg[i], fig)
 
     reshaped_test_np = np.array(reshaped_test)
     reshaped_test_splitd = [reshaped_test_np[:, :, i].tolist() for i in range(RGB)]
@@ -404,6 +410,7 @@ if __name__ == '__main__':
     test_numpy_stackd = np.concatenate((test_numpy[0], test_numpy[1], test_numpy[2]), axis=1)
 
     ts_images = np.swapaxes(np.swapaxes(ts_images.numpy(), 1, -1), 1, 2)
+    to_view_bg_images = np.swapaxes(np.swapaxes(to_view_bg_images.numpy(), 1, -1), 1, 2)
 
     # fetch loss function and metrics
     loss_fn = net.loss_fn
@@ -414,25 +421,35 @@ if __name__ == '__main__':
 
     test_metrics, incorrect_samples = evaluate(model, loss_fn, test_dl, metrics, incorrect, num_epochs - 1)
 
-    # print(incorrect_samples)
-
-    # plt.ion()
     plt.show()
-    for i in range(len(ts_images)):
-        plt.figure(i+1)
-        plt.imshow(ts_images[i])
-        # plt.show()
-        plt.draw()
 
-    # print(np.array(shap_numpy_stackd).shape)
+    num_of_samples = len(ts_images)
+    num_rows = max(1, int(np.floor(np.sqrt(num_of_samples))))
+    axes = np.zeros((num_rows, int(np.ceil(num_of_samples / num_rows)))).tolist()
 
-    # labels.shape[0] == shap_values[0].shape[0]
-    # print(np.matmul(np.ones([2,1]),np.arange(len(shap_numpy_stackd)).reshape([1, len(shap_numpy_stackd)])).shape[0])
-    # print(shap_numpy_stackd[0].shape[0])
-    #
-    # # labels.shape[1] == len(shap_values)
-    # print(np.matmul(np.ones([2,1]),np.arange(len(shap_numpy_stackd)).reshape([1, len(shap_numpy_stackd)])).shape[1])
-    # print(len(shap_numpy_stackd))
+    fig = plt.figure()
+    fig.suptitle('test samples')
+
+    for i in range(num_of_samples):
+        row, col = np.unravel_index(i, (num_rows, int(np.ceil(num_of_samples / num_rows))))
+        axes[row][col] = fig.add_subplot(num_rows, int(np.ceil(num_of_samples / num_rows)), i + 1)
+        axes[row][col].axis('off')
+        axes[row][col].imshow(ts_images[i])
+
+    # for background
+    num_of_samples = len(to_view_bg_images)
+    num_rows = max(1, int(np.floor(np.sqrt(num_of_samples))))
+    axes = np.zeros((num_rows, int(np.ceil(num_of_samples / num_rows)))).tolist()
+
+    fig = plt.figure()
+    fig.suptitle('background samples')
+
+    for i in range(num_of_samples):
+        row, col = np.unravel_index(i, (num_rows, int(np.ceil(num_of_samples / num_rows))))
+        axes[row][col] = fig.add_subplot(num_rows, int(np.ceil(num_of_samples / num_rows)), i + 1)
+        axes[row][col].axis('off')
+        axes[row][col].imshow(to_view_bg_images[i])
+
     labels_for_plot = np.matmul(np.ones([len(shap_numpy_stackd[0]), 1], dtype=int),
                                 np.arange(len(shap_numpy_stackd)).reshape([1, len(shap_numpy_stackd)]))
 
