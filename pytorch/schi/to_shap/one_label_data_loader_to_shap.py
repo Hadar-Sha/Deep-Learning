@@ -113,7 +113,7 @@ def fetch_dataloader(types, data_dir):
 
             else:
                 dl = DataLoader(dataset=SchiDigitDataset(csv_file=path, transform=transforms.Compose([Normalize(0, 1), ToTensor()])),
-                                batch_size=batch_size, shuffle=True)  # shuffle=False)
+                                batch_size=batch_size, shuffle=False)  # shuffle=True)  #
 
             dataloaders[split] = dl
 

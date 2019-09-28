@@ -21,7 +21,7 @@ import model_gan.two_labels_data_loader as data_loader
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--parent_dir', default="C:/Users/H/Documents/Haifa Univ/Thesis/DL-Pytorch-data", help='path to experiments and data folder. not for Server')
+parser.add_argument('--parent_dir', default="toSync/Thesis/DL-Pytorch-data", help='path to experiments and data folder. not for Server')
 parser.add_argument('--data_dir', default='data/two-labels/single-class/hidden-easy-big-only-9-5', help="Directory containing the dataset")
 parser.add_argument('--model_dir', default='experiments/acgan_model/hiding_scheme/debug', help="Directory containing params.json")
 parser.add_argument('--restore_file', default=None,
@@ -29,6 +29,7 @@ parser.add_argument('--restore_file', default=None,
                     training")  # 'best' or 'train'
 
 
+# C:/Users/H/Documents/Haifa Univ/Thesis/DL-Pytorch-data
 def train_discriminator(d, optimizer, real_data, fake_data, real_labels, fake_labels, r_f_loss_fn, c_loss_fn, num_classes):
     # Reset gradients
     optimizer.zero_grad()
@@ -460,7 +461,8 @@ if __name__ == '__main__':
     # Load the parameters from json file
     args = parser.parse_args()
     if args.parent_dir and not torch.cuda.is_available():
-        os.chdir(args.parent_dir)
+        past_to_drive = os.environ['OneDrive']
+        os.chdir(os.path.join(past_to_drive, args.parent_dir))
     json_path = os.path.join(args.model_dir, 'params.json')
     assert os.path.isfile(json_path), "No json configuration file found at {}".format(json_path)
     params = utils.Params(json_path)

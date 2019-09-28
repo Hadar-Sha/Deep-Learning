@@ -31,6 +31,7 @@ class NeuralNet(nn.Module):
         out = F.dropout(out, self.dropout_rate, training=self.training)
 
         out = self.fc4(out)
+        print(out)
         # out = F.relu(self.fc4(out))
         out = F.log_softmax(out, dim=1)
 
