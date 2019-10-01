@@ -221,7 +221,7 @@ def samples_to_images(samples, fig=None):
     return ts_images
 
 
-def plot_images(images, title=None):
+def plot_images(images, title=None, path=None):
 
     num_of_samples = len(images)
     num_rows = max(1, int(np.floor(np.sqrt(num_of_samples))))
@@ -238,5 +238,7 @@ def plot_images(images, title=None):
         axes[row][col].imshow(images[i])
 
     plt.show()
+    if path is not None:
+        plt.savefig(path)
     plt.close(fig)
     return

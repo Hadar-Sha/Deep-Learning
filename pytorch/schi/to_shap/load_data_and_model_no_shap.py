@@ -6,10 +6,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # import utils
-import net_to_shap as net
+import net_to_fviz as net
 import one_label_data_loader_to_shap as one_labels_data_loader
 import plot_digit_utils
-from evaluate_to_shap import evaluate
+from evaluate_to_fviz import evaluate
 
 import utils_shap
 
@@ -25,9 +25,8 @@ parser.add_argument('--model_dir', default='experiments/debug', help="Directory 
 parser.add_argument('--restore_file', default='best',
                     help="Optional, name of the file in --model_dir containing weights to reload before \
                     training")  # 'best' or 'train'
-parser.add_argument('--reduce_background_shap', default=0, type=int,
-                    help="if showing relative shap values to background's shap values")
-parser.add_argument('--change_test_shap', default=0, type=int, help='how to modify background')
+parser.add_argument('--all_layers', default=0, type=int,
+                    help="if saving all layers output")
 parser.add_argument('--focused_ind', default=-1, type=int, help='specific index to show in plot')
 
 
@@ -63,7 +62,7 @@ def load_model(model_dir, restore_file):
 
 if __name__ == '__main__':
 
-    print(os.getcwd())
+    # print(os.getcwd())
 
     # Load the parameters from json file
     args = parser.parse_args()
@@ -71,10 +70,10 @@ if __name__ == '__main__':
         past_to_drive = os.environ['OneDrive']
         os.chdir(os.path.join(past_to_drive, args.parent_dir))
 
-    print(os.getcwd())
-    json_path = os.path.join(args.model_dir, 'params.json')
-    assert os.path.isfile(json_path), "No json configuration file found at {}".format(json_path)
-    params = utils_shap.Params(json_path)
+    # print(os.getcwd())
+    # json_path = os.path.join(args.model_dir, 'params.json')
+    # assert os.path.isfile(json_path), "No json configuration file found at {}".format(json_path)
+    # params = utils_shap.Params(json_path)
 
     # Set the logger
     utils_shap.set_logger(os.path.join(args.model_dir, 'analyze.log'))
@@ -108,30 +107,71 @@ if __name__ == '__main__':
     # size_of_batch = images.shape[0]
     # bg_len = size_of_batch
 
-    out_layer_1, out_layer_2, out_layer_3, _, y_hat = model(test_im)
+    out_layer_1, out_layer_2, out_layer_3, out_layer_4, _, y_hat = model(test_im)
 
-    layers_out_list = [out_layer_1, out_layer_2, out_layer_3, y_hat]
+    layers_out_list = [out_layer_1, out_layer_2, out_layer_3, out_layer_4, y_hat]
 
     num_classes = y_hat.shape[1]
 
-    for ind in range(len(layers_out_list)):
-        val_to_hist = layers_out_list[ind].cpu().detach().numpy()
-        # nonzeros_vals_to_hist = val_to_hist[np.nonzero(val_to_hist)]
-        dif_vals = np.zeros(val_to_hist.shape)
-        stats = np.zeros((val_to_hist.shape[0], 4))
+    if args.all_layers:
+        for ind in range(len(layers_out_list)):
+            val_to_hist = layers_out_list[ind].cpu().detach().numpy()
+            # nonzeros_vals_to_hist = val_to_hist[np.nonzero(val_to_hist)]
+            dif_vals = np.zeros(val_to_hist.shape)
+            stats = np.zeros((val_to_hist.shape[0], 4))
 
-        for i in range(val_to_hist.shape[0]):
-            dif_vals[i] = val_to_hist[i]-val_to_hist[5]
-            stats[i] = (val_to_hist[i].min(), np.mean(val_to_hist[i]), np.median(val_to_hist[i]), val_to_hist[i].max())
+            for i in range(val_to_hist.shape[0]):
+                dif_vals[i] = val_to_hist[i]-val_to_hist[5]
+                stats[i] = (val_to_hist[i].min(), np.mean(val_to_hist[i]), np.median(val_to_hist[i]), val_to_hist[i].max())
 
-        # plt.hist(val_to_hist[i])
-        path = os.path.join(args.model_dir, 'out_layer_{}_dif_gray.csv'.format(ind))
-        utils_shap.save_out_to_csv(dif_vals, path)
+            # plt.hist(val_to_hist[i])
+            path = os.path.join(args.model_dir, 'out_layer_{}_dif_gray.csv'.format(ind))
+            utils_shap.save_out_to_csv(dif_vals, path)
 
-    labels = list(range(val_to_hist.shape[0]))
-    labels = [str(v) for v in labels]
+        labels = list(range(val_to_hist.shape[0]))
+        labels = [str(v) for v in labels]
 
-    plt.plot(stats)
+        plt.plot(stats)
+
+    # else:
+    if args.focused_ind in range(num_classes):
+        num_colors = 11
+        num_conds = y_hat.shape[0] // num_colors
+        print(num_conds)
+        print(y_hat.shape)
+        rel_vals = y_hat[:, args.focused_ind].cpu().detach().numpy()
+        for i in range(num_conds):
+            filename = 'cond_{}_all_colors'.format(i)
+            plt.figure()
+            plt.title(filename)
+            plt.xlabel("color")
+            plt.ylabel("last layer output class {}".format(args.focused_ind))
+            plt.plot(rel_vals[i*num_colors:(i+1)*num_colors])
+            plt.savefig(os.path.join(args.model_dir, filename))
+        # plt.figure()
+        # plt.plot(rel_vals[11:22])
+        # plt.figure()
+        # plt.plot(rel_vals[22:33])
+        # plt.figure()
+        # plt.plot(rel_vals[33:44])
+        for i in range(num_conds):
+            filename = 'color_{}_all_conds'.format(i)
+            plt.figure()
+            plt.title(filename)
+            plt.xlabel("condition")
+            plt.ylabel("last layer output class {}".format(args.focused_ind))
+            plt.plot(rel_vals[i::num_colors])
+            plt.savefig(os.path.join(args.model_dir, filename))
+        # plt.figure()
+        # plt.plot(rel_vals[1::11])
+        # plt.figure()
+        # plt.plot(rel_vals[2::11])
+        # plt.figure()
+        # plt.plot(rel_vals[3::11])
+
+    # max_vals_list = []
+    # # compare only network's output
+    # for i in range(len(y_hat)):
 
     # fetch loss function and metrics
     loss_fn = net.loss_fn
@@ -162,4 +202,5 @@ if __name__ == '__main__':
     # plot_digit_utils.plot_images(bg_samples_to_plot, 'background')
 
     test_samples_to_plot = plot_digit_utils.samples_to_images(test_im)
-    plot_digit_utils.plot_images(test_samples_to_plot, 'test')
+    path = os.path.join(args.model_dir, 'test_samples')
+    plot_digit_utils.plot_images(test_samples_to_plot, 'test', path)

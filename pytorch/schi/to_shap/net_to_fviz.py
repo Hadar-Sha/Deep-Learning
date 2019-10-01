@@ -34,9 +34,9 @@ class NeuralNet(nn.Module):
         # print(out)
         # out = F.relu(self.fc4(out))
         out_l_s = F.log_softmax(out_4_l, dim=1)   # on purpose
-        out_s = F.log_softmax(out_4_l, dim=1)   # on purpose
+        out_s = F.softmax(out_4_l, dim=1)   # on purpose
 
-        return out_1_f, out_2_f, out_3_f, out_l_s, out_s
+        return out_1_f, out_2_f, out_3_f, out_4_l, out_l_s, out_s
         # return out
 
 
