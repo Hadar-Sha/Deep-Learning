@@ -1,29 +1,27 @@
 import argparse
+import logging
 import os
 import torch
 import numpy as np
-import shap
 import matplotlib.pyplot as plt
-from matplotlib.patches import Polygon
-from torchvision.transforms import functional as F
 
 # import utils
 import net_to_shap as net
 import one_label_data_loader_to_shap as one_labels_data_loader
+import plot_digit_utils
 from evaluate_to_shap import evaluate
 
-width = 1
-height = 0.2
-im_w = 200
-im_h = 300
-RGB = 3
+import utils_shap
+
 
 plt.ioff()
+#
+# RGB = 3
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--parent_dir', default="toSync/Thesis/DL-Pytorch-data/to_shap", help='path to experiments and data folder. not for Server')
 parser.add_argument('--data_dir', default='./data/grayscale-data', help="Directory containing the destination dataset")
-parser.add_argument('--model_dir', default='', help="Directory containing params.json")
+parser.add_argument('--model_dir', default='experiments/debug', help="Directory containing params.json")
 parser.add_argument('--restore_file', default='best',
                     help="Optional, name of the file in --model_dir containing weights to reload before \
                     training")  # 'best' or 'train'
@@ -63,194 +61,9 @@ def load_model(model_dir, restore_file):
     return
 
 
-def vectors_to_samples(vectors):
-    vectors = vectors.reshape(vectors.size()[0], -1, 3)
-    vectors = vectors.cpu().numpy()
-    vectors = vectors.tolist()
-    return vectors
-
-
-def create_background(color, center=[width, 1.5*width], area=1):
-
-    area = max(1, area)  # to make sure we avoid division by 0 later
-    points = np.zeros([4, 2], dtype=float)
-    points[0] = [center[0]-width, center[1]-1.5*width]
-    points[1] = [center[0]-width, center[1]+1.5*width]
-    points[2] = [center[0]+width, center[1]+1.5*width]
-    points[3] = [center[0]+width, center[1]-1.5*width]
-
-    if area > 1:
-        color = [it / area for it in color]
-
-    background = Polygon(points, True, facecolor=color)
-    return background
-
-
-def create_segment(segment_center, vertical_or_horizontal, color, area=1):
-    points = np.zeros([6, 2], dtype=float)
-    area = max(1, area)  # to make sure we avoid division by 0 later
-
-    if not vertical_or_horizontal:  # segment is horizontal
-        points[0, 0] = segment_center[0] - width / 2
-        points[0, 1] = segment_center[1] - height / 2
-
-        points[1, 0] = segment_center[0] + width / 2
-        points[1, 1] = segment_center[1] - height / 2
-
-        points[2, 0] = segment_center[0] + width / 2 + height / 2
-        points[2, 1] = segment_center[1]
-
-        points[3, 0] = segment_center[0] + width / 2
-        points[3, 1] = segment_center[1] + height / 2
-
-        points[4, 0] = segment_center[0] - width / 2
-        points[4, 1] = segment_center[1] + height / 2
-
-        points[5, 0] = segment_center[0] - width / 2 - height / 2
-        points[5, 1] = segment_center[1]
-
-    else:  # segment is vertical
-        points[0, 0] = segment_center[0] + height / 2
-        points[0, 1] = segment_center[1] - width / 2
-
-        points[1, 0] = segment_center[0] + height / 2
-        points[1, 1] = segment_center[1] + width / 2
-
-        points[2, 0] = segment_center[0]
-        points[2, 1] = segment_center[1] + width / 2 + height / 2
-
-        points[3, 0] = segment_center[0] - height / 2
-        points[3, 1] = segment_center[1] + width / 2
-
-        points[4, 0] = segment_center[0] - height / 2
-        points[4, 1] = segment_center[1] - width / 2
-
-        points[5, 0] = segment_center[0]
-        points[5, 1] = segment_center[1] - width / 2 - height / 2
-
-    if area > 1:
-        color = [it / area for it in color]
-
-    segment = Polygon(points, True, facecolor=color)
-    return segment
-
-
-def grayscale_to_binary(colors):
-    for i in range(RGB):
-        for j in range(len(colors[0])):
-            colors[i][j] = [1. if colors[i][j][it] == colors[i][j][7] else 0. for it in range(len(colors[0][0]))]
-
-    return colors
-
-
-def grayscale_to_white_bg(colors):
-    for i in range(RGB):
-        for j in range(len(colors[0])):
-            max_v = np.array(colors[i][j]).max()
-            min_v = np.array(colors[i][j]).min()
-            colors[i][j] = [1. if colors[i][j][it] == colors[i][j][7] else 1.-(max_v-min_v)
-                            for it in range(len(colors[0][0]))]
-
-    return colors
-
-
-def grayscale_to_bright(colors):
-    for i in range(RGB):
-        for j in range(len(colors[0])):
-            max_v = np.array(colors[i][j]).max()
-            min_v = np.array(colors[i][j]).min()
-            colors[i][j] = [1. if colors[i][j][it] == max_v else 1.-(max_v-min_v)
-                            for it in range(len(colors[0][0]))]
-
-    return colors
-
-
-def create_digit_image(colors, fig, curr_min_val=0, curr_max_val=1, normalized_color=0):
-
-    fig.clear()
-
-    normalized = False
-    is_grayscale = False
-
-    # to avoid division with big number we normalize by total image area
-    segment_area = 0.22*0.25*(im_w*im_w) / (im_w*im_h)
-    background_area = ((im_w*im_h) - (7 * segment_area)) / (im_w*im_h)
-
-    numpy_colors = np.array(colors)
-    if len(numpy_colors.shape) == 1:
-        numpy_colors = numpy_colors.reshape(numpy_colors.shape[0], 1) * np.ones([1, 3])
-        is_grayscale = True
-
-    # convert to [0,1] to draw
-    if numpy_colors.min() < 0 or numpy_colors.max() > 1:
-
-        if (curr_max_val - curr_min_val) <= 0:
-            print('wrong min and max input values')
-            return
-        else:
-            numpy_colors = np.round(((numpy_colors - curr_min_val) / (curr_max_val - curr_min_val)), 3)
-            normalized = True
-
-    colors = numpy_colors.tolist()
-
-    plt.subplots_adjust(0, 0, 1, 1)
-    myaxis = fig.add_subplot()
-    patches = []
-
-    myaxis.axis('off')
-    myaxis.set_xlim([0, 2 * width])
-    myaxis.set_ylim([0, 3 * width])
-    myaxis.set_aspect('equal', 'box')
-
-    segments_centers = []
-    center = [width, 1.5*width]
-    if normalized_color:
-        in_area = segment_area
-        bg_area = background_area
-    else:
-        in_area = 1
-        bg_area = 1
-
-    bg_patch = create_background(colors[7], area=bg_area)
-    patches.append(bg_patch)
-    myaxis.add_patch(bg_patch)
-
-    segments_centers.append([center[0], center[1] + width + height])
-    segments_centers.append([center[0], center[1]])
-    segments_centers.append([center[0], center[1] - width - height])
-    segments_centers.append([center[0] - width / 2 - height / 2, center[1] + width / 2 + height / 2])
-    segments_centers.append([center[0] + width / 2 + height / 2, center[1] + width / 2 + height / 2])
-    segments_centers.append([center[0] - width / 2 - height / 2, center[1] - width / 2 - height / 2])
-    segments_centers.append([center[0] + width / 2 + height / 2, center[1] - width / 2 - height / 2])
-
-    vertical_horizon = [0, 0, 0, 1, 1, 1, 1]
-    for i in range(len(segments_centers)):
-
-        polygon = create_segment(segments_centers[i], vertical_horizon[i], colors[i], area=in_area)
-        patches.append(polygon)
-        myaxis.add_patch(polygon)
-
-    fig.canvas.draw()
-    fig.canvas.toolbar.pack_forget()
-
-    data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-    data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-    data_c = data/255.
-
-    if is_grayscale:
-        data_c = data_c[:, :, 0]
-
-    if normalized:
-        data_back = np.round(curr_min_val + data_c * (curr_max_val - curr_min_val), 3)
-    else:
-        data_back = np.round(data_c, 3)
-
-    data_tensor = F.to_tensor(data_back)
-
-    return data_tensor
-
-
 if __name__ == '__main__':
+
+    print(os.getcwd())
 
     # Load the parameters from json file
     args = parser.parse_args()
@@ -258,29 +71,95 @@ if __name__ == '__main__':
         past_to_drive = os.environ['OneDrive']
         os.chdir(os.path.join(past_to_drive, args.parent_dir))
 
+    print(os.getcwd())
+    json_path = os.path.join(args.model_dir, 'params.json')
+    assert os.path.isfile(json_path), "No json configuration file found at {}".format(json_path)
+    params = utils_shap.Params(json_path)
+
+    # Set the logger
+    utils_shap.set_logger(os.path.join(args.model_dir, 'analyze.log'))
+
     # Create the input data pipeline
-    print("Loading the datasets...")
+    logging.info("Loading the datasets...")
 
     # fetch dataloaders
     dataloaders = one_labels_data_loader.fetch_dataloader(['train', 'test'], args.data_dir)
     train_dl = dataloaders['train']
     test_dl = dataloaders['test']
 
-    print("data was loaded from {}".format(args.data_dir))
-    print("- done.")
+    logging.info("data was loaded from {}".format(args.data_dir))
+    logging.info("- done.")
+
+    num_of_batches = max(1, len(train_dl.dataset) // train_dl.batch_size)
+    logging.info("data-set size: {}".format(len(train_dl.dataset)))
+    logging.info("number of batches: {}".format(num_of_batches))
 
     # Define the model and optimizer
     model = net.NeuralNet()
 
     load_model(args.model_dir, args.restore_file)
 
-    batch = next(iter(train_dl))
-    images, labels = batch
+    # batch = next(iter(train_dl))
+    # images, labels = batch
 
     test_batch = next(iter(test_dl))
     test_im, test_l = test_batch
 
-    size_of_batch = images.shape[0]
-    bg_len = size_of_batch
+    # size_of_batch = images.shape[0]
+    # bg_len = size_of_batch
 
-    y_hat = model(test_im)
+    out_layer_1, out_layer_2, out_layer_3, _, y_hat = model(test_im)
+
+    layers_out_list = [out_layer_1, out_layer_2, out_layer_3, y_hat]
+
+    num_classes = y_hat.shape[1]
+
+    for ind in range(len(layers_out_list)):
+        val_to_hist = layers_out_list[ind].cpu().detach().numpy()
+        # nonzeros_vals_to_hist = val_to_hist[np.nonzero(val_to_hist)]
+        dif_vals = np.zeros(val_to_hist.shape)
+        stats = np.zeros((val_to_hist.shape[0], 4))
+
+        for i in range(val_to_hist.shape[0]):
+            dif_vals[i] = val_to_hist[i]-val_to_hist[5]
+            stats[i] = (val_to_hist[i].min(), np.mean(val_to_hist[i]), np.median(val_to_hist[i]), val_to_hist[i].max())
+
+        # plt.hist(val_to_hist[i])
+        path = os.path.join(args.model_dir, 'out_layer_{}_dif_gray.csv'.format(ind))
+        utils_shap.save_out_to_csv(dif_vals, path)
+
+    labels = list(range(val_to_hist.shape[0]))
+    labels = [str(v) for v in labels]
+
+    plt.plot(stats)
+
+    # fetch loss function and metrics
+    loss_fn = net.loss_fn
+
+    metrics = net.metrics
+    incorrect = net.incorrect
+    num_epochs = 10000
+
+    test_metrics, incorrect_samples = evaluate(model, loss_fn, test_dl, metrics, incorrect, num_epochs - 1)
+
+    # print(dif_list)
+    # plt.hist(val_to_hist, label=labels)
+    # for i in range(val_to_hist.shape[0]):
+    #     plt.hist(val_to_hist[i]-val_to_hist[5])
+
+    # if args.focused_ind in range(num_classes):
+    #     class_vals_to_hist = val_to_hist[:, args.focused_ind]
+    #     plt.hist(class_vals_to_hist)
+    # plt.hist(val_to_hist)
+
+    # print(type(out_lay_1))
+    #
+    # print(type(out_lay_2))
+    # print(type(out_lay_3))
+    # print(type(y_hat))
+
+    # bg_samples_to_plot = plot_digit_utils.samples_to_images(images)
+    # plot_digit_utils.plot_images(bg_samples_to_plot, 'background')
+
+    test_samples_to_plot = plot_digit_utils.samples_to_images(test_im)
+    plot_digit_utils.plot_images(test_samples_to_plot, 'test')

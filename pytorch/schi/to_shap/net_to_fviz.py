@@ -30,13 +30,14 @@ class NeuralNet(nn.Module):
         out_3_1 = F.relu(self.fc3(out_2_f))
         out_3_f = F.dropout(out_3_1, self.dropout_rate, training=self.training)
 
-        out = self.fc4(out_3_f)
+        out_4_l = self.fc4(out_3_f)
         # print(out)
         # out = F.relu(self.fc4(out))
-        # out = F.log_softmax(out, dim=1)   # on purpose
+        out_l_s = F.log_softmax(out_4_l, dim=1)   # on purpose
+        out_s = F.log_softmax(out_4_l, dim=1)   # on purpose
 
-        # return out_1_f, out_2_f, out_3_f, out
-        return out
+        return out_1_f, out_2_f, out_3_f, out_l_s, out_s
+        # return out
 
 
 def convert_int_to_one_hot_vector(label, num_of_classes):
