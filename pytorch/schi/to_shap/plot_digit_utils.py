@@ -237,8 +237,11 @@ def plot_images(images, title=None, path=None):
         axes[row][col].axis('off')
         axes[row][col].imshow(images[i])
 
-    plt.show()
+    plt.draw()
+    # plt.show()
     if path is not None:
+        plt.pause(0.01)
         plt.savefig(path)
+        plt.close(fig)
     plt.close(fig)
     return

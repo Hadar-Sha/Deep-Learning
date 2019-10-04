@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 # import utils
 import net_to_fviz as net
-import one_label_data_loader_to_shap as one_labels_data_loader
+import one_label_data_loader_to_fviz as one_labels_data_loader
 import plot_digit_utils
 from evaluate_to_fviz import evaluate
 
@@ -28,6 +28,7 @@ parser.add_argument('--restore_file', default='best',
 parser.add_argument('--all_layers', default=0, type=int,
                     help="if saving all layers output")
 parser.add_argument('--focused_ind', default=-1, type=int, help='specific index to show in plot')
+parser.add_argument('--num_colors', default=1, type=int, help='')
 
 
 # './experiment-data-with-gray-4000' # './grayscale-data'
@@ -98,20 +99,31 @@ if __name__ == '__main__':
 
     load_model(args.model_dir, args.restore_file)
 
-    # batch = next(iter(train_dl))
-    # images, labels = batch
+    model.eval()  # important for dropout not to work in forward pass
 
-    test_batch = next(iter(test_dl))
-    test_im, test_l = test_batch
+    batch = next(iter(train_dl))
+    images, labels = batch
+
+    # test_batch = test_dl
+    # test_im, test_l = test_batch
+
+    # test_batch = next(iter(test_dl))
+    # test_im, test_l = test_batch
 
     # size_of_batch = images.shape[0]
     # bg_len = size_of_batch
 
-    out_layer_1, out_layer_2, out_layer_3, out_layer_4, _, y_hat = model(test_im)
+    # out_layer_1, out_layer_2, out_layer_3, out_layer_4, _, y_hat = model(test_im)
+    out_layer_1, out_layer_2, out_layer_3, out_layer_4, y_hat_log, y_hat = model(images)
 
-    layers_out_list = [out_layer_1, out_layer_2, out_layer_3, out_layer_4, y_hat]
+    layers_out_list = [out_layer_1, out_layer_2, out_layer_3, out_layer_4, y_hat_log, y_hat]
 
     num_classes = y_hat.shape[1]
+
+    test_samples_to_plot = plot_digit_utils.samples_to_images(images)
+    # test_samples_to_plot = plot_digit_utils.samples_to_images(test_im)
+    path = os.path.join(args.model_dir, 'test_samples')
+    plot_digit_utils.plot_images(test_samples_to_plot, 'test', path)
 
     if args.all_layers:
         for ind in range(len(layers_out_list)):
@@ -135,39 +147,87 @@ if __name__ == '__main__':
 
     # else:
     if args.focused_ind in range(num_classes):
-        num_colors = 11
-        num_conds = y_hat.shape[0] // num_colors
+        # num_colors = 1  # 11  # 6  #
+        num_conds = y_hat.shape[0] // args.num_colors
         print(num_conds)
         print(y_hat.shape)
-        rel_vals = y_hat[:, args.focused_ind].cpu().detach().numpy()
-        for i in range(num_conds):
-            filename = 'cond_{}_all_colors'.format(i)
-            plt.figure()
-            plt.title(filename)
-            plt.xlabel("color")
-            plt.ylabel("last layer output class {}".format(args.focused_ind))
-            plt.plot(rel_vals[i*num_colors:(i+1)*num_colors])
-            plt.savefig(os.path.join(args.model_dir, filename))
-        # plt.figure()
-        # plt.plot(rel_vals[11:22])
-        # plt.figure()
-        # plt.plot(rel_vals[22:33])
-        # plt.figure()
-        # plt.plot(rel_vals[33:44])
-        for i in range(num_conds):
-            filename = 'color_{}_all_conds'.format(i)
-            plt.figure()
-            plt.title(filename)
-            plt.xlabel("condition")
-            plt.ylabel("last layer output class {}".format(args.focused_ind))
-            plt.plot(rel_vals[i::num_colors])
-            plt.savefig(os.path.join(args.model_dir, filename))
-        # plt.figure()
-        # plt.plot(rel_vals[1::11])
-        # plt.figure()
-        # plt.plot(rel_vals[2::11])
-        # plt.figure()
-        # plt.plot(rel_vals[3::11])
+        softmax_y_hat = y_hat[:, args.focused_ind].cpu().detach().numpy()
+        log_softmax_y_hat = y_hat_log[:, args.focused_ind].cpu().detach().numpy()
+        last_linear_out = out_layer_4[:, args.focused_ind].cpu().detach().numpy()
+        labels_list = ['softmax', 'log_softmax', 'last_linear_out']
+        layers_list = [softmax_y_hat, log_softmax_y_hat, last_linear_out]
+        if args.num_colors > 1 and num_conds > 1:
+            for i in range(num_conds):
+                for j in range(len(layers_list)):
+                    label_s = labels_list[j]
+                    layer_v = layers_list[j]
+                    filename = 'cond_{}_all_colors_ '.format(i) + label_s
+                    f = plt.figure()
+                    plt.title(filename)
+                    plt.xlabel("color")
+                    plt.ylabel("last layer output class {}".format(args.focused_ind))
+                    plt.plot(layer_v[i*args.num_colors:(i+1)*args.num_colors], label=label_s)
+                    plt.tight_layout()
+                    plt.savefig(os.path.join(args.model_dir, filename))
+                    plt.close(f)
+            #     plt.plot(log_softmax_y_hat[i*args.num_colors:(i+1)*args.num_colors], label='log_softmax')
+            #     plt.plot(last_linear_out[i*args.num_colors:(i+1)*args.num_colors], label='last_linear_out')
+            #     plt.tight_layout()
+            #     # plt.legend()
+            #     plt.savefig(os.path.join(args.model_dir, filename))
+            # plt.close('all')
+
+            for i in range(num_conds):
+                for j in range(len(layers_list)):
+                    label_s = labels_list[j]
+                    layer_v = layers_list[j]
+                    filename = 'color_{}_all_conds_'.format(i) + label_s
+                    f = plt.figure()
+                    plt.title(filename)
+                    plt.xlabel("condition")
+                    plt.ylabel("last layer output class {}".format(args.focused_ind))
+                    plt.plot(layer_v[i::args.num_colors], label=label_s)
+                # plt.plot(log_softmax_y_hat[i::args.num_colors], label='log_softmax')
+                # plt.plot(last_linear_out[i::args.num_colors], label='last_linear_out')
+                    plt.tight_layout()
+                # plt.legend()
+                    plt.savefig(os.path.join(args.model_dir, filename))
+                    plt.close(f)
+            # plt.close('all')
+        elif num_conds > 1:
+            for j in range(len(layers_list)):
+                label_s = labels_list[j]
+                layer_v = layers_list[j]
+                filename = 'all_conds_single_color_' + label_s
+                f = plt.figure()
+                plt.title(filename)
+                plt.xlabel("condition")
+                plt.ylabel("last layer output class {}".format(args.focused_ind))
+                plt.plot(layer_v, label=label_s)
+            # plt.plot(log_softmax_y_hat, label='log_softmax')
+            # plt.plot(last_linear_out, label='last_linear_out')
+                plt.tight_layout()
+            # plt.legend()
+                plt.savefig(os.path.join(args.model_dir, filename))
+                plt.close(f)
+            # plt.close('all')
+        else:
+            for j in range(len(layers_list)):
+                label_s = labels_list[j]
+                layer_v = layers_list[j]
+                filename = 'all_colors_single_cond_' + label_s
+                f = plt.figure()
+                plt.title(filename)
+                plt.xlabel("color")
+                plt.ylabel("last layer output class {}".format(args.focused_ind))
+                plt.plot(layer_v, label=label_s)
+            # plt.plot(log_softmax_y_hat, label='log_softmax')
+            # plt.plot(last_linear_out, label='last_linear_out')
+                plt.tight_layout()
+            # plt.legend()
+                plt.savefig(os.path.join(args.model_dir, filename))
+                plt.close(f)
+            # plt.close('all')
 
     # max_vals_list = []
     # # compare only network's output
@@ -201,6 +261,4 @@ if __name__ == '__main__':
     # bg_samples_to_plot = plot_digit_utils.samples_to_images(images)
     # plot_digit_utils.plot_images(bg_samples_to_plot, 'background')
 
-    test_samples_to_plot = plot_digit_utils.samples_to_images(test_im)
-    path = os.path.join(args.model_dir, 'test_samples')
-    plot_digit_utils.plot_images(test_samples_to_plot, 'test', path)
+

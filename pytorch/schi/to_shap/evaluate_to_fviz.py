@@ -2,6 +2,7 @@
 
 import numpy as np
 from torch.autograd import Variable
+import logging
 
 
 def evaluate(model, loss_fn, dataloader, metrics, incorrect, epoch):
@@ -69,5 +70,7 @@ def evaluate(model, loss_fn, dataloader, metrics, incorrect, epoch):
     if (epoch+1) % (0.01*num_epochs) == 0:
         print("eval Epoch {}/{}".format(epoch + 1, num_epochs))
         print(metrics_string)
+        logging.info("eval Epoch {}/{}".format(epoch + 1, num_epochs))
+        logging.info(metrics_string)
 
     return metrics_mean, incorrect_samples
