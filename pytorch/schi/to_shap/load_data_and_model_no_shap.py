@@ -15,20 +15,18 @@ import utils_shap
 
 
 plt.ioff()
-#
-# RGB = 3
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--parent_dir', default="toSync/Thesis/DL-Pytorch-data/to_shap", help='path to experiments and data folder. not for Server')
-parser.add_argument('--data_dir', default='./data/grayscale-data', help="Directory containing the destination dataset")
-parser.add_argument('--model_dir', default='experiments/debug', help="Directory containing params.json")
+parser.add_argument('--data_dir', default='./data/gest_laws/proximity/digit-5-const-lab-change-only-horizontal', help="Directory containing the dataset")  # './data/grayscale-data'
+parser.add_argument('--model_dir', default='experiments/gest_laws/proximity/debug', help="Directory containing trained network")
 parser.add_argument('--restore_file', default='best',
                     help="Optional, name of the file in --model_dir containing weights to reload before \
                     training")  # 'best' or 'train'
 parser.add_argument('--all_layers', default=0, type=int,
                     help="if saving all layers output")
-parser.add_argument('--focused_ind', default=-1, type=int, help='specific index to show in plot')
-parser.add_argument('--num_colors', default=1, type=int, help='')
+parser.add_argument('--focused_ind', default=5, type=int, help='specific index to show in plot')   # default=-1
+parser.add_argument('--num_colors', default=11, type=int, help='')  # default=1
 
 
 # './experiment-data-with-gray-4000' # './grayscale-data'
@@ -63,18 +61,11 @@ def load_model(model_dir, restore_file):
 
 if __name__ == '__main__':
 
-    # print(os.getcwd())
-
     # Load the parameters from json file
     args = parser.parse_args()
     if args.parent_dir and not torch.cuda.is_available():
         past_to_drive = os.environ['OneDrive']
         os.chdir(os.path.join(past_to_drive, args.parent_dir))
-
-    # print(os.getcwd())
-    # json_path = os.path.join(args.model_dir, 'params.json')
-    # assert os.path.isfile(json_path), "No json configuration file found at {}".format(json_path)
-    # params = utils_shap.Params(json_path)
 
     # Set the logger
     utils_shap.set_logger(os.path.join(args.model_dir, 'analyze.log'))
@@ -94,6 +85,14 @@ if __name__ == '__main__':
     logging.info("data-set size: {}".format(len(train_dl.dataset)))
     logging.info("number of batches: {}".format(num_of_batches))
 
+    image_path = os.path.join(args.model_dir, 'graphs')
+    if not os.path.isdir(image_path):
+        os.mkdir(image_path)
+
+    data_path = os.path.join(args.model_dir, 'data')
+    if not os.path.isdir(data_path):
+        os.mkdir(data_path)
+
     # Define the model and optimizer
     model = net.NeuralNet()
 
@@ -109,9 +108,6 @@ if __name__ == '__main__':
 
     # test_batch = next(iter(test_dl))
     # test_im, test_l = test_batch
-
-    # size_of_batch = images.shape[0]
-    # bg_len = size_of_batch
 
     # out_layer_1, out_layer_2, out_layer_3, out_layer_4, _, y_hat = model(test_im)
     out_layer_1, out_layer_2, out_layer_3, out_layer_4, y_hat_log, y_hat = model(images)
@@ -145,9 +141,7 @@ if __name__ == '__main__':
 
         plt.plot(stats)
 
-    # else:
     if args.focused_ind in range(num_classes):
-        # num_colors = 1  # 11  # 6  #
         num_conds = y_hat.shape[0] // args.num_colors
         print(num_conds)
         print(y_hat.shape)
@@ -156,78 +150,105 @@ if __name__ == '__main__':
         last_linear_out = out_layer_4[:, args.focused_ind].cpu().detach().numpy()
         labels_list = ['softmax', 'log_softmax', 'last_linear_out']
         layers_list = [softmax_y_hat, log_softmax_y_hat, last_linear_out]
+        min_y_axis_list = [round(v.min(), -1 * int(round(np.log10(np.std(v))))) for v in layers_list]
+        max_y_axis_list = [round(v.max(), -1 * int(round(np.log10(np.std(v))))) for v in layers_list]
+        scale_list = [-1 * int(round(np.log10(np.std(v)))) for v in layers_list]
+
         if args.num_colors > 1 and num_conds > 1:
             for i in range(num_conds):
                 for j in range(len(layers_list)):
                     label_s = labels_list[j]
                     layer_v = layers_list[j]
+                    data_v = layer_v[i*args.num_colors:(i+1)*args.num_colors]
                     filename = 'cond_{}_all_colors_ '.format(i) + label_s
+                    path_v_im = os.path.join(image_path, filename)
+                    path_v_dat = os.path.join(data_path, filename)
+
                     f = plt.figure()
+
                     plt.title(filename)
                     plt.xlabel("color")
                     plt.ylabel("last layer output class {}".format(args.focused_ind))
-                    plt.plot(layer_v[i*args.num_colors:(i+1)*args.num_colors], label=label_s)
+                    plt.plot(data_v, label=label_s, marker='.')
+                    plt.xticks(np.arange(0, args.num_colors, 1))
+                    plt.yticks(np.arange(min_y_axis_list[j], max_y_axis_list[j], 10**-scale_list[j]))
                     plt.tight_layout()
-                    plt.savefig(os.path.join(args.model_dir, filename))
-                    plt.close(f)
-            #     plt.plot(log_softmax_y_hat[i*args.num_colors:(i+1)*args.num_colors], label='log_softmax')
-            #     plt.plot(last_linear_out[i*args.num_colors:(i+1)*args.num_colors], label='last_linear_out')
-            #     plt.tight_layout()
-            #     # plt.legend()
-            #     plt.savefig(os.path.join(args.model_dir, filename))
-            # plt.close('all')
 
-            for i in range(num_conds):
+                    plt.savefig(path_v_im)
+                    plt.close(f)
+
+                    utils_shap.save_out_to_csv(data_v, path_v_dat + '.csv')
+
+            for i in range(args.num_colors):  # num_conds
                 for j in range(len(layers_list)):
                     label_s = labels_list[j]
                     layer_v = layers_list[j]
+                    data_v = layer_v[i::args.num_colors]
                     filename = 'color_{}_all_conds_'.format(i) + label_s
+
+                    path_v_im = os.path.join(image_path, filename)
+                    path_v_dat = os.path.join(data_path, filename)
+
                     f = plt.figure()
                     plt.title(filename)
                     plt.xlabel("condition")
                     plt.ylabel("last layer output class {}".format(args.focused_ind))
-                    plt.plot(layer_v[i::args.num_colors], label=label_s)
-                # plt.plot(log_softmax_y_hat[i::args.num_colors], label='log_softmax')
-                # plt.plot(last_linear_out[i::args.num_colors], label='last_linear_out')
+                    plt.plot(data_v, label=label_s, marker='.')
+                    plt.xticks(np.arange(0, num_conds, 1))
+                    plt.yticks(
+                        np.arange(min_y_axis_list[j], max_y_axis_list[j], 10 ** -scale_list[j]))
                     plt.tight_layout()
-                # plt.legend()
-                    plt.savefig(os.path.join(args.model_dir, filename))
+
+                    plt.savefig(path_v_im)
                     plt.close(f)
-            # plt.close('all')
+
+                    utils_shap.save_out_to_csv(data_v, path_v_dat + '.csv')
+
         elif num_conds > 1:
             for j in range(len(layers_list)):
                 label_s = labels_list[j]
                 layer_v = layers_list[j]
+                data_v = layer_v
                 filename = 'all_conds_single_color_' + label_s
+                # path_v = os.path.join(args.model_dir, filename)
+                path_v_im = os.path.join(image_path, filename)
+                path_v_dat = os.path.join(data_path, filename)
+
                 f = plt.figure()
                 plt.title(filename)
                 plt.xlabel("condition")
                 plt.ylabel("last layer output class {}".format(args.focused_ind))
-                plt.plot(layer_v, label=label_s)
-            # plt.plot(log_softmax_y_hat, label='log_softmax')
-            # plt.plot(last_linear_out, label='last_linear_out')
+                plt.plot(data_v, label=label_s, marker='.')
+                plt.xticks(np.arange(0, num_conds, 1))
+                plt.yticks(
+                    np.arange(min_y_axis_list[j], max_y_axis_list[j], 10 ** -scale_list[j]))
                 plt.tight_layout()
-            # plt.legend()
-                plt.savefig(os.path.join(args.model_dir, filename))
+                plt.savefig(path_v_im)
                 plt.close(f)
-            # plt.close('all')
+                utils_shap.save_out_to_csv(data_v, path_v_dat + '.csv')
+
         else:
             for j in range(len(layers_list)):
                 label_s = labels_list[j]
                 layer_v = layers_list[j]
+                data_v = layer_v
                 filename = 'all_colors_single_cond_' + label_s
+                # path_v = os.path.join(args.model_dir, filename)
+                path_v_im = os.path.join(image_path, filename)
+                path_v_dat = os.path.join(data_path, filename)
+
                 f = plt.figure()
                 plt.title(filename)
                 plt.xlabel("color")
                 plt.ylabel("last layer output class {}".format(args.focused_ind))
-                plt.plot(layer_v, label=label_s)
-            # plt.plot(log_softmax_y_hat, label='log_softmax')
-            # plt.plot(last_linear_out, label='last_linear_out')
+                plt.plot(data_v, label=label_s, marker='.')
+                plt.xticks(np.arange(0, num_conds, 1))
+                plt.yticks(
+                    np.arange(min_y_axis_list[j], max_y_axis_list[j], 10 ** -scale_list[j]))
                 plt.tight_layout()
-            # plt.legend()
-                plt.savefig(os.path.join(args.model_dir, filename))
+                plt.savefig(path_v_im)
                 plt.close(f)
-            # plt.close('all')
+                utils_shap.save_out_to_csv(data_v, path_v_dat + '.csv')
 
     # max_vals_list = []
     # # compare only network's output
