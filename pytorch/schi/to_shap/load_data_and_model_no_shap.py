@@ -242,7 +242,8 @@ if __name__ == '__main__':
                 plt.xlabel("color")
                 plt.ylabel("last layer output class {}".format(args.focused_ind))
                 plt.plot(data_v, label=label_s, marker='.')
-                plt.xticks(np.arange(0, num_conds, 1))
+                plt.xticks(np.arange(0, args.num_colors, 1))
+                # plt.xticks(np.arange(0, num_conds, 1))
                 plt.yticks(
                     np.arange(min_y_axis_list[j], max_y_axis_list[j], 10 ** -scale_list[j]))
                 plt.tight_layout()
