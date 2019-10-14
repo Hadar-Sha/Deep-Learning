@@ -221,10 +221,11 @@ def samples_to_images(samples, fig=None):
     return ts_images
 
 
-def plot_images(images, title=None, path=None):
+def plot_images(images, num_rows=None, title=None, path=None):
 
     num_of_samples = len(images)
-    num_rows = max(1, int(np.floor(np.sqrt(num_of_samples))))
+    if num_rows is None or isinstance(num_rows, (int,)) is False:
+        num_rows = max(1, int(np.floor(np.sqrt(num_of_samples))))
     axes = np.zeros((num_rows, int(np.ceil(num_of_samples / num_rows)))).tolist()
 
     fig = plt.figure()

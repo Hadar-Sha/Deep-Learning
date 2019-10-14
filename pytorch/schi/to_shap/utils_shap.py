@@ -212,14 +212,18 @@ def load_checkpoint(checkpoint, model, optimizer=None):
 def save_out_to_csv(samples, csv_path):
     with open(csv_path, 'w', newline='') as csvfile:
         mywriter = csv.writer(csvfile, delimiter=',')
-        round_scale = -1 * round(np.log10(np.std(np.array(samples))))
-        round_scale = max(0, round_scale)
-        for item in samples:
-            if isinstance(item, (list,)) and len(item) > 0:
-                item = [round(it, round_scale) for it in item]
-                mywriter.writerow(item)
-            else:
-                mywriter.writerow(samples)
+        # round_scale = -1 * int(round(np.log10(np.std(np.array(samples)))))
+        # print(round_scale)
+        # round_scale = max(0, round_scale)
+        if isinstance(samples, (list, np.ndarray)) and isinstance(samples[0], (list, np.ndarray)):
+            for item in samples:
+                if len(item) > 0:
+                    # item = [round(it, round_scale) for it in item]
+                    mywriter.writerow(item)
+
+        else:
+            # samples = [round(it, round_scale) for it in samples]
+            mywriter.writerow(samples)
 
     return
 
