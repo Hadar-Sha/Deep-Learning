@@ -170,11 +170,10 @@ if __name__ == '__main__':
                     data_v = layer_v[i*args.num_colors:(i+1)*args.num_colors]
 
                     all_data_all_conds[j].append(data_v)
-                    # all_data_all_conds[j].extend(data_v)
 
                     temp_list = [v for v in range(args.num_colors*num_conds)]
                     x_idx = temp_list[i*args.num_colors:(i+1)*args.num_colors]
-                    # print(x_idx)
+
                     filename = 'cond_{}_all_colors_ '.format(i) + label_s
                     path_v_im = os.path.join(image_path, filename)
                     path_v_dat = os.path.join(data_path, filename)
@@ -186,18 +185,14 @@ if __name__ == '__main__':
                     plt.ylabel("last layer output class {}".format(args.focused_ind))
                     plt.plot(x_idx, data_v, label=label_s, marker='.')
                     plt.xticks(np.arange(i*args.num_colors, (i+1)*args.num_colors, 1))
-                    # plt.xticks(np.arange(0, args.num_colors, 1))
+
                     plt.yticks(np.arange(min_y_axis_list[j], max_y_axis_list[j], 10**-scale_list[j]))
                     plt.tight_layout()
 
                     plt.savefig(path_v_im)
                     plt.close(f)
 
-                    # if i == 0:
-                    # print('saving data i= {}, j= {}'.format(i, j))
-                    # print(data_v.shape)
-                    # utils_shap.save_out_to_csv(data_v, path_v_dat + '.csv')
-
+            # plotting few lines in the same plot -> grouped by color
             print(np.array(all_data_all_conds).shape)
             for j in range(len(layers_list)):
                 label_s = labels_list[j]
@@ -209,12 +204,23 @@ if __name__ == '__main__':
                 f = plt.figure()
 
                 for i in range(num_conds):
-                    plt.plot(np.arange(0, args.num_colors, 1), all_data_all_conds[j][i], label='cond_{}'.format(i), marker='.')
+                    x_vals = np.arange(0, args.num_colors, 1)
+                    y_vals = all_data_all_conds[j][i]
+                    plt.plot(x_vals, y_vals, label='cond_{}'.format(i), marker='.')
+                    # if i == 0:
+                    #     for (x, y) in zip(x_vals, y_vals):
+                    #         # label = str(y)
+                    #         label = "m: {:.2f}, std: {:.2f}".format(np.mean(y), np.std(y))
+                    #         plt.annotate(label,  # this is the text
+                    #                      (x, y),  # this is the point to label
+                    #                      textcoords="offset points",  # how to position the text
+                    #                      xytext=(0, 10),  # distance from text to points (x,y)
+                    #                      ha='center')  # horizontal alignment can be left, right or center
 
                 plt.title(filename)
                 plt.xlabel("color")
                 plt.ylabel("last layer output class {}".format(args.focused_ind))
-                # plt.xticks(np.arange(i * args.num_colors, (i + 1) * args.num_colors, 1))
+
                 plt.xticks(np.arange(0, args.num_colors, 1))
                 plt.yticks(np.arange(min_y_axis_list[j], max_y_axis_list[j], 10 ** -scale_list[j]))
                 plt.legend()
@@ -224,21 +230,18 @@ if __name__ == '__main__':
                 plt.close(f)
 
             for_graphs_list = [[] for _ in range(len(layers_list))]
-            # conds_list = ['all_dark', 'all_bright', 'bright_dark', 'dark_bright']
 
-            for i in range(args.num_colors):  # num_conds
+            for i in range(args.num_colors):
                 for j in range(len(layers_list)):
                     label_s = labels_list[j]
                     layer_v = layers_list[j]
                     data_v = layer_v[i::args.num_colors]
 
                     for_graphs_list[j].append(data_v)
-                    # for_graphs_list[j].extend(data_v)
-                    # print(for_graphs_list[j])
 
                     temp_list = [v for v in range(args.num_colors*num_conds)]
                     x_idx = temp_list[i::args.num_colors]
-                    # print(x_idx)
+
                     filename = 'color_{}_all_conds_'.format(i) + label_s
 
                     path_v_im = os.path.join(image_path, filename)
@@ -250,7 +253,7 @@ if __name__ == '__main__':
                     plt.ylabel("last layer output class {}".format(args.focused_ind))
                     plt.plot(x_idx, data_v, label=label_s, marker='.')
                     plt.xticks(np.arange(i, args.num_colors*num_conds, args.num_colors))
-                    # plt.xticks(np.arange(0, num_conds, 1))
+
                     plt.yticks(
                         np.arange(min_y_axis_list[j], max_y_axis_list[j], 10 ** -scale_list[j]))
                     plt.tight_layout()
@@ -258,11 +261,7 @@ if __name__ == '__main__':
                     plt.savefig(path_v_im)
                     plt.close(f)
 
-                    # if i == 0:
-                    # print('saving data i= {}, j= {}'.format(i, j))
-                    # print(data_v.shape)
-                    # utils_shap.save_out_to_csv(data_v, path_v_dat + '.csv')
-
+            # plotting few lines in the same plot -> grouped by condition
             print(np.array(for_graphs_list).shape)
             for j in range(len(layers_list)):
                 label_s = labels_list[j]
@@ -275,20 +274,27 @@ if __name__ == '__main__':
                 f = plt.figure()
 
                 for i in range(args.num_colors):
-                    plt.plot(np.arange(0, num_conds, 1), for_graphs_list[j][i], label='color_{}'.format(i), marker='*')
+                    x_vals = np.arange(0, num_conds, 1)
+                    y_vals = for_graphs_list[j][i]
+                    plt.plot(x_vals, y_vals, label='color_{}'.format(i), marker='*')
+                    # if i == 0:
+                    #     for (x, y) in zip(x_vals, y_vals):
+                    #         label = "m: {:.2f}, std: {:.2f}".format(np.mean(y), np.std(y))
+                    #         # label = str(y)
+                    #         plt.annotate(label,  # this is the text
+                    #                      (x, y),  # this is the point to label
+                    #                      textcoords="offset points",  # how to position the text
+                    #                      xytext=(0, 10),  # distance from text to points (x,y)
+                    #                      ha='center')  # horizontal alignment can be left, right or center
 
                 plt.title(filename)
                 plt.xlabel("condition")
                 plt.ylabel("last layer output class {}".format(args.focused_ind))
-                # for i in range(len(for_graphs_list[j])):
-                #     plt.plot(for_graphs_list[j][i])
-                # plt.xticks(np.arange(i, args.num_colors * num_conds, args.num_colors))
                 plt.xticks(np.arange(0, num_conds, 1))
                 plt.yticks(
                     np.arange(min_y_axis_list[j], max_y_axis_list[j], 10 ** -scale_list[j]))
                 plt.legend()
                 plt.tight_layout()
-                # plt.show()
 
                 plt.savefig(path_v_im)
                 plt.close(f)

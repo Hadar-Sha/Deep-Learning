@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from torchvision.transforms import functional as F
+import os
 
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
@@ -383,9 +384,83 @@ if __name__ == '__main__':
         [0.859, 0.71, 0.141]
     ]
     gray = [[0.5], [0], [0.5], [0.5], [0.5], [1], [0.5]]
+
+    color_type_3 = [
+        [168, 217, 140],
+        [94, 189, 126],
+        [94, 189, 126],
+        [94, 189, 126],
+        [234, 245, 154],
+        [94, 189, 126],
+        [234, 245, 154],
+        [94, 189, 126]
+    ]
+    color_type_3 = [[v/255 for v in color] for color in color_type_3]
+
+    color_type_3_2 = [
+        [178, 176, 240],
+        [178, 176, 240],
+        [178, 176, 240],
+        [113, 154, 226],
+        [178, 176, 240],
+        [98, 150, 223],
+        [178, 176, 240],
+        [98, 150, 223]
+    ]
+
+    color_type_3_2 = [[v / 255 for v in color] for color in color_type_3_2]
+
+    color_type_2_1 = [
+        [230, 141, 176],
+        [230, 141, 176],
+        [230, 141, 176],
+        [187, 102, 137],
+        [145, 63, 99],
+        [230, 141, 176],
+        [187, 102, 137],
+        [187, 102, 137]
+    ]
+
+    color_type_2_1 = [[v / 255 for v in color] for color in color_type_2_1]
+
+    color_type_1_1= [
+        114, 233, 182, 114, 233, 182, 114, 233, 182, 114, 233, 182, 114, 233, 182, 34, 244, 135, 114, 233, 182, 34, 244,
+        135
+    ]
+
+    color_type_1_1 = np.array(color_type_1_1).reshape((8, 3)).tolist()
+
+    color_type_1_1 = [[v / 255 for v in color] for color in color_type_1_1]
+
+
+    color_type_2_2 = [
+        99, 125, 91, 118, 129, 111, 148, 189, 181, 127, 162, 135, 89, 123, 97, 127, 162, 135, 112, 163, 161, 127, 162,
+        135
+        # 189, 134, 119, 201, 131, 82, 164, 147, 80, 180, 140, 97, 197, 133, 76, 180, 140, 97, 169, 145, 74, 180, 140, 97
+        # 156, 130, 74, 156, 130, 74, 241, 210, 150, 198, 169, 111, 241, 210, 150, 198, 169, 111, 156, 130, 74, 198, 169,
+        # 111
+        # 75, 148, 193, 73, 153, 207, 120, 107, 158, 100, 140, 170, 119, 139, 193, 136, 138, 167, 113, 144, 172, 119, 139,
+        # 193
+        # 165, 226, 142, 165, 226, 142, 188, 218, 189, 155, 228, 148, 177, 222, 165, 165, 226, 142, 188, 218, 189, 177,
+        # 222, 165
+    ]
+
+    color_type_2_2 = np.array(color_type_2_2).reshape((8, 3)).tolist()
+
+    color_type_2_2 = [[v / 255 for v in color] for color in color_type_2_2]
+
     colors = color_one
 
     fig = plt.figure()
+
+    ax = fig.add_subplot()
+    display_digit(color_type_1_1, ax)
+
+    past_to_drive = os.environ['OneDrive']
+
+    pth = os.path.join(past_to_drive, "toSync/Thesis/Master's Thesis/figures")
+
+    fig.savefig(os.path.join(pth, './sample-type-1-1'), bbox_inches='tight')
 
     # ax = fig.add_subplot()
     # display_digit(color_hide, ax)
@@ -424,18 +499,18 @@ if __name__ == '__main__':
     # # plt.tight_layout()
     # # plt.show()
 
-    color_hide_with_filt = convert_to_after_filer_grayscale(np.array(color_hide))
-
-    fig.clear()
-    # fig = plt.figure()
-    ax = fig.add_subplot()
-    display_digit(color_hide_with_filt, ax)
-    fig.savefig('./hiding-with-filter', bbox_inches='tight')
-
-    color_hide_g_filter_pass = [[0, 0.02*v[1], 0] for v in color_hide]
-
-    fig.clear()
-    # fig = plt.figure()
-    ax = fig.add_subplot()
-    display_digit(color_hide_g_filter_pass, ax)
-    fig.savefig('./hiding-sample-g-filter-pass', bbox_inches='tight')
+    # color_hide_with_filt = convert_to_after_filer_grayscale(np.array(color_hide))
+    #
+    # fig.clear()
+    # # fig = plt.figure()
+    # ax = fig.add_subplot()
+    # display_digit(color_hide_with_filt, ax)
+    # fig.savefig('./hiding-with-filter', bbox_inches='tight')
+    #
+    # color_hide_g_filter_pass = [[0, 0.02*v[1], 0] for v in color_hide]
+    #
+    # fig.clear()
+    # # fig = plt.figure()
+    # ax = fig.add_subplot()
+    # display_digit(color_hide_g_filter_pass, ax)
+    # fig.savefig('./hiding-sample-g-filter-pass', bbox_inches='tight')
