@@ -1,3 +1,4 @@
+
 import argparse
 import logging
 import os
@@ -272,11 +273,28 @@ if __name__ == '__main__':
                 utils_shap.save_out_to_csv(for_graphs_list[j], path_v_dat + '.csv')
 
                 f = plt.figure()
+                ax = plt.subplot(111)
 
                 for i in range(args.num_colors):
-                    x_vals = np.arange(0, num_conds, 1)
+                    x_vals = np.arange(1, num_conds+1, 1)
                     y_vals = for_graphs_list[j][i]
-                    plt.plot(x_vals, y_vals, label='color_{}'.format(i), marker='*')
+                    # base_gray = np.round(np.ones([3])*(i+1)/args.num_colors, decimals=2)
+                    extra_red = np.zeros(3)
+                    if i//5 == 0:
+                        extra_red[0] = (i+1)/5
+                        color_val = extra_red
+                    extra_green = np.zeros(3)
+                    if i // 5 == 1:
+                        extra_green[1] = (i + 1) / 5 -1
+                        color_val = extra_green
+                    extra_blue = np.zeros(3)
+                    if i // 5 == 2:
+                        extra_blue[2] = (i + 1) / 5 -2
+                        color_val = extra_blue
+                    # color_val = base_gray + extra_red + extra_green + extra_blue
+                    # print(color_val)
+                    ax.plot(x_vals, y_vals, label='color_{}'.format(i+1), marker='*')  # , color=color_val)
+                    # plt.plot(x_vals, y_vals, label='color_{}'.format(i), marker='*')
                     # if i == 0:
                     #     for (x, y) in zip(x_vals, y_vals):
                     #         label = "m: {:.2f}, std: {:.2f}".format(np.mean(y), np.std(y))
@@ -290,11 +308,17 @@ if __name__ == '__main__':
                 plt.title(filename)
                 plt.xlabel("condition")
                 plt.ylabel("last layer output class {}".format(args.focused_ind))
-                plt.xticks(np.arange(0, num_conds, 1))
+                plt.xticks(np.arange(1, num_conds+1, 1))
                 plt.yticks(
                     np.arange(min_y_axis_list[j], max_y_axis_list[j], 10 ** -scale_list[j]))
-                plt.legend()
-                plt.tight_layout()
+
+                # Shrink current axis by 20%
+                box = ax.get_position()
+                ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+
+                ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+                # plt.legend()
+                # plt.tight_layout()
 
                 plt.savefig(path_v_im)
                 plt.close(f)
