@@ -60,6 +60,84 @@ def load_model(model_dir, restore_file):
     return
 
 
+def create_multiline_graph(data_for_graph, layers_list, labels_list, num_conds, num_colors, image_path, data_path, gtype=None):
+    # print(np.array(data_for_graph).shape)
+    for j in range(len(layers_list)):
+        label_s = labels_list[j]
+        if gtype is not None and isinstance(gtype, (str,)):
+            filename = 'all_colors_all_conds_' + gtype + label_s
+        else:
+            filename = 'all_colors_all_conds_' + label_s
+
+        path_v_im = os.path.join(image_path, filename)
+        path_v_dat = os.path.join(data_path, filename)
+        utils_shap.save_out_to_csv(data_for_graph[j], path_v_dat + '.csv')
+
+        f = plt.figure()
+        ax = plt.subplot(111)
+
+        for i in range(num_colors):
+            x_vals = np.arange(1, num_conds + 1, 1)
+            y_vals = data_for_graph[j][i]
+            # extra_red = np.zeros(3)
+            # if i // 5 == 0:
+            #     extra_red[0] = (i + 1) / 5
+            #     color_val = extra_red
+            # extra_green = np.zeros(3)
+            # if i // 5 == 1:
+            #     extra_green[1] = (i + 1) / 5 - 1
+            #     color_val = extra_green
+            # extra_blue = np.zeros(3)
+            # if i // 5 == 2:
+            #     extra_blue[2] = (i + 1) / 5 - 2
+            #     color_val = extra_blue
+
+            ax.plot(x_vals, y_vals, label='color_{}'.format(i + 1), marker='*')  # , color=color_val)
+
+        plt.title(filename)
+        plt.xlabel("condition")
+        plt.ylabel("last layer output class {}".format(args.focused_ind))
+        plt.xticks(np.arange(1, num_conds + 1, 1))
+        plt.yticks(
+            np.arange(min_y_axis_list[j], max_y_axis_list[j], 10 ** -scale_list[j]))
+
+        # Shrink current axis by 20%
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+
+        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+
+        plt.savefig(path_v_im)
+        plt.close(f)
+    return
+
+
+def create_dif_list(num_conds, list_to_dif, layers_list, num_colors):
+    if num_conds >= 4 and num_conds % 4 == 0:
+        # print(np.array(for_graphs_list).shape)
+        # print(len(for_graphs_list[0][0]))
+        diff_list = [[[0, 0, 0, 0] for _ in range(len(list_to_dif[0]))] for _ in range(len(list_to_dif))]
+        print(np.array(diff_list).shape)
+        for i in range(len(layers_list)):
+            for c in range(num_colors):
+                for ind in range(int(num_conds / 2), num_conds):
+                    temp_ind = ind  # + 1
+                    to_dec_ind = temp_ind % int(num_conds / 4)
+                    chose_ind = [ti for ti in range(int(num_conds / 2)) if ti % int(num_conds / 4) == to_dec_ind]
+                    for r in chose_ind:
+                        if r % int(num_conds / 2) == ind % int(num_conds / 2):
+                            rel_chose_ind = r
+                    diff_list[i][c][rel_chose_ind] = \
+                        list_to_dif[i][c][chose_ind[0]] - list_to_dif[i][c][ind]
+
+                    diff_list[i][c][ind] = \
+                        list_to_dif[i][c][chose_ind[1]] - list_to_dif[i][c][ind]
+
+        #     print(diff_list[i])
+        # print(np.array(diff_list).shape)
+    return diff_list
+
+
 if __name__ == '__main__':
 
     # Load the parameters from json file
@@ -263,65 +341,38 @@ if __name__ == '__main__':
                     plt.close(f)
 
             # plotting few lines in the same plot -> grouped by condition
-            print(np.array(for_graphs_list).shape)
-            for j in range(len(layers_list)):
-                label_s = labels_list[j]
-                filename = 'all_colors_all_conds_' + label_s
+            create_multiline_graph(for_graphs_list, layers_list, labels_list, num_conds,
+                                   args.num_colors, image_path, data_path)
 
-                path_v_im = os.path.join(image_path, filename)
-                path_v_dat = os.path.join(data_path, filename)
-                utils_shap.save_out_to_csv(for_graphs_list[j], path_v_dat + '.csv')
+            diff_list = create_dif_list(num_conds, for_graphs_list, layers_list, args.num_colors)
+            # f = plt.figure()
+            # plt.plot(np.arange(1, num_conds + 1, 1), diff_list)
+            # plt.show()
 
-                f = plt.figure()
-                ax = plt.subplot(111)
-
-                for i in range(args.num_colors):
-                    x_vals = np.arange(1, num_conds+1, 1)
-                    y_vals = for_graphs_list[j][i]
-                    # base_gray = np.round(np.ones([3])*(i+1)/args.num_colors, decimals=2)
-                    extra_red = np.zeros(3)
-                    if i//5 == 0:
-                        extra_red[0] = (i+1)/5
-                        color_val = extra_red
-                    extra_green = np.zeros(3)
-                    if i // 5 == 1:
-                        extra_green[1] = (i + 1) / 5 -1
-                        color_val = extra_green
-                    extra_blue = np.zeros(3)
-                    if i // 5 == 2:
-                        extra_blue[2] = (i + 1) / 5 -2
-                        color_val = extra_blue
-                    # color_val = base_gray + extra_red + extra_green + extra_blue
-                    # print(color_val)
-                    ax.plot(x_vals, y_vals, label='color_{}'.format(i+1), marker='*')  # , color=color_val)
-                    # plt.plot(x_vals, y_vals, label='color_{}'.format(i), marker='*')
-                    # if i == 0:
-                    #     for (x, y) in zip(x_vals, y_vals):
-                    #         label = "m: {:.2f}, std: {:.2f}".format(np.mean(y), np.std(y))
-                    #         # label = str(y)
-                    #         plt.annotate(label,  # this is the text
-                    #                      (x, y),  # this is the point to label
-                    #                      textcoords="offset points",  # how to position the text
-                    #                      xytext=(0, 10),  # distance from text to points (x,y)
-                    #                      ha='center')  # horizontal alignment can be left, right or center
-
-                plt.title(filename)
-                plt.xlabel("condition")
-                plt.ylabel("last layer output class {}".format(args.focused_ind))
-                plt.xticks(np.arange(1, num_conds+1, 1))
-                plt.yticks(
-                    np.arange(min_y_axis_list[j], max_y_axis_list[j], 10 ** -scale_list[j]))
-
-                # Shrink current axis by 20%
-                box = ax.get_position()
-                ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-
-                ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-                # plt.legend()
-                # plt.tight_layout()
-
-                plt.savefig(path_v_im)
-                plt.close(f)
+            create_multiline_graph(diff_list, layers_list, labels_list, num_conds,
+                                   args.num_colors, image_path, data_path, gtype='diff_')
+            # if num_conds >= 4 and num_conds % 4 == 0:
+            #     # print(np.array(for_graphs_list).shape)
+            #     # print(len(for_graphs_list[0][0]))
+            #     diff_list = [[[0, 0, 0, 0] for _ in range(len(for_graphs_list[0]))] for _ in range(len(for_graphs_list))]
+            #     print(np.array(diff_list).shape)
+            #     for i in range(len(layers_list)):
+            #         for c in range(args.num_colors):
+            #             for ind in range(int(num_conds / 2), num_conds):
+            #                 temp_ind = ind  # + 1
+            #                 to_dec_ind = temp_ind % int(num_conds/4)
+            #                 chose_ind = [ti for ti in range(int(num_conds / 2)) if ti % int(num_conds/4) == to_dec_ind]
+            #                 for r in chose_ind:
+            #                     if r % int(num_conds / 2) == ind % int(num_conds / 2):
+            #                         rel_chose_ind = r
+            #                 diff_list[i][c][rel_chose_ind] = \
+            #                     for_graphs_list[i][c][chose_ind[0]] - for_graphs_list[i][c][ind]
+            #
+            #                 diff_list[i][c][ind] = \
+            #                     for_graphs_list[i][c][chose_ind[1]] - for_graphs_list[i][c][ind]
+            #
+            #     #     print(diff_list[i])
+            #     # print(np.array(diff_list).shape)
 
         elif num_conds > 1:
             for j in range(len(layers_list)):
