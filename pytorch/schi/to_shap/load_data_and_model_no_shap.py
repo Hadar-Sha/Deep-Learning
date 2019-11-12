@@ -80,14 +80,13 @@ def create_singleline_graph(fname, image_path, x_vals, y_vals, x_title, y_title,
 
 
 def create_multiline_graph(fname, im_path, x_vals, data_for_graph, x_title, y_title, ticks_x, ticks_y, plot_label):
-    # print(np.array(data_for_graph).shape)
 
     f = plt.figure()
     ax = plt.subplot(111)
 
-    # x_vals = np.arange(1, x_range + 1, 1)
-    for i in range(len(data_for_graph[0])):
-        y_vals = data_for_graph[j][i]
+    for i in range(len(data_for_graph)):
+        y_vals = data_for_graph[i]
+
         # extra_red = np.zeros(3)
         # if i // 5 == 0:
         #     extra_red[0] = (i + 1) / 5
@@ -108,6 +107,40 @@ def create_multiline_graph(fname, im_path, x_vals, data_for_graph, x_title, y_ti
     plt.ylabel(y_title)
     plt.xticks(ticks_x)
     plt.yticks(ticks_y)
+
+    # Shrink current axis by 20%
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+
+    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+
+    plt.savefig(im_path)
+    plt.close(f)
+
+    return
+
+
+def create_multiple_bars(fname, im_path, x_vals, data_for_graph, x_title, y_title, ticks_x, ticks_y, plot_label):
+
+    f = plt.figure()
+    ax = plt.subplot(111)
+    width = 0.35
+
+    labels = ['one_color', 'two_colors']
+    x_vals = 1 + np.arange(len(data_for_graph[:, 0]))
+    for i in range(len(data_for_graph[0])):
+        y_vals = data_for_graph[:, i]
+        t_x_vals = x_vals + width*(i - 1/2)
+        ax.bar(t_x_vals, y_vals, width, label=labels[i])
+
+    plt.title(fname)
+    plt.xlabel(x_title)
+    plt.ylabel(y_title)
+    plt.xticks(x_vals)
+    # if ticks_x is not None:
+    #     plt.xticks(ticks_x)
+    # if ticks_y is not None:
+    #     plt.yticks(ticks_y)
 
     # Shrink current axis by 20%
     box = ax.get_position()
@@ -147,6 +180,22 @@ def create_dif_list(num_conds, list_to_dif, num_colors):
     return diff_list
 
 
+def create_avg_list(orig_list):
+    for_avg_list = np.array(orig_list)
+    avg_shape = list(np.array(orig_list).shape)
+    avg_shape[2] = list(np.array(orig_list).shape)[2] // 2
+
+    avg_list = np.zeros(avg_shape)
+    for idx in range(0, np.array(orig_list).shape[2], 2):
+        left_op = for_avg_list[:, :, idx]
+        left_op = left_op[:, :, np.newaxis]
+        right_op = for_avg_list[:, :, idx + 1]
+        right_op = right_op[:, :, np.newaxis]
+        temp_arr = np.concatenate((left_op, right_op), axis=2)
+        avg_list[:, :, idx // 2] = np.average(temp_arr, axis=2)
+    return avg_list
+
+
 if __name__ == '__main__':
 
     # Load the parameters from json file
@@ -162,9 +211,9 @@ if __name__ == '__main__':
     logging.info("Loading the datasets...")
 
     # fetch dataloaders
-    dataloaders = one_labels_data_loader.fetch_dataloader(['train', 'test'], args.data_dir)
+    dataloaders = one_labels_data_loader.fetch_dataloader(['train'], args.data_dir)  # ['train', 'test']
     train_dl = dataloaders['train']
-    test_dl = dataloaders['test']
+    # test_dl = dataloaders['test']
 
     logging.info("data was loaded from {}".format(args.data_dir))
     logging.info("- done.")
@@ -282,7 +331,7 @@ if __name__ == '__main__':
 
                 create_multiline_graph(filename, path_v_im,
                                        np.arange(1, args.num_colors + 1, 1),
-                                       all_data_all_conds, "color",
+                                       all_data_all_conds[j], "color",
                                        "last layer output class {}".format(args.focused_ind),
                                        np.arange(1, args.num_colors + 1, 1),
                                        np.arange(min_y_axis_list[j], max_y_axis_list[j], 10 ** -scale_list[j]),
@@ -321,13 +370,27 @@ if __name__ == '__main__':
                 utils_shap.save_out_to_csv(for_graphs_list[j], path_v_dat + '.csv')
                 create_multiline_graph(filename, path_v_im,
                                        np.arange(1, num_conds+1, 1),
-                                       for_graphs_list, "condition",
+                                       for_graphs_list[j], "condition",
                                        "last layer output class {}".format(args.focused_ind),
                                         np.arange(1, num_conds + 1, 1),
                                         np.arange(min_y_axis_list[j], max_y_axis_list[j], 10 ** -scale_list[j]),
                                        "color")
 
             diff_list = create_dif_list(num_conds, for_graphs_list, args.num_colors)
+
+            avg_list = create_avg_list(for_graphs_list)
+            # for_avg_list = np.array(for_graphs_list)
+            # avg_shape = list(np.array(for_graphs_list).shape)
+            # avg_shape[2] = list(np.array(for_graphs_list).shape)[2] // 2
+            #
+            # avg_list = np.zeros(avg_shape)
+            # for i in range(0, np.array(for_graphs_list).shape[2], 2):
+            #     left_op = for_avg_list[:,:,i]
+            #     left_op = left_op[:,:,np.newaxis]
+            #     right_op = for_avg_list[:,:,i+1]
+            #     right_op = right_op[:,:,np.newaxis]
+            #     temp_arr = np.concatenate((left_op, right_op), axis=2)
+            #     avg_list[:,:,i//2] = np.average(temp_arr,axis=2)
 
             for j in range(len(labels_list)):
                 label_str = labels_list[j]
@@ -337,9 +400,23 @@ if __name__ == '__main__':
 
                 create_multiline_graph(filename, path_v_im,
                                        np.arange(1, num_conds + 1, 1),
-                                       diff_list, "condition",
+                                       diff_list[j], "condition",
                                        "last layer output class {}".format(args.focused_ind),
                                        np.arange(1, num_conds + 1, 1),
+                                       np.arange(min_y_axis_list[j]-max_y_axis_list[j], max_y_axis_list[j]-min_y_axis_list[j], 10 ** -scale_list[j]),
+                                       "color")
+
+            for j in range(len(labels_list)):
+                label_str = labels_list[j]
+                filename = 'all_colors_all_conds_avg_' + label_str
+                path_v_im = os.path.join(image_path, filename)
+                path_v_dat = os.path.join(data_path, filename)
+
+                create_multiple_bars(filename, path_v_im,
+                                       np.arange(1, num_conds//2 + 1, 1),
+                                       avg_list[j], "condition",
+                                       "last layer output class {}".format(args.focused_ind),
+                                       np.arange(1, num_conds//2 + 1, 1),
                                        np.arange(min_y_axis_list[j]-max_y_axis_list[j], max_y_axis_list[j]-min_y_axis_list[j], 10 ** -scale_list[j]),
                                        "color")
 
@@ -385,4 +462,4 @@ if __name__ == '__main__':
     incorrect = net.incorrect
     num_epochs = 10000
 
-    test_metrics, incorrect_samples = evaluate(model, loss_fn, test_dl, metrics, incorrect, num_epochs - 1)
+    test_metrics, incorrect_samples = evaluate(model, loss_fn, train_dl, metrics, incorrect, num_epochs - 1)  # test_dl
