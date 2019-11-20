@@ -120,7 +120,7 @@ def create_multiline_graph(fname, im_path, x_vals, data_for_graph, x_title, y_ti
     return
 
 
-def create_multiple_bars(fname, im_path, x_vals, data_for_graph, x_title, y_title, ticks_x, ticks_y, plot_label):
+def create_multiple_bars(fname, im_path, data_for_graph, x_title, y_title):
 
     f = plt.figure()
     ax = plt.subplot(111)
@@ -137,10 +137,6 @@ def create_multiple_bars(fname, im_path, x_vals, data_for_graph, x_title, y_titl
     plt.xlabel(x_title)
     plt.ylabel(y_title)
     plt.xticks(x_vals)
-    # if ticks_x is not None:
-    #     plt.xticks(ticks_x)
-    # if ticks_y is not None:
-    #     plt.yticks(ticks_y)
 
     # Shrink current axis by 20%
     box = ax.get_position()
@@ -413,12 +409,8 @@ if __name__ == '__main__':
                 path_v_dat = os.path.join(data_path, filename)
 
                 create_multiple_bars(filename, path_v_im,
-                                       np.arange(1, num_conds//2 + 1, 1),
                                        avg_list[j], "condition",
-                                       "last layer output class {}".format(args.focused_ind),
-                                       np.arange(1, num_conds//2 + 1, 1),
-                                       np.arange(min_y_axis_list[j]-max_y_axis_list[j], max_y_axis_list[j]-min_y_axis_list[j], 10 ** -scale_list[j]),
-                                       "color")
+                                       "last layer output class {}".format(args.focused_ind))
 
         elif num_conds > 1:
             for j in range(len(layers_list)):
