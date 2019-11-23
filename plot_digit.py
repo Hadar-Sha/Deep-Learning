@@ -2,9 +2,11 @@ import torch
 import numpy as np
 from torchvision.transforms import functional as F
 import os
+import math
 
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
+from matplotlib import animation
 
 width = 1
 height = 0.2
@@ -122,6 +124,16 @@ def convert_to_after_filer_grayscale(np_colors, scale_green=0.02):
     np_grays = (np_colors[:, 0]+np_colors[:, 1] * scale_green)/max_gray
     np_grays = np.reshape(np_grays, (np_grays.shape[0], 1))
     grayscale_np_colors = np_grays * np.ones((1, 3))
+    return grayscale_np_colors
+
+
+def convert_digit_to_after_filer_grayscale(np_colors, scale_green=0.02):
+    max_gray = 1 + scale_green
+    np_colors = np_colors.reshape(np_colors.shape[0], -1, 3)
+    np_grays = (np_colors[:,:, 0]+np_colors[:, :, 1] * scale_green)/max_gray
+    np_grays = np.reshape(np_grays, (np_grays.shape[0], np_grays.shape[1], 1))
+    grayscale_np_colors = np_grays * np.ones((1, 3))
+    grayscale_np_colors = grayscale_np_colors.reshape(grayscale_np_colors.shape[0], 24)
     return grayscale_np_colors
 
 
@@ -350,6 +362,65 @@ def plot_images(images, num_rows=None, title=None, path=None):
     return
 
 
+def create_figure():
+    fig = plt.figure(figsize=(20, 30))
+    return fig
+
+
+def close_figure(figure):
+    plt.close(figure)
+    return
+
+
+def feed_digits_to_figure(samples, fig, image_path, curr_min_val, curr_max_val, dtype, labels=None, withgrayscale=False):
+    fig.clear()
+    # fig.suptitle('ACGAN {} network output'.format(dtype))
+    # if dtype is not None:
+    #     fig.suptitle('batch #{}'.format(epoch))
+    # else:
+    #     fig.suptitle('epoch #{}'.format(epoch))
+
+    num_of_samples = len(samples)
+    num_of_rows = max(1, math.floor(math.sqrt(num_of_samples)))
+
+    axes = np.zeros((num_of_rows, math.ceil(num_of_samples / num_of_rows))).tolist()
+    plt.subplots_adjust(wspace=0, hspace=0)
+
+    for i in range(num_of_samples):
+        row, col = np.unravel_index(i, (num_of_rows, math.ceil(num_of_samples / num_of_rows)))
+        axes[row][col] = fig.add_subplot(num_of_rows, math.ceil(num_of_samples / num_of_rows), i + 1)
+
+        if labels is not None:
+            digit_val = str(labels[i])
+            axes[row][col].set_title(digit_val)
+        print(np.array(samples[i]).shape)
+        display_digit(samples[i], axes[row][col], curr_min_val, curr_max_val, withgrayscale)
+
+    # save graph
+    path = os.path.join(image_path, 'images')
+    if not os.path.isdir(path):
+        os.mkdir(path)
+
+    impath = os.path.join(path, 'ACGAN_{}_network_output.png'.format(dtype))
+    # if dtype is not None:
+    #     impath = os.path.join(path, '{}_samples_batch_#{}.png'.format(dtype, epoch))
+    # else:
+    #     impath = os.path.join(path, 'test_samples_epoch_#{}.png'.format(epoch))
+
+    fig.savefig(impath, bbox_inches='tight')
+    return
+
+
+def fill_figure(samples, fig, image_path, curr_min_val, curr_max_val, withgrayscale=False, dtype=None, labels=None):
+
+    im_ani = animation.FuncAnimation(fig, feed_digits_to_figure, frames=None,
+                         fargs=(samples, fig, image_path, curr_min_val, curr_max_val, labels, dtype, withgrayscale),
+                                     interval=2, repeat=False, blit=False)
+
+    plt.draw()
+    plt.pause(0.01)
+
+
 if __name__ == '__main__':
     color_one = [
         [0.62, 0, 0.5],
@@ -434,8 +505,8 @@ if __name__ == '__main__':
 
 
     color_type_2_2 = [
-        99, 125, 91, 118, 129, 111, 148, 189, 181, 127, 162, 135, 89, 123, 97, 127, 162, 135, 112, 163, 161, 127, 162,
-        135
+        198,237,82,198,237,82,198,237,82, 89, 219, 78, 198,237,82,198,237,82,89, 219, 78, 89,219,78
+        # 99, 125, 91, 118, 129, 111, 148, 189, 181, 127, 162, 135, 89, 123, 97, 127, 162, 135, 112, 163, 161, 127, 162, 135
         # 189, 134, 119, 201, 131, 82, 164, 147, 80, 180, 140, 97, 197, 133, 76, 180, 140, 97, 169, 145, 74, 180, 140, 97
         # 156, 130, 74, 156, 130, 74, 241, 210, 150, 198, 169, 111, 241, 210, 150, 198, 169, 111, 156, 130, 74, 198, 169,
         # 111
@@ -454,13 +525,14 @@ if __name__ == '__main__':
     fig = plt.figure()
 
     ax = fig.add_subplot()
-    display_digit(color_type_1_1, ax)
+    display_digit(color_type_2_2, ax)
+    # display_digit(color_type_1_1, ax)
 
     past_to_drive = os.environ['OneDrive']
 
     pth = os.path.join(past_to_drive, "toSync/Thesis/Master's Thesis/figures")
 
-    fig.savefig(os.path.join(pth, './sample-type-1-1'), bbox_inches='tight')
+    fig.savefig(os.path.join(pth, './sample-type-1-2'), bbox_inches='tight')
 
     # ax = fig.add_subplot()
     # display_digit(color_hide, ax)

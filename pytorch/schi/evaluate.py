@@ -9,16 +9,16 @@ import torch
 from torch.autograd import Variable
 # from pytorchtools import EarlyStopping
 import utils
-# import model.net as net
-# import model.one_label_data_loader as data_loader
-import model_weighted_schi_distance.net as net
-import model_weighted_schi_distance.one_label_data_loader as data_loader
+import model.net as net
+import model.one_label_data_loader as data_loader
+# import model_weighted_schi_distance.net as net
+# import model_weighted_schi_distance.one_label_data_loader as data_loader
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--parent_dir', default="C:/Users/H/Documents/Haifa Univ/Thesis/DL-Pytorch-data", help='path to experiments and data folder. not for Server')
-parser.add_argument('--data_dir', default='data', help="Directory containing the dataset")
-parser.add_argument('--model_dir', default='experiments/base_model', help="Directory containing params.json")
-parser.add_argument('--restore_file', default='best', help="name of the file in --model_dir \
+parser.add_argument('--parent_dir', default="toSync/Thesis/DL-Pytorch-data", help='path to experiments and data folder. not for Server')
+parser.add_argument('--data_dir', default='data/with-grayscale/data-with-grayscale-4000', help="Directory containing the dataset")
+parser.add_argument('--model_dir', default='experiments/transfer_training_model/in-grayscale-4000', help="Directory containing params.json")
+parser.add_argument('--restore_file', default='fully_connected_best', help="name of the file in --model_dir \
                      containing weights to load")
 
 
@@ -37,7 +37,7 @@ def evaluate(model, loss_fn, dataloader, metrics, incorrect, params, epoch):
     """
 
     # set model to evaluation mode
-    model.eval()
+    # model.eval()
 
     # summary for current eval loop
     summ = []
@@ -92,6 +92,8 @@ def evaluate(model, loss_fn, dataloader, metrics, incorrect, params, epoch):
     if (epoch+1) % (0.01*params.num_epochs) == 0:
         print("eval Epoch {}/{}".format(epoch + 1, params.num_epochs))
         print(metrics_string)
+        logging.info("eval Epoch {}/{}".format(epoch + 1, params.num_epochs))
+        logging.info(metrics_string)
 
     return metrics_mean, incorrect_samples  # , need_to_stop
 
@@ -103,7 +105,8 @@ if __name__ == '__main__':
     # Load the parameters
     args = parser.parse_args()
     if args.parent_dir and not torch.cuda.is_available():
-        os.chdir(args.parent_dir)
+        past_to_drive = os.environ['OneDrive']
+        os.chdir(os.path.join(past_to_drive, args.parent_dir))
 
     json_path = os.path.join(args.model_dir, 'params.json')
     assert os.path.isfile(json_path), "No json configuration file found at {}".format(json_path)
@@ -126,10 +129,19 @@ if __name__ == '__main__':
     dataloaders = data_loader.fetch_dataloader(['test'], args.data_dir, params)
     test_dl = dataloaders['test']
 
+    logging.info("data was loaded from {}".format(args.data_dir))
     logging.info("- done.")
+
+    num_of_batches = max(1, len(test_dl.dataset) // test_dl.batch_size)
+    logging.info("data-set size: {}".format(len(test_dl.dataset)))
+    logging.info("number of batches: {}".format(num_of_batches))
+
+    # logging.info("- done.")
 
     # Define the model
     model = net.NeuralNet(params).cuda() if params.cuda else net.NeuralNet(params)
+
+    model.eval()  # important for dropout not to work in forward pass
     
     loss_fn = net.loss_fn
     metrics = net.metrics
@@ -141,7 +153,7 @@ if __name__ == '__main__':
     utils.load_checkpoint(os.path.join(args.model_dir, args.restore_file + '.pth.tar'), model)
 
     # Evaluate
-    test_metrics, incorrect_samples = evaluate(model, loss_fn, test_dl, metrics, incorrect, params, params.num_epochs)
+    test_metrics, incorrect_samples = evaluate(model, loss_fn, test_dl, metrics, incorrect, params, params.num_epochs-1)
     save_path = os.path.join(args.model_dir, "metrics_test_{}.json".format(args.restore_file))
     utils.save_dict_to_json(test_metrics, save_path)
 

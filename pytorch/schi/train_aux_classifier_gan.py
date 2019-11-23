@@ -316,7 +316,8 @@ def train_gan(d_model, g_model, train_dataloader, d_optimizer, g_optimizer, r_f_
                 best_csv_real_path = os.path.join(stats_dir, "incorrect_real_best_{}_samples.csv".format(it))
                 best_csv_fake_path = os.path.join(stats_dir, "incorrect_fake_best_{}_samples.csv".format(it))
 
-                utils.save_dict_to_json(metric_dict, best_json_path, epoch + 1)
+                utils.save_dict_to_json(best_dict, best_json_path, epoch + 1)
+                # utils.save_dict_to_json(metric_dict, best_json_path, epoch + 1)
                 utils.save_incorrect_to_csv(incorrect_samples[0], best_csv_real_path)
                 utils.save_incorrect_to_csv(incorrect_samples[1], best_csv_fake_path)
 

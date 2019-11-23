@@ -173,6 +173,8 @@ def create_dif_list(num_conds, list_to_dif, num_colors):
 
         #     print(diff_list[i])
         # print(np.array(diff_list).shape)
+    else:
+        diff_list = []
     return diff_list
 
 
@@ -375,6 +377,7 @@ if __name__ == '__main__':
             diff_list = create_dif_list(num_conds, for_graphs_list, args.num_colors)
 
             avg_list = create_avg_list(for_graphs_list)
+
             # for_avg_list = np.array(for_graphs_list)
             # avg_shape = list(np.array(for_graphs_list).shape)
             # avg_shape[2] = list(np.array(for_graphs_list).shape)[2] // 2
@@ -388,29 +391,31 @@ if __name__ == '__main__':
             #     temp_arr = np.concatenate((left_op, right_op), axis=2)
             #     avg_list[:,:,i//2] = np.average(temp_arr,axis=2)
 
-            for j in range(len(labels_list)):
-                label_str = labels_list[j]
-                filename = 'all_colors_all_conds_diff_' + label_str
-                path_v_im = os.path.join(image_path, filename)
-                path_v_dat = os.path.join(data_path, filename)
+            if diff_list is True:
+                for j in range(len(labels_list)):
+                    label_str = labels_list[j]
+                    filename = 'all_colors_all_conds_diff_' + label_str
+                    path_v_im = os.path.join(image_path, filename)
+                    path_v_dat = os.path.join(data_path, filename)
 
-                create_multiline_graph(filename, path_v_im,
-                                       np.arange(1, num_conds + 1, 1),
-                                       diff_list[j], "condition",
-                                       "last layer output class {}".format(args.focused_ind),
-                                       np.arange(1, num_conds + 1, 1),
-                                       np.arange(min_y_axis_list[j]-max_y_axis_list[j], max_y_axis_list[j]-min_y_axis_list[j], 10 ** -scale_list[j]),
-                                       "color")
+                    create_multiline_graph(filename, path_v_im,
+                                           np.arange(1, num_conds + 1, 1),
+                                           diff_list[j], "condition",
+                                           "last layer output class {}".format(args.focused_ind),
+                                           np.arange(1, num_conds + 1, 1),
+                                           np.arange(min_y_axis_list[j]-max_y_axis_list[j], max_y_axis_list[j]-min_y_axis_list[j], 10 ** -scale_list[j]),
+                                           "color")
 
-            for j in range(len(labels_list)):
-                label_str = labels_list[j]
-                filename = 'all_colors_all_conds_avg_' + label_str
-                path_v_im = os.path.join(image_path, filename)
-                path_v_dat = os.path.join(data_path, filename)
+            if avg_list is True:
+                for j in range(len(labels_list)):
+                    label_str = labels_list[j]
+                    filename = 'all_colors_all_conds_avg_' + label_str
+                    path_v_im = os.path.join(image_path, filename)
+                    path_v_dat = os.path.join(data_path, filename)
 
-                create_multiple_bars(filename, path_v_im,
-                                       avg_list[j], "condition",
-                                       "last layer output class {}".format(args.focused_ind))
+                    create_multiple_bars(filename, path_v_im,
+                                           avg_list[j], "samples",
+                                           "last layer output class {}".format(args.focused_ind))
 
         elif num_conds > 1:
             for j in range(len(layers_list)):
