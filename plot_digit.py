@@ -393,7 +393,7 @@ def feed_digits_to_figure(samples, fig, image_path, curr_min_val, curr_max_val, 
         if labels is not None:
             digit_val = str(labels[i])
             axes[row][col].set_title(digit_val)
-        print(np.array(samples[i]).shape)
+        # print(np.array(samples[i]).shape)
         display_digit(samples[i], axes[row][col], curr_min_val, curr_max_val, withgrayscale)
 
     # save graph
@@ -401,7 +401,7 @@ def feed_digits_to_figure(samples, fig, image_path, curr_min_val, curr_max_val, 
     if not os.path.isdir(path):
         os.mkdir(path)
 
-    impath = os.path.join(path, 'ACGAN_{}_network_output.png'.format(dtype))
+    impath = os.path.join(path, 'acgan_{}_network_output.png'.format(dtype))
     # if dtype is not None:
     #     impath = os.path.join(path, '{}_samples_batch_#{}.png'.format(dtype, epoch))
     # else:

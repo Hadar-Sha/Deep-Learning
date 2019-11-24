@@ -9,8 +9,10 @@ import plot_digit as display_results
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--parent_dir', default="toSync/Thesis/DL-Pytorch-data", help='path to experiments and data folder. not for Server')
-parser.add_argument('--data_dir', default='experiments/acgan_model/hiding_scheme/partial_class/easy/combined-samples-easy-for-plot.csv', help="Directory containing the dataset")
-parser.add_argument('--model_dir', default='experiments/acgan_model/hiding_scheme/partial_class/easy',
+parser.add_argument('--data_dir',
+                    default='experiments/acgan_model/hiding_scheme/partial_class/hard/partial_class_hard_hidden_2/three_layers_exact_net/hidden_size_300/to-thesis/samples_epoch_380.csv',
+                    help="Directory containing the dataset")
+parser.add_argument('--model_dir', default='experiments/acgan_model/hiding_scheme/partial_class/hard/partial_class_hard_hidden_2/three_layers_exact_net/hidden_size_300/to-thesis',
                     help="Directory containing ACGAN output")
 parser.add_argument('--restore_file', default=None,
                     help="Optional, name of the file in --model_dir containing weights to reload before \
@@ -33,7 +35,7 @@ if __name__ == '__main__':
     data_frame = pd.read_csv(args.data_dir, header=None)
     # temp = np.float32(data_frame.values)
     # print(temp[0])
-    shuffled_data_frame = data_frame.sample(n=25)
+    shuffled_data_frame = data_frame  #data_frame.sample(n=25)
     # shuffled_data_frame = data_frame.sample(frac=1)
 
     images = shuffled_data_frame.values
@@ -57,8 +59,8 @@ if __name__ == '__main__':
 
     fig = display_results.create_figure()
 
-    display_results.feed_digits_to_figure(test_samples_reshaped, fig, args.model_dir, 0, 255, dtype='DO_masking')
-    display_results.feed_digits_to_figure(gray_test_samples_reshaped, fig, args.model_dir, 0, 255, dtype='DO_hidden')
+    display_results.feed_digits_to_figure(test_samples_reshaped, fig, args.model_dir, 0, 255, dtype='num_380_masking')
+    display_results.feed_digits_to_figure(gray_test_samples_reshaped, fig, args.model_dir, 0, 255, dtype='num_380_hidden')  # 'DO_hidden')
     # display_results.fill_figure(test_samples_reshaped, fig, args.model_dir, 0, 255, dtype='A&D_masking')
     # display_results.fill_figure(gray_test_samples_reshaped, fig, args.model_dir, 0, 255, dtype='A&D_hidden')
 
