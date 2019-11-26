@@ -372,7 +372,8 @@ def close_figure(figure):
     return
 
 
-def feed_digits_to_figure(samples, fig, image_path, curr_min_val, curr_max_val, dtype, labels=None, withgrayscale=False):
+def feed_digits_to_figure(samples, fig, image_path, curr_min_val, curr_max_val, dtype, labels=None, withgrayscale=False,
+                          num_of_rows=None):
     fig.clear()
     # fig.suptitle('ACGAN {} network output'.format(dtype))
     # if dtype is not None:
@@ -381,10 +382,11 @@ def feed_digits_to_figure(samples, fig, image_path, curr_min_val, curr_max_val, 
     #     fig.suptitle('epoch #{}'.format(epoch))
 
     num_of_samples = len(samples)
-    num_of_rows = max(1, math.floor(math.sqrt(num_of_samples)))
+    if num_of_rows is None:
+        num_of_rows = max(1, math.floor(math.sqrt(num_of_samples)))
 
     axes = np.zeros((num_of_rows, math.ceil(num_of_samples / num_of_rows))).tolist()
-    plt.subplots_adjust(wspace=0, hspace=0)
+    plt.subplots_adjust(wspace=0.1, hspace=0.1)
 
     for i in range(num_of_samples):
         row, col = np.unravel_index(i, (num_of_rows, math.ceil(num_of_samples / num_of_rows)))
@@ -394,7 +396,11 @@ def feed_digits_to_figure(samples, fig, image_path, curr_min_val, curr_max_val, 
             digit_val = str(labels[i])
             axes[row][col].set_title(digit_val)
         # print(np.array(samples[i]).shape)
-        display_digit(samples[i], axes[row][col], curr_min_val, curr_max_val, withgrayscale)
+        temp = np.array(samples[i])
+        if temp.min() >= curr_min_val and temp.max() <= curr_max_val:
+            display_digit(samples[i], axes[row][col], curr_min_val, curr_max_val, withgrayscale)
+        else:
+            axes[row][col].axis('off')
 
     # save graph
     path = os.path.join(image_path, 'images')

@@ -31,36 +31,38 @@ if __name__ == '__main__':
     # json_path = os.path.join(args.model_dir, 'params.json')
     # assert os.path.isfile(json_path), "No json configuration file found at {}".format(json_path)
     # params = utils.Params(json_path)
+    # print(os.getcwd())
 
     data_frame = pd.read_csv(args.data_dir, header=None)
-    # temp = np.float32(data_frame.values)
-    # print(temp[0])
+
     shuffled_data_frame = data_frame  #data_frame.sample(n=25)
     # shuffled_data_frame = data_frame.sample(frac=1)
 
     images = shuffled_data_frame.values
     images = np.float32(images)
-    # print(images.shape)
 
-    gray_images = display_results.convert_digit_to_after_filer_grayscale(images)
-    # print(images[0])
+    images = images[:, :24]
+
+    # gray_images = display_results.convert_digit_to_after_filer_grayscale(images)
 
     tensor_image = torch.from_numpy(images)
     tensor_image = tensor_image.type(torch.FloatTensor)
 
+    # print(tensor_image.shape)
+
     test_samples_reshaped = display_results.vectors_to_samples(tensor_image)
-    # print(np.array(test_samples_reshaped).shape)
 
-    gray_tensor_image = torch.from_numpy(gray_images)
-    gray_tensor_image = gray_tensor_image.type(torch.FloatTensor)
+    # gray_tensor_image = torch.from_numpy(gray_images)
+    # gray_tensor_image = gray_tensor_image.type(torch.FloatTensor)
 
-    gray_test_samples_reshaped = display_results.vectors_to_samples(gray_tensor_image)
-    # print(np.array(gray_test_samples_reshaped).shape)
+    # gray_test_samples_reshaped = display_results.vectors_to_samples(gray_tensor_image)
 
     fig = display_results.create_figure()
 
-    display_results.feed_digits_to_figure(test_samples_reshaped, fig, args.model_dir, 0, 255, dtype='num_380_masking')
-    display_results.feed_digits_to_figure(gray_test_samples_reshaped, fig, args.model_dir, 0, 255, dtype='num_380_hidden')  # 'DO_hidden')
+    display_results.feed_digits_to_figure(test_samples_reshaped, fig, args.model_dir, 0, 255, dtype='missing_segment', num_of_rows=7)
+
+    # display_results.feed_digits_to_figure(test_samples_reshaped, fig, args.model_dir, 0, 255, dtype='num_380_masking')
+    # display_results.feed_digits_to_figure(gray_test_samples_reshaped, fig, args.model_dir, 0, 255, dtype='num_380_hidden')  # 'DO_hidden')
     # display_results.fill_figure(test_samples_reshaped, fig, args.model_dir, 0, 255, dtype='A&D_masking')
     # display_results.fill_figure(gray_test_samples_reshaped, fig, args.model_dir, 0, 255, dtype='A&D_hidden')
 
