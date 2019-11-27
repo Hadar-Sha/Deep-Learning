@@ -292,9 +292,13 @@ if __name__ == '__main__':
         last_linear_out = out_layer_4[:, args.focused_ind].cpu().detach().numpy()
         labels_list = ['softmax', 'log_softmax', 'last_linear_out']
         layers_list = [softmax_y_hat, log_softmax_y_hat, last_linear_out]
-        min_y_axis_list = [round(v.min(), -1 * int(round(np.log10(np.std(v))))) for v in layers_list]
-        max_y_axis_list = [round(v.max(), -1 * int(round(np.log10(np.std(v))))) for v in layers_list]
-        scale_list = [-1 * int(round(np.log10(np.std(v)))) for v in layers_list]
+        # for v in layers_list:
+        #     print(v.min())
+        #     print(v.max())
+        #     print(np.std(v))
+        min_y_axis_list = [round(v.min(), -1 * int(round(np.log10(np.std(v))))) if np.std(v) > 0 else v.min() for v in layers_list ]
+        max_y_axis_list = [round(v.max(), -1 * int(round(np.log10(np.std(v))))) if np.std(v) > 0 else v.max() for v in layers_list ]
+        scale_list = [-1 * int(round(np.log10(np.std(v)))) if np.std(v) > 0 else 1 for v in layers_list]
 
         all_data_all_conds = [[] for _ in range(len(layers_list))]
         if args.num_colors > 1 and num_conds > 1:
