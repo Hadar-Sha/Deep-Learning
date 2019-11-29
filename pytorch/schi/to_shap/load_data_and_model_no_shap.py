@@ -29,6 +29,7 @@ parser.add_argument('--all_layers', default=0, type=int,
 parser.add_argument('--focused_ind', default=5, type=int, help='specific index to show in plot')   # default=-1
 parser.add_argument('--num_colors', default=8, type=int, help='')  # default=1  11
 parser.add_argument('--notation', default=0, type=int)
+parser.add_argument('--plot_graphs', default=1, type=int)
 
 
 # './experiment-data-with-gray-4000' # './grayscale-data'
@@ -331,13 +332,14 @@ if __name__ == '__main__':
                 path_v_dat = os.path.join(data_path, filename)
                 utils_shap.save_out_to_csv(all_data_all_conds[j], path_v_dat + '.csv')
 
-                create_multiline_graph(filename, path_v_im,
-                                       np.arange(1, args.num_colors + 1, 1),
-                                       all_data_all_conds[j], "color",
-                                       "last layer output class {}".format(args.focused_ind),
-                                       np.arange(1, args.num_colors + 1, 1),
-                                       np.arange(min_y_axis_list[j], max_y_axis_list[j], 10 ** -scale_list[j]),
-                                       "cond")
+                if args.plot_graphs:
+                    create_multiline_graph(filename, path_v_im,
+                                           np.arange(1, args.num_colors + 1, 1),
+                                           all_data_all_conds[j], "color",
+                                           "last layer output class {}".format(args.focused_ind),
+                                           np.arange(1, args.num_colors + 1, 1),
+                                           np.arange(min_y_axis_list[j], max_y_axis_list[j], 10 ** -scale_list[j]),
+                                           "cond")
 
             for_graphs_list = [[] for _ in range(len(layers_list))]
 
@@ -370,13 +372,14 @@ if __name__ == '__main__':
                 path_v_dat = os.path.join(data_path, filename)
 
                 utils_shap.save_out_to_csv(for_graphs_list[j], path_v_dat + '.csv')
-                create_multiline_graph(filename, path_v_im,
-                                       np.arange(1, num_conds+1, 1),
-                                       for_graphs_list[j], "condition",
-                                       "last layer output class {}".format(args.focused_ind),
-                                        np.arange(1, num_conds + 1, 1),
-                                        np.arange(min_y_axis_list[j], max_y_axis_list[j], 10 ** -scale_list[j]),
-                                       "color")
+                if args.plot_graphs:
+                    create_multiline_graph(filename, path_v_im,
+                                           np.arange(1, num_conds+1, 1),
+                                           for_graphs_list[j], "condition",
+                                           "last layer output class {}".format(args.focused_ind),
+                                            np.arange(1, num_conds + 1, 1),
+                                            np.arange(min_y_axis_list[j], max_y_axis_list[j], 10 ** -scale_list[j]),
+                                           "color")
 
             diff_list = create_dif_list(num_conds, for_graphs_list, args.num_colors)
 
@@ -402,13 +405,14 @@ if __name__ == '__main__':
                     path_v_im = os.path.join(image_path, filename)
                     path_v_dat = os.path.join(data_path, filename)
 
-                    create_multiline_graph(filename, path_v_im,
-                                           np.arange(1, num_conds + 1, 1),
-                                           diff_list[j], "condition",
-                                           "last layer output class {}".format(args.focused_ind),
-                                           np.arange(1, num_conds + 1, 1),
-                                           np.arange(min_y_axis_list[j]-max_y_axis_list[j], max_y_axis_list[j]-min_y_axis_list[j], 10 ** -scale_list[j]),
-                                           "color")
+                    if args.plot_graphs:
+                        create_multiline_graph(filename, path_v_im,
+                                               np.arange(1, num_conds + 1, 1),
+                                               diff_list[j], "condition",
+                                               "last layer output class {}".format(args.focused_ind),
+                                               np.arange(1, num_conds + 1, 1),
+                                               np.arange(min_y_axis_list[j]-max_y_axis_list[j], max_y_axis_list[j]-min_y_axis_list[j], 10 ** -scale_list[j]),
+                                               "color")
 
             if avg_list is True:
                 for j in range(len(labels_list)):
@@ -417,9 +421,10 @@ if __name__ == '__main__':
                     path_v_im = os.path.join(image_path, filename)
                     path_v_dat = os.path.join(data_path, filename)
 
-                    create_multiple_bars(filename, path_v_im,
-                                           avg_list[j], "samples",
-                                           "last layer output class {}".format(args.focused_ind))
+                    if args.plot_graphs:
+                        create_multiple_bars(filename, path_v_im,
+                                               avg_list[j], "samples",
+                                               "last layer output class {}".format(args.focused_ind))
 
         elif num_conds > 1:
             for j in range(len(layers_list)):
