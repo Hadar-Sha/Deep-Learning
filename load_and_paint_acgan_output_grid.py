@@ -59,7 +59,7 @@ if __name__ == '__main__':
 
     fig = display_results.create_figure()
 
-    display_results.feed_digits_to_figure(test_samples_reshaped, fig, args.model_dir, 0, 255, dtype='missing_segment', num_of_rows=10)  # 7)
+    display_results.feed_digits_to_figure(test_samples_reshaped, fig, args.model_dir, 0, 255, dtype='missing_segment')  #, num_of_rows=8) # 7) # 10)  #
 
     # display_results.feed_digits_to_figure(test_samples_reshaped, fig, args.model_dir, 0, 255, dtype='num_380_masking')
     # display_results.feed_digits_to_figure(gray_test_samples_reshaped, fig, args.model_dir, 0, 255, dtype='num_380_hidden')  # 'DO_hidden')

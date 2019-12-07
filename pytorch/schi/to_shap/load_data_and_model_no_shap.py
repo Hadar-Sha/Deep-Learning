@@ -239,6 +239,8 @@ if __name__ == '__main__':
     batch = next(iter(train_dl))
     images, labels = batch
 
+    print(images.shape)
+
     # test_batch = test_dl
     # test_im, test_l = test_batch
 

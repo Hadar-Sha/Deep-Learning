@@ -95,7 +95,7 @@ def fetch_dataloader(types, data_dir):
         data: (dict) contains the DataLoader object for each type in types
     """
     dataloaders = {}
-    batch_size = 200  # 100
+    batch_size = 400  #200  # 100
 
     for split in ['train', 'dev', 'test']:
 
