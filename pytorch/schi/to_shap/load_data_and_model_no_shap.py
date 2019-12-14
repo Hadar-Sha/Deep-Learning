@@ -183,15 +183,19 @@ def create_avg_list(orig_list):
     for_avg_list = np.array(orig_list)
     avg_shape = list(np.array(orig_list).shape)
     avg_shape[2] = list(np.array(orig_list).shape)[2] // 2
+    check_even_for_avg = list(np.array(orig_list).shape)[2] % 2
 
-    avg_list = np.zeros(avg_shape)
-    for idx in range(0, np.array(orig_list).shape[2], 2):
-        left_op = for_avg_list[:, :, idx]
-        left_op = left_op[:, :, np.newaxis]
-        right_op = for_avg_list[:, :, idx + 1]
-        right_op = right_op[:, :, np.newaxis]
-        temp_arr = np.concatenate((left_op, right_op), axis=2)
-        avg_list[:, :, idx // 2] = np.average(temp_arr, axis=2)
+    if check_even_for_avg == 0:
+        avg_list = np.zeros(avg_shape)
+        for idx in range(0, np.array(orig_list).shape[2], 2):
+            left_op = for_avg_list[:, :, idx]
+            left_op = left_op[:, :, np.newaxis]
+            right_op = for_avg_list[:, :, idx + 1]
+            right_op = right_op[:, :, np.newaxis]
+            temp_arr = np.concatenate((left_op, right_op), axis=2)
+            avg_list[:, :, idx // 2] = np.average(temp_arr, axis=2)
+    else:
+        avg_list = []
     return avg_list
 
 
