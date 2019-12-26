@@ -264,13 +264,25 @@ if __name__ == '__main__':
     logging.info("number of conditions: {}".format(num_conds))
     logging.info("number of colors: {}".format(args.num_colors))
 
-    test_samples_to_plot = plot_digit_utils.samples_to_images(images)
-    # test_samples_to_plot = plot_digit_utils.samples_to_images(test_im)
-    path = os.path.join(args.model_dir, 'test_samples')
-    if num_conds > 1:
-        plot_digit_utils.plot_images(test_samples_to_plot, num_rows=num_conds, path=path)
-    else:
-        plot_digit_utils.plot_images(test_samples_to_plot, path=path)
+    fig = plot_digit_utils.create_figure()
+
+    test_samples_reshaped = plot_digit_utils.vectors_to_samples(images)
+
+    # if args.rows_num is not None and args.rows_num > 0:
+    #     nr = args.rows_num
+    # else:
+    #     nr = None
+    plot_digit_utils.feed_digits_to_figure(test_samples_reshaped, fig, args.model_dir, 0, 255, dtype=None,
+                                          num_of_rows=num_conds)
+
+    plot_digit_utils.close_figure(fig)
+    # test_samples_to_plot = plot_digit_utils.samples_to_images(images)
+    # # test_samples_to_plot = plot_digit_utils.samples_to_images(test_im)
+    # path = os.path.join(args.model_dir, 'test_samples')
+    # if num_conds > 1:
+    #     plot_digit_utils.plot_images(test_samples_to_plot, num_rows=num_conds, path=path)
+    # else:
+    #     plot_digit_utils.plot_images(test_samples_to_plot, path=path)
 
     if args.all_layers:
         for ind in range(len(layers_out_list)):

@@ -1,4 +1,6 @@
 import torch
+import math
+import os
 import numpy as np
 from torchvision.transforms import functional as F
 
@@ -324,12 +326,13 @@ def samples_to_images(samples, fig=None):
 
 def plot_images(images, num_rows=None, title=None, path=None):
 
+    fig = plt.figure(figsize=(20, 30))
     num_of_samples = len(images)
     if num_rows is None or isinstance(num_rows, (int,)) is False:
         num_rows = max(1, int(np.floor(np.sqrt(num_of_samples))))
     axes = np.zeros((num_rows, int(np.ceil(num_of_samples / num_rows)))).tolist()
+    plt.subplots_adjust(wspace=0.1, hspace=0.1)
 
-    fig = plt.figure()
     if title is not None and isinstance(title, (str,)):
         fig.suptitle(title)
 
@@ -339,13 +342,59 @@ def plot_images(images, num_rows=None, title=None, path=None):
         axes[row][col].axis('off')
         axes[row][col].imshow(images[i])
 
-    plt.draw()
+    # plt.draw()
     # plt.show()
     if path is not None:
         plt.pause(0.01)
-        plt.savefig(path)
+        plt.savefig(path, bbox_inches='tight')
         plt.close(fig)
     plt.close(fig)
+    return
+
+
+def create_figure():
+    fig = plt.figure(figsize=(20, 30))
+    return fig
+
+
+def close_figure(figure):
+    plt.close(figure)
+    return
+
+
+def feed_digits_to_figure(samples, fig, image_path, curr_min_val, curr_max_val, dtype, labels=None, withgrayscale=False,
+                          num_of_rows=None):
+    fig.clear()
+
+    num_of_samples = len(samples)
+    if num_of_rows is None:
+        num_of_rows = max(1, math.floor(math.sqrt(num_of_samples)))
+
+    axes = np.zeros((num_of_rows, math.ceil(num_of_samples / num_of_rows))).tolist()
+    plt.subplots_adjust(wspace=0.1, hspace=0.1)
+
+    for i in range(num_of_samples):
+        row, col = np.unravel_index(i, (num_of_rows, math.ceil(num_of_samples / num_of_rows)))
+        axes[row][col] = fig.add_subplot(num_of_rows, math.ceil(num_of_samples / num_of_rows), i + 1)
+
+        if labels is not None:
+            digit_val = str(labels[i])
+            axes[row][col].set_title(digit_val)
+
+        temp = np.array(samples[i])
+        if temp.min() >= curr_min_val and temp.max() <= curr_max_val:
+            display_digit(samples[i], axes[row][col], curr_min_val, curr_max_val, withgrayscale)
+        else:
+            axes[row][col].axis('off')
+
+    # save graph
+    # path = os.path.join(image_path, 'images')
+    # if not os.path.isdir(path):
+    #     os.mkdir(path)
+
+    impath = os.path.join(image_path, 'test_samples.png')
+
+    fig.savefig(impath, bbox_inches='tight')
     return
 
 
