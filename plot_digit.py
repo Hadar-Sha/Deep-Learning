@@ -528,17 +528,29 @@ if __name__ == '__main__':
 
     colors = color_one
 
+    color_simple_0 = [238,0,238,128,128,128,0,240,200,0,240,200,0,240,200,238,0,238,238,0,238,128,128,128]
+
+    color_simple_0 = np.array(color_simple_0).reshape((8, 3)).tolist()
+
+    color_simple_0 = [[v / 255 for v in color] for color in color_simple_0]
     fig = plt.figure()
 
     ax = fig.add_subplot()
-    display_digit(color_type_2_2, ax)
+    display_digit(color_simple_0, ax)
+    # display_digit(color_type_2_2, ax)
     # display_digit(color_type_1_1, ax)
 
     past_to_drive = os.environ['OneDrive']
 
     pth = os.path.join(past_to_drive, "toSync/Thesis/Master's Thesis/figures")
 
-    fig.savefig(os.path.join(pth, './sample-type-1-2'), bbox_inches='tight')
+    fig.savefig(os.path.join(pth, './sample-simple-0'), bbox_inches='tight')
+    # fig.savefig(os.path.join(pth, './sample-type-1-2'), bbox_inches='tight')
+
+    # color_hide_with_filt = convert_to_after_filer_grayscale(np.array(color_simple_0))
+    #
+    # display_digit(color_hide_with_filt, ax)
+    # plt.show()
 
     # ax = fig.add_subplot()
     # display_digit(color_hide, ax)
