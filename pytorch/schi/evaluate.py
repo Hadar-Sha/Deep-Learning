@@ -17,12 +17,13 @@ import model.one_label_data_loader as data_loader
 parser = argparse.ArgumentParser()
 parser.add_argument('--parent_dir', default="toSync/Thesis/DL-Pytorch-data", help='path to experiments and data folder. not for Server')
 parser.add_argument('--data_dir', default='data/with-grayscale/data-with-grayscale-4000', help="Directory containing the dataset")
-parser.add_argument('--model_dir', default='experiments/transfer_training_model/in-grayscale-4000', help="Directory containing params.json")
-parser.add_argument('--restore_file', default='fully_connected_best', help="name of the file in --model_dir \
-                     containing weights to load")
+parser.add_argument('--model_dir', default='experiments/base_model_debug', help="Directory containing params.json")   # default='experiments/transfer_training_model/in-grayscale-4000'
+parser.add_argument('--restore_file', default='best', help="name of the file in --model_dir \
+                     containing weights to load")   # default='fully_connected_best'
+parser.add_argument('--is_dev', type=bool, default=False, help="")
 
 
-def evaluate(model, loss_fn, dataloader, metrics, incorrect, params, epoch):
+def evaluate(model, loss_fn, dataloader, metrics, incorrect, correct_fn, params, epoch):
     """Evaluate the model on `num_steps` batches.
 
     Args:
@@ -36,8 +37,11 @@ def evaluate(model, loss_fn, dataloader, metrics, incorrect, params, epoch):
         epoch:
     """
 
+    # print(model.training)
     # set model to evaluation mode
-    # model.eval()
+    model.eval()
+
+    # print(model.training)
 
     # summary for current eval loop
     summ = []
@@ -45,6 +49,7 @@ def evaluate(model, loss_fn, dataloader, metrics, incorrect, params, epoch):
 
     # incorrect samples of current loop
     incorrect_samples = []
+    correct_res_samples = []
     # need_to_stop = False
 
     # early_stopping = EarlyStopping(patience=(0.01 * params.num_epochs), verbose=True)
@@ -81,6 +86,9 @@ def evaluate(model, loss_fn, dataloader, metrics, incorrect, params, epoch):
         incorrect_batch = incorrect(data_batch, output_batch, labels_batch)
         incorrect_samples.extend(incorrect_batch)
 
+        correct_res_batch = correct_fn(data_batch, output_batch, labels_batch)
+        correct_res_samples.extend(correct_res_batch)
+
     # compute mean of all metrics in summary
     prop_sum = np.sum(prop)
     metrics_mean = {metric: np.sum([x[metric] for x in summ]/prop_sum) for metric in summ[0]}
@@ -95,7 +103,7 @@ def evaluate(model, loss_fn, dataloader, metrics, incorrect, params, epoch):
         logging.info("eval Epoch {}/{}".format(epoch + 1, params.num_epochs))
         logging.info(metrics_string)
 
-    return metrics_mean, incorrect_samples  # , need_to_stop
+    return metrics_mean, incorrect_samples, correct_res_samples  # , need_to_stop
 
 
 if __name__ == '__main__':
@@ -118,22 +126,36 @@ if __name__ == '__main__':
     # # Set the random seed for reproducible experiments
     # torch.manual_seed(230)
     # if params.cuda: torch.cuda.manual_seed(230)
-        
+
+    if args.is_dev is True:
+        logger_type = 'dev'
+    else:
+        logger_type = 'test'
+
     # Get the logger
-    utils.set_logger(os.path.join(args.model_dir, 'evaluate.log'))
+    utils.set_logger(os.path.join(args.model_dir, 'evaluate_' + logger_type + '.log'))
 
     # Create the input data pipeline
     logging.info("Creating the dataset...")
 
     # fetch dataloaders
-    dataloaders = data_loader.fetch_dataloader(['test'], args.data_dir, params)
+    dataloaders = data_loader.fetch_dataloader(['test', 'dev'], args.data_dir, params)
     test_dl = dataloaders['test']
+    dev_dl = dataloaders['dev']
+
+    if args.is_dev is True:
+        chosen_dl = dev_dl
+    else:
+        chosen_dl = test_dl
 
     logging.info("data was loaded from {}".format(args.data_dir))
     logging.info("- done.")
 
-    num_of_batches = max(1, len(test_dl.dataset) // test_dl.batch_size)
-    logging.info("data-set size: {}".format(len(test_dl.dataset)))
+    num_of_batches = max(1, len(chosen_dl.dataset) // chosen_dl.batch_size)
+    logging.info("data-set size: {}".format(len(chosen_dl.dataset)))
+    logging.info("data-set type: " + logger_type)
+    # num_of_batches = max(1, len(test_dl.dataset) // test_dl.batch_size)
+    # logging.info("data-set size: {}".format(len(test_dl.dataset)))
     logging.info("number of batches: {}".format(num_of_batches))
 
     # logging.info("- done.")
@@ -141,11 +163,12 @@ if __name__ == '__main__':
     # Define the model
     model = net.NeuralNet(params).cuda() if params.cuda else net.NeuralNet(params)
 
-    model.eval()  # important for dropout not to work in forward pass
+    # model.eval()  # important for dropout not to work in forward pass
     
     loss_fn = net.loss_fn
     metrics = net.metrics
     incorrect = net.incorrect
+    correct_fn = net.correct_classification
     
     logging.info("Starting evaluation")
 
@@ -153,7 +176,14 @@ if __name__ == '__main__':
     utils.load_checkpoint(os.path.join(args.model_dir, args.restore_file + '.pth.tar'), model)
 
     # Evaluate
-    test_metrics, incorrect_samples = evaluate(model, loss_fn, test_dl, metrics, incorrect, params, params.num_epochs-1)
-    save_path = os.path.join(args.model_dir, "metrics_test_{}.json".format(args.restore_file))
+    test_metrics, incorrect_samples, correct_res_samples = evaluate(model, loss_fn, chosen_dl, metrics,
+                                                                    incorrect, correct_fn, params, params.num_epochs-1)
+    save_path = os.path.join(args.model_dir, "evaluate_metrics_" + logger_type + "{}.json".format(args.restore_file))
     utils.save_dict_to_json(test_metrics, save_path)
+
+    best_inc_csv_path = os.path.join(args.model_dir, "evaluate_" + logger_type + "_incorrect_samples.csv")
+    utils.save_incorrect_to_csv(incorrect_samples, best_inc_csv_path)
+
+    best_c_csv_path = os.path.join(args.model_dir, "evaluate_" + logger_type + "_correct_samples.csv")
+    utils.save_incorrect_to_csv(correct_res_samples, best_c_csv_path)
 

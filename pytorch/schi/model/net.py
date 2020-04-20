@@ -20,6 +20,8 @@ class NeuralNet(nn.Module):
 
     def forward(self, x):
 
+        # print(self.training)
+
         # first layer
         out = F.relu(self.fc1(x))
         out = F.dropout(out, self.dropout_rate, training=self.training)
@@ -66,6 +68,20 @@ def convert_int_to_one_hot_vector(label, num_of_classes):
         if torch.cuda.is_available():
             return one_hot_matrix.cuda()
         return one_hot_matrix
+
+
+def vectors_to_samples(vectors):
+    vectors = vectors.reshape(vectors.size()[0], -1, 3)
+    vectors = vectors.cpu().numpy()
+    vectors = vectors.tolist()
+    return vectors
+
+
+def labels_to_titles(labels):
+    if len(labels.shape) > 1 and min(labels.shape) == 1:
+        labels = labels.view(labels.size()[0],)
+    labels = (labels.cpu().numpy()).tolist()
+    return labels
 
 
 def loss_fn(outputs, labels, num_of_classes):
@@ -249,7 +265,7 @@ def accuracy(outputs, labels):
 
     Returns: (float) accuracy in [0,1]
     """
-    print("in accuracy")
+    # print("in accuracy")
     # print(outputs.shape)
     # print(labels.shape)
     outputs = np.argmax(outputs, axis=1)
@@ -287,7 +303,7 @@ def accuracy_two_labels(outputs, labels):
     return all_count / float(labels.shape[0])
 
 
-def incorrect(images, outputs, labels):
+def incorrect(images, outputs, labels, curr_min=0, curr_max=1, dest_min=0, dest_max=255):
     """
         Keep all images for which the classification is wrong
 
@@ -298,7 +314,7 @@ def incorrect(images, outputs, labels):
 
         Returns: (list) of images for which the classification is wrong, the classification and the correct label
         """
-    print("in inccorect")
+    # print("in incorrect")
     # print(outputs.shape)
     # print(labels.shape)
     mat_out = []
@@ -309,9 +325,13 @@ def incorrect(images, outputs, labels):
 
     # find compatible incorrect samples and save them in a list
     samples_numpy = images.cpu().numpy()
+    # convert back to range [0, 255]
+    samples_numpy = \
+        dest_min + (dest_max - dest_min) * (samples_numpy - curr_min) / (curr_max - curr_min)
+    samples_numpy = np.around(samples_numpy).astype(int)
 
     # find samples
-    incorrect_samples = (samples_numpy[current_incorrect_indexes]).astype(int)
+    incorrect_samples = (samples_numpy[current_incorrect_indexes])  # .astype(int)
 
     # find classifier result
     labels_pred_numpy = outputs
@@ -329,6 +349,55 @@ def incorrect(images, outputs, labels):
         mat_out.extend(numpy_mat_out.tolist())
 
     return mat_out
+
+
+def correct_classification(images, outputs, labels, curr_min=0, curr_max=1, dest_min=0, dest_max=255):
+    """
+        Keep all images for which the classification is right
+
+        Args:
+            images: (np.ndarray) dimension batch_size x 24- input to the model
+            outputs: (np.ndarray) dimension batch_size x 10 - log softmax output of the model
+            labels: (np.ndarray) dimension batch_size, where each element is a value in [0- 9]
+
+        Returns: (list) of images for which the classification is wrong, the classification and the correct label
+        """
+    # print("in correct")
+    correct_mat_out = []
+    outputs = np.argmax(outputs, axis=1)
+    # find correct indexes
+    current_correct_bin = (outputs == labels)
+    current_correct_indexes = np.nonzero(current_correct_bin)
+
+    # find compatible incorrect samples and save them in a list
+    samples_numpy = images.cpu().numpy()
+    # convert back to range [0, 255]
+    samples_numpy = \
+        dest_min + (dest_max - dest_min) * (samples_numpy - curr_min) / (curr_max - curr_min)
+    samples_numpy = np.around(samples_numpy).astype(int)
+
+    # find samples
+    correct_samples = (samples_numpy[current_correct_indexes])  # .astype(int)
+
+    # find classifier result
+    labels_pred_numpy = outputs
+    correct_labels = labels_pred_numpy[current_correct_indexes]
+
+    # find true labels
+    labels_actual_numpy = labels
+    true_labels = labels_actual_numpy[current_correct_indexes]
+
+    # organize data
+    all_labels = np.column_stack((correct_labels, true_labels))
+    numpy_mat_out = np.concatenate((correct_samples, all_labels), axis=1)
+    list_out = numpy_mat_out.tolist()
+    length = len(list_out)
+    # length = len(numpy_mat_out.tolist())
+    if length > 0:
+        correct_mat_out.extend(list_out)
+        # correct_mat_out.extend(numpy_mat_out.tolist())
+
+    return correct_mat_out
 
 
 def incorrect_two_labels(images, outputs, labels):
@@ -390,6 +459,70 @@ def incorrect_two_labels(images, outputs, labels):
         mat_out.extend(numpy_mat_out.tolist())
 
     return mat_out
+
+
+def correct_classification_two_labels(images, outputs, labels):
+    """
+        Keep all images for which the classification is wrong
+
+        Args:
+            images: (np.ndarray) dimension batch_size x 24- input to the model
+            outputs: (np.ndarray) dimension batch_size x 10 - log softmax output of the model
+            labels: (np.ndarray) dimension batch_size, where each element is a value in [0- 9]
+
+        Returns: (list) of images for which the classification is wrong, the classification and the correct label
+        """
+    correct_mat_out = []
+
+    label_before_filter = labels[:, 0]  # unneeded
+    label_after_filter = labels[:, 1]
+
+    out_before_filter = outputs[:, :10]
+    out_after_filter = outputs[:, 10:]
+
+    out_int_before = np.argmax(out_before_filter, axis=1)
+    out_int_after = np.argmax(out_after_filter, axis=1)
+
+    # find incorrect indexes
+    # the classification before filter is incorrect only if it is equal to label after filter
+    correct_before_indexes = np.nonzero(out_int_before != label_after_filter)  # label_after_filter : not a typo!!!!
+    correct_after_indexes = np.nonzero(out_int_after == label_after_filter)
+    # all_indexes = np.arange(out_int_before.shape[0])  # to get all indices
+    all_correct_indexes = np.intersect1d(correct_before_indexes, correct_after_indexes)
+    # incorrect_indexes = np.setdiff1d(all_indexes, all_correct_indexes)
+
+    # find compatible incorrect samples and save them in a list
+    samples_numpy = images.cpu().numpy()
+
+    # find samples
+    correct_samples = (samples_numpy[all_correct_indexes]).astype(int)
+
+    # find classifier result for before filter
+    correct_before_labels = out_int_before[all_correct_indexes]
+
+    # find classifier result for after filter
+    correct_after_labels = out_int_after[all_correct_indexes]
+
+    # find true labels for before filter
+    true_before_labels = label_before_filter[all_correct_indexes]
+
+    # find true labels for after filter
+    true_after_labels = label_after_filter[all_correct_indexes]
+
+    # organize data
+    before_labels = np.column_stack((correct_before_labels, true_before_labels))
+    after_labels = np.column_stack((correct_after_labels, true_after_labels))
+    all_labels = np.column_stack((before_labels, after_labels))
+
+    numpy_mat_out = np.concatenate((correct_samples, all_labels), axis=1)
+    list_out = numpy_mat_out.tolist()
+    length = len(list_out)
+    # length = len(numpy_mat_out.tolist())
+    if length > 0:
+        correct_mat_out.extend(list_out)
+        # mat_out.extend(numpy_mat_out.tolist())
+
+    return correct_mat_out
 
 
 # maintain all metrics required in this dictionary- these are used in the training and evaluation loops

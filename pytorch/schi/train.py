@@ -15,10 +15,10 @@ from pytorchtools import EarlyStopping
 # from tqdm import tqdm
 
 import utils
-import model_weighted_schi_distance.net as net
-import model_weighted_schi_distance.one_label_data_loader as data_loader
-# import model.net as net
-# import model.one_label_data_loader as data_loader
+# import model_weighted_schi_distance.net as net
+# import model_weighted_schi_distance.one_label_data_loader as data_loader
+import model.net as net
+import model.one_label_data_loader as data_loader
 from evaluate import evaluate
 import display_digit as display_results
 
@@ -141,7 +141,7 @@ def train(model, optimizer, loss_fn, dataloader, metrics, params, epoch, fig):
     losses.append(loss_v.item())
 
 
-def train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_fn, metrics, incorrect, params, model_dir,
+def train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_fn, metrics, incorrect, correct_fn, params, model_dir,
                        restore_file=None):
     """Train the model and evaluate every epoch.
 
@@ -165,7 +165,7 @@ def train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_
 
     best_dev_acc = 0.0
 
-    if params.early_stop:
+    if args.early_stop:
         early_stopping = EarlyStopping(patience=round(0.1 * params.num_epochs), verbose=False)
         # early_stopping = EarlyStopping(patience=round(0.01 * params.num_epochs), verbose=False)
 
@@ -179,13 +179,13 @@ def train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_
         train(model, optimizer, loss_fn, train_dataloader, metrics, params, epoch, fig)
 
         # Evaluate for one epoch on validation set
-        dev_metrics, incorrect_samples = evaluate(model, loss_fn, dev_dataloader, metrics, incorrect, params, epoch)
+        dev_metrics, incorrect_samples, correct_samples = evaluate(model, loss_fn, dev_dataloader, metrics, incorrect, correct_fn, params, epoch)
 
         dev_loss = dev_metrics['loss']
-        if params.early_stop:
+        if args.early_stop:
             early_stopping(dev_loss, model)
 
-        if params.early_stop and early_stopping.early_stop:
+        if args.early_stop and early_stopping.early_stop:
             # need_to_stop = True
             print("Early stopping")
             logging.info("Early stopping")
@@ -218,17 +218,23 @@ def train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_
 
             # Save best val metrics in a json file in the model directory
             best_json_path = os.path.join(model_dir, "metrics_dev_best_weights.json")
-            utils.save_dict_to_json(dev_metrics, best_json_path)
+            utils.save_dict_to_json(dev_metrics, best_json_path, epoch + 1)
 
-            best_csv_path = os.path.join(model_dir, "incorrect_best_samples.csv")
-            utils.save_incorrect_to_csv(incorrect_samples, best_csv_path)
+            best_inc_csv_path = os.path.join(model_dir, "incorrect_best_samples.csv")
+            utils.save_incorrect_to_csv(incorrect_samples, best_inc_csv_path)
+
+            best_c_csv_path = os.path.join(model_dir, "correct_best_samples.csv")
+            utils.save_incorrect_to_csv(correct_samples, best_c_csv_path)
 
         # Save latest val metrics in a json file in the model directory
         last_json_path = os.path.join(model_dir, "metrics_dev_last_weights.json")
-        utils.save_dict_to_json(dev_metrics, last_json_path)
+        utils.save_dict_to_json(dev_metrics, last_json_path, epoch + 1)
 
-        last_csv_path = os.path.join(model_dir, "incorrect_last_samples.csv")
-        utils.save_incorrect_to_csv(incorrect_samples, last_csv_path)
+        last_inc_csv_path = os.path.join(model_dir, "incorrect_last_samples.csv")
+        utils.save_incorrect_to_csv(incorrect_samples, last_inc_csv_path)
+
+        last_c_csv_path = os.path.join(model_dir, "correct_last_samples.csv")
+        utils.save_incorrect_to_csv(correct_samples, last_c_csv_path)
 
         # compute mean of all metrics in summary (loss, bce part, kl part)
         accuracy.append(dev_acc)
@@ -369,18 +375,21 @@ if __name__ == '__main__':
     logging.info("network structure is")
     logging.info("{}".format(model))
 
-    optimizer = torch.optim.SGD(model.parameters(), lr=params.learning_rate)
+    optimizer = torch.optim.Adam(model.parameters(), lr=params.learning_rate, betas=(params.beta1, params.beta2))
+    # torch.optim.SGD(model.parameters(), lr=params.learning_rate)
+    # optimizer = torch.optim.SGD(model.parameters(), lr=params.learning_rate)
 
     # fetch loss function and metrics
     # loss_fn = net.loss_fn_two_labels
-    # loss_fn = net.loss_fn
-    loss_fn = net.loss_fn_low_entropy
+    loss_fn = net.loss_fn
+    # loss_fn = net.loss_fn_low_entropy
 
     # comment to self - print to file the name of loss function !!!!!!
     # print(loss_fn)
 
     metrics = net.metrics
     incorrect = net.incorrect
+    correct_fn = net.correct_classification
 
     losses = []
     accuracy = []
@@ -389,7 +398,7 @@ if __name__ == '__main__':
 
     # Train the model
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))
-    train_and_evaluate(model, train_dl, dev_dl, optimizer, loss_fn, metrics, incorrect, params, args.model_dir,
+    train_and_evaluate(model, train_dl, dev_dl, optimizer, loss_fn, metrics, incorrect, correct_fn, params, args.model_dir,
                        args.restore_file)
 
     print('plotting graphs')
