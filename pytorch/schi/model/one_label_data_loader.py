@@ -107,12 +107,12 @@ def fetch_dataloader(types, data_dir, params):
 
             # prevent shuffling in dev or test
             if split == 'train':
-                dl = DataLoader(dataset=SchiDigitDataset(csv_file=path, transform=transforms.Compose([Normalize(0, 1), ToTensor()])),
-                                batch_size=params.batch_size, shuffle=True)
+                dl = DataLoader(dataset=SchiDigitDataset(csv_file=path, transform=transforms.Compose([ToTensor()])),
+                                batch_size=params.batch_size, shuffle=True)  # [Normalize(0, 1), ToTensor()]
 
             else:
-                dl = DataLoader(dataset=SchiDigitDataset(csv_file=path, transform=transforms.Compose([Normalize(0, 1), ToTensor()])),
-                                batch_size=params.batch_size, shuffle=False)
+                dl = DataLoader(dataset=SchiDigitDataset(csv_file=path, transform=transforms.Compose([ToTensor()])),
+                                batch_size=params.batch_size, shuffle=False)  # [Normalize(0, 1), ToTensor()]
 
             dataloaders[split] = dl
 

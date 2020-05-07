@@ -368,6 +368,10 @@ if __name__ == '__main__':
     logging.info("data was loaded from {}".format(args.data_dir))
     logging.info("- done.")
 
+    num_of_batches = max(1, len(train_dl.dataset) // train_dl.batch_size)
+    logging.info("data-set size: {}".format(len(train_dl.dataset)))
+    logging.info("number of batches: {}".format(num_of_batches))
+
     # Define the model and optimizer
     model = net.NeuralNet(params).cuda() if params.cuda else net.NeuralNet(params)
 
@@ -375,9 +379,9 @@ if __name__ == '__main__':
     logging.info("network structure is")
     logging.info("{}".format(model))
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=params.learning_rate, betas=(params.beta1, params.beta2))
+    # optimizer = torch.optim.Adam(model.parameters(), lr=params.learning_rate, betas=(params.beta1, params.beta2))
     # torch.optim.SGD(model.parameters(), lr=params.learning_rate)
-    # optimizer = torch.optim.SGD(model.parameters(), lr=params.learning_rate)
+    optimizer = torch.optim.SGD(model.parameters(), lr=params.learning_rate)
 
     # fetch loss function and metrics
     # loss_fn = net.loss_fn_two_labels

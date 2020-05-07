@@ -73,6 +73,15 @@ def convert_int_to_one_hot_vector(label, num_of_classes):
 def vectors_to_samples(vectors):
     vectors = vectors.reshape(vectors.size()[0], -1, 3)
     vectors = vectors.cpu().numpy()
+    min_check = np.min(vectors)
+    max_check = np.max(vectors)
+    dest_min = 0
+    dest_max = 1
+    curr_min = 0
+    curr_max = 255
+    if min_check >= 0 and min_check <= 0.5 and max_check > 1 and max_check <= 255:
+        vectors = \
+            dest_min + (dest_max - dest_min) * (vectors - curr_min) / (curr_max - curr_min)
     vectors = vectors.tolist()
     return vectors
 
@@ -326,8 +335,11 @@ def incorrect(images, outputs, labels, curr_min=0, curr_max=1, dest_min=0, dest_
     # find compatible incorrect samples and save them in a list
     samples_numpy = images.cpu().numpy()
     # convert back to range [0, 255]
-    samples_numpy = \
-        dest_min + (dest_max - dest_min) * (samples_numpy - curr_min) / (curr_max - curr_min)
+    min_check = np.min(samples_numpy)
+    max_check = np.max(samples_numpy)
+    if min_check >= 0 and min_check <= 0.5 and max_check >= 0.5 and max_check <= 1:
+        samples_numpy = \
+            dest_min + (dest_max - dest_min) * (samples_numpy - curr_min) / (curr_max - curr_min)
     samples_numpy = np.around(samples_numpy).astype(int)
 
     # find samples
@@ -372,8 +384,11 @@ def correct_classification(images, outputs, labels, curr_min=0, curr_max=1, dest
     # find compatible incorrect samples and save them in a list
     samples_numpy = images.cpu().numpy()
     # convert back to range [0, 255]
-    samples_numpy = \
-        dest_min + (dest_max - dest_min) * (samples_numpy - curr_min) / (curr_max - curr_min)
+    min_check = np.min(samples_numpy)
+    max_check = np.max(samples_numpy)
+    if min_check >= 0 and min_check <= 0.5 and max_check > 0.5 and max_check <= 1:
+        samples_numpy = \
+            dest_min + (dest_max - dest_min) * (samples_numpy - curr_min) / (curr_max - curr_min)
     samples_numpy = np.around(samples_numpy).astype(int)
 
     # find samples

@@ -128,12 +128,12 @@ if __name__ == '__main__':
     # if params.cuda: torch.cuda.manual_seed(230)
 
     if args.is_dev is True:
-        logger_type = 'dev'
+        logger_type = "dev"
     else:
-        logger_type = 'test'
+        logger_type = "test"
 
     # Get the logger
-    utils.set_logger(os.path.join(args.model_dir, 'evaluate_' + logger_type + '.log'))
+    utils.set_logger(os.path.join(args.model_dir, "evaluate_" + logger_type + ".log"))
 
     # Create the input data pipeline
     logging.info("Creating the dataset...")
@@ -178,12 +178,15 @@ if __name__ == '__main__':
     # Evaluate
     test_metrics, incorrect_samples, correct_res_samples = evaluate(model, loss_fn, chosen_dl, metrics,
                                                                     incorrect, correct_fn, params, params.num_epochs-1)
-    save_path = os.path.join(args.model_dir, "evaluate_metrics_" + logger_type + "{}.json".format(args.restore_file))
+    save_path = os.path.join(args.model_dir, "evaluate_metrics_" + logger_type + "_{}.json".format(args.restore_file))
     utils.save_dict_to_json(test_metrics, save_path)
+    # print(save_path)
 
     best_inc_csv_path = os.path.join(args.model_dir, "evaluate_" + logger_type + "_incorrect_samples.csv")
     utils.save_incorrect_to_csv(incorrect_samples, best_inc_csv_path)
+    # print(best_inc_csv_path)
 
     best_c_csv_path = os.path.join(args.model_dir, "evaluate_" + logger_type + "_correct_samples.csv")
     utils.save_incorrect_to_csv(correct_res_samples, best_c_csv_path)
+    # print(best_c_csv_path)
 
