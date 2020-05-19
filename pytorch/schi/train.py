@@ -23,16 +23,16 @@ from evaluate import evaluate
 import display_digit as display_results
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--parent_dir', default="C:/Users/H/Documents/Haifa Univ/Thesis/DL-Pytorch-data", help='path to experiments and data folder. not for Server')
+parser.add_argument('--parent_dir', default="toSync/Thesis/DL-Pytorch-data", help='path to experiments and data folder. not for Server')  # "C:/Users/H/Documents/Haifa Univ/Thesis/DL-Pytorch-data"
 parser.add_argument('--data_dir', default='data/color-syn-one-color-big', help="Directory containing the dataset")
-parser.add_argument('--model_dir', default='experiments/base_model_weighted_schi_dist/syn-color/three_layers/debug', help="Directory containing params.json")
+parser.add_argument('--model_dir', default='experiments/debug', help="Directory containing params.json")
 parser.add_argument('--early_stop', type=int, default=0, help="Optional, do early stop")  # action='store_true'
 parser.add_argument('--restore_file', default=None,
                     help="Optional, name of the file in --model_dir containing weights to reload before \
                     training")  # 'best' or 'train'
 
 
-def train(model, optimizer, loss_fn, dataloader, metrics, params, epoch, fig):
+def train(model, optimizer, loss_fn, dataloader, metrics, params, epoch, fig, model_dir, losses, grayscale=False):
     """Train the model on `num_steps` batches
 
     Args:
@@ -121,8 +121,8 @@ def train(model, optimizer, loss_fn, dataloader, metrics, params, epoch, fig):
             real_titles = net.labels_to_titles(labels_batch)
 
             print('plotting batch #{} of input data'.format(i+1))
-            display_results.fill_figure(real_samples_reshaped, fig, i + 1, args.model_dir, -1, 1, labels=real_titles,
-                                        dtype='real')
+            display_results.fill_figure(real_samples_reshaped, fig, i + 1, model_dir, -1, 1, labels=real_titles,
+                                        withgrayscale=grayscale, dtype='real')
 
     # compute mean of all metrics in summary
     # print(summ)
@@ -176,7 +176,7 @@ def train_and_evaluate(model, train_dataloader, dev_dataloader, optimizer, loss_
         logging.info("Epoch {}/{}".format(epoch + 1, params.num_epochs))
 
         # compute number of batches in one epoch (one full pass over the training set)
-        train(model, optimizer, loss_fn, train_dataloader, metrics, params, epoch, fig)
+        train(model, optimizer, loss_fn, train_dataloader, metrics, params, epoch, fig, model_dir, losses)
 
         # Evaluate for one epoch on validation set
         dev_metrics, incorrect_samples, correct_samples = evaluate(model, loss_fn, dev_dataloader, metrics, incorrect, correct_fn, params, epoch)
@@ -336,7 +336,8 @@ if __name__ == '__main__':
     # Load the parameters from json file
     args = parser.parse_args()
     if args.parent_dir and not torch.cuda.is_available():
-        os.chdir(os.path.join(os.path.expanduser(os.environ['USERPROFILE']), args.parent_dir))
+        os.chdir(os.path.join(os.path.expanduser(os.environ['OneDrive']), args.parent_dir))
+        # os.chdir(os.path.join(os.path.expanduser(os.environ['USERPROFILE']), args.parent_dir))
         # os.chdir(args.parent_dir)
 
     # print(args.early_stop)
@@ -379,9 +380,15 @@ if __name__ == '__main__':
     logging.info("network structure is")
     logging.info("{}".format(model))
 
-    # optimizer = torch.optim.Adam(model.parameters(), lr=params.learning_rate, betas=(params.beta1, params.beta2))
+    print("optimizer is {}".format(params.optimizer))
+    logging.info("optimizer is {}".format(params.optimizer))
+
+    if params.optimizer == "Adam":
+        optimizer = torch.optim.Adam(model.parameters(), lr=params.learning_rate, betas=(params.beta1, params.beta2))
+    else:
+        optimizer = torch.optim.SGD(model.parameters(), lr=params.learning_rate)
     # torch.optim.SGD(model.parameters(), lr=params.learning_rate)
-    optimizer = torch.optim.SGD(model.parameters(), lr=params.learning_rate)
+    # optimizer = torch.optim.SGD(model.parameters(), lr=params.learning_rate)
 
     # fetch loss function and metrics
     # loss_fn = net.loss_fn_two_labels

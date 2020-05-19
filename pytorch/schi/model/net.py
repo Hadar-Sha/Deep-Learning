@@ -75,11 +75,14 @@ def vectors_to_samples(vectors):
     vectors = vectors.cpu().numpy()
     min_check = np.min(vectors)
     max_check = np.max(vectors)
+    # print(min_check)
+    # print(max_check)
     dest_min = 0
     dest_max = 1
     curr_min = 0
     curr_max = 255
-    if min_check >= 0 and min_check <= 0.5 and max_check > 1 and max_check <= 255:
+    if min_check >= 0 and max_check > 1 and max_check <= 255:
+    # if min_check >= 0 and min_check <= 0.5 and max_check > 1 and max_check <= 255:
         vectors = \
             dest_min + (dest_max - dest_min) * (vectors - curr_min) / (curr_max - curr_min)
     vectors = vectors.tolist()
@@ -145,7 +148,7 @@ def loss_fn_two_labels(outputs, labels, num_of_classes):
     """
 
     # kl_criterion = nn.KLDivLoss(size_average=True, reduce=True)
-    kl_criterion = nn.KLDivLoss()
+    kl_criterion = nn.KLDivLoss(reduction='batchmean')
     min_entropy_criterion = HLoss()
 
     label_before_filter = torch.index_select(labels, 1, torch.tensor([0], device=labels.device))
@@ -157,7 +160,7 @@ def loss_fn_two_labels(outputs, labels, num_of_classes):
     out_before_filter = torch.index_select(outputs, 1, torch.tensor(list(range(10)), device=outputs.device))
     out_after_filter = torch.index_select(outputs, 1, torch.tensor(list(range(10, 20)), device=outputs.device))
 
-    completing_after_filter = (torch.ones(labels.shape[0], num_of_classes) - one_hot_vector_after_filter)\
+    completing_after_filter = (torch.ones(labels.shape[0], num_of_classes, device=outputs.device) - one_hot_vector_after_filter)\
                                / (num_of_classes-1)
 
     func = kl_criterion(out_after_filter, one_hot_vector_after_filter) + \
@@ -415,7 +418,7 @@ def correct_classification(images, outputs, labels, curr_min=0, curr_max=1, dest
     return correct_mat_out
 
 
-def incorrect_two_labels(images, outputs, labels):
+def incorrect_two_labels(images, outputs, labels, curr_min=0, curr_max=1, dest_min=0, dest_max=255):
     """
         Keep all images for which the classification is wrong
 
@@ -447,9 +450,16 @@ def incorrect_two_labels(images, outputs, labels):
 
     # find compatible incorrect samples and save them in a list
     samples_numpy = images.cpu().numpy()
+    # convert back to range [0, 255]
+    min_check = np.min(samples_numpy)
+    max_check = np.max(samples_numpy)
+    if min_check >= 0 and min_check <= 0.5 and max_check > 0.5 and max_check <= 1:
+        samples_numpy = \
+            dest_min + (dest_max - dest_min) * (samples_numpy - curr_min) / (curr_max - curr_min)
+    samples_numpy = np.around(samples_numpy).astype(int)
 
     # find samples
-    incorrect_samples = (samples_numpy[incorrect_indexes]).astype(int)
+    incorrect_samples = samples_numpy[incorrect_indexes]  # .astype(int)
 
     # find classifier result for before filter
     incorrect_before_labels = out_int_before[incorrect_indexes]
@@ -476,7 +486,7 @@ def incorrect_two_labels(images, outputs, labels):
     return mat_out
 
 
-def correct_classification_two_labels(images, outputs, labels):
+def correct_classification_two_labels(images, outputs, labels, curr_min=0, curr_max=1, dest_min=0, dest_max=255):
     """
         Keep all images for which the classification is wrong
 
@@ -509,8 +519,16 @@ def correct_classification_two_labels(images, outputs, labels):
     # find compatible incorrect samples and save them in a list
     samples_numpy = images.cpu().numpy()
 
+    # convert back to range [0, 255]
+    min_check = np.min(samples_numpy)
+    max_check = np.max(samples_numpy)
+    if min_check >= 0 and min_check <= 0.5 and max_check > 0.5 and max_check <= 1:
+        samples_numpy = \
+            dest_min + (dest_max - dest_min) * (samples_numpy - curr_min) / (curr_max - curr_min)
+    samples_numpy = np.around(samples_numpy).astype(int)
+
     # find samples
-    correct_samples = (samples_numpy[all_correct_indexes]).astype(int)
+    correct_samples = samples_numpy[all_correct_indexes]  # .astype(int)
 
     # find classifier result for before filter
     correct_before_labels = out_int_before[all_correct_indexes]

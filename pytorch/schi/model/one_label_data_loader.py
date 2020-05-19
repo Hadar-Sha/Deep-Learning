@@ -96,6 +96,11 @@ def fetch_dataloader(types, data_dir, params):
     """
     dataloaders = {}
 
+    if params.normalize_input == 1:
+        trns = transforms.Compose([Normalize(0, 1), ToTensor()])
+    else:
+        trns = transforms.Compose([ToTensor()])
+
     for split in ['train', 'dev', 'test']:
 
         if split in types:
@@ -107,11 +112,11 @@ def fetch_dataloader(types, data_dir, params):
 
             # prevent shuffling in dev or test
             if split == 'train':
-                dl = DataLoader(dataset=SchiDigitDataset(csv_file=path, transform=transforms.Compose([ToTensor()])),
+                dl = DataLoader(dataset=SchiDigitDataset(csv_file=path, transform=trns),
                                 batch_size=params.batch_size, shuffle=True)  # [Normalize(0, 1), ToTensor()]
 
             else:
-                dl = DataLoader(dataset=SchiDigitDataset(csv_file=path, transform=transforms.Compose([ToTensor()])),
+                dl = DataLoader(dataset=SchiDigitDataset(csv_file=path, transform=trns),
                                 batch_size=params.batch_size, shuffle=False)  # [Normalize(0, 1), ToTensor()]
 
             dataloaders[split] = dl

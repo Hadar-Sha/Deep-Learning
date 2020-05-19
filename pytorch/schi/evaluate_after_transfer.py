@@ -153,3 +153,5 @@ if __name__ == '__main__':
     save_path = os.path.join(args.model_dir, "metrics_test_{}.json".format(args.restore_file))
     utils.save_dict_to_json(test_metrics, save_path)
 
+    best_inc_csv_path = os.path.join(args.model_dir, "evaluate_" + "test" + "_incorrect_samples.csv")
+    utils.save_incorrect_to_csv(incorrect_samples, best_inc_csv_path)
